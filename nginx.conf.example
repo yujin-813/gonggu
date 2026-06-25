@@ -1,0 +1,27 @@
+# 이 파일을 EC2에서 /etc/nginx/sites-available/gonggu 로 복사한 후:
+# sudo ln -s /etc/nginx/sites-available/gonggu /etc/nginx/sites-enabled/gonggu
+# sudo nginx -t && sudo systemctl reload nginx
+
+server {
+    listen 80;
+    server_name gonggu.askdatanugget.com;
+
+    client_max_body_size 20m;
+
+    location / {
+        proxy_pass         http://localhost:3002;
+        proxy_http_version 1.1;
+
+        proxy_set_header Host              $host;
+        proxy_set_header X-Real-IP         $remote_addr;
+        proxy_set_header X-Forwarded-For   $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header Upgrade           $http_upgrade;
+        proxy_set_header Connection        "upgrade";
+
+        proxy_read_timeout 60s;
+    }
+}
+
+# SSL은 certbot이 자동으로 아래 블록을 추가합니다:
+# sudo certbot --nginx -d gonggu.askdatanugget.com

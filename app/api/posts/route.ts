@@ -1,0 +1,106 @@
+import { NextRequest, NextResponse } from 'next/server'
+import { loadPosts, savePosts } from '@/lib/store'
+import type { Post } from '@/lib/types'
+
+const CAT_EMOJI: Record<string, string> = {
+  fashion: '👗', beauty: '💄', food: '🍱', life: '🏠',
+  kids: '🧸', health: '💊', pet: '🐾', digital: '📱',
+}
+
+function daysLeft(p: Post): number {
+  if (!p.deadline) return 999
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+  const d = new Date(p.deadline)
+  d.setHours(0, 0, 0, 0)
+  return Math.ceil((d.getTime() - today.getTime()) / (1000 * 60 * 60 * 24))
+}
+
+export async function GET(request: NextRequest) {
+  const { searchParams } = request.nextUrl
+  const cat      = searchParams.get('cat')
+  const search   = (searchParams.get('q') || '').toLowerCase()
+  const sort     = searchParams.get('sort') || 'latest'
+  const page     = parseInt(searchParams.get('page') || '1')
+  const perPage  = parseInt(searchParams.get('per_page') || '50')
+  const adminMode = searchParams.get('admin') === '1'
+
+  let posts = loadPosts()
+
+  // 고객 페이지: published가 false인 항목 제외 (undefined는 true로 취급)
+  if (!adminMode) {
+    posts = posts.filter(p => p.published !== false)
+  }
+
+  if (cat && cat !== 'all') posts = posts.filter(p => p.cat === cat)
+  if (search) {
+    posts = posts.filter(p =>
+      p.title.toLowerCase().includes(search) ||
+      p.account.toLowerCase().includes(search) ||
+      (p.brand || '').toLowerCase().includes(search) ||
+      (p.caption || '').toLowerCase().includes(search)
+    )
+  }
+
+  if (sort === 'latest') {
+    posts = [...posts].sort((a, b) =>
+      (b.scraped_at || '').localeCompare(a.scraped_at || '')
+    )
+  } else if (sort === 'deadline') {
+    posts = [...posts].sort((a, b) => {
+      const da = daysLeft(a), db = daysLeft(b)
+      if (da < 0 && db >= 0) return 1
+      if (db < 0 && da >= 0) return -1
+      return da - db
+    })
+  } else if (sort === 'discount') {
+    posts = [...posts].sort((a, b) => {
+      const da = a.origPrice && a.origPrice > a.price ? (a.origPrice - a.price) / a.origPrice : 0
+      const db = b.origPrice && b.origPrice > b.price ? (b.origPrice - b.price) / b.origPrice : 0
+      return db - da
+    })
+  } else if (sort === 'popular') {
+    posts = [...posts].sort((a, b) => (b.participants || 0) - (a.participants || 0))
+  }
+
+  const total  = posts.length
+  const start  = (page - 1) * perPage
+  const paged  = posts.slice(start, start + perPage)
+
+  return NextResponse.json({ posts: paged, total, page, per_page: perPage, pages: Math.ceil(total / perPage) })
+}
+
+export async function POST(request: NextRequest) {
+  const data = await request.json()
+  const required = ['title', 'account', 'price', 'cat']
+  for (const field of required) {
+    if (!data[field]) return NextResponse.json({ error: `필수 필드 누락: ${field}` }, { status: 400 })
+  }
+
+  const posts = loadPosts()
+  const newPost: Post = {
+    id:         Date.now(),
+    shortcode:  null,
+    title:      data.title,
+    account:    data.account.startsWith('@') ? data.account : '@' + data.account,
+    cat:        data.cat,
+    price:      parseInt(data.price),
+    origPrice:  data.origPrice ? parseInt(data.origPrice) : null,
+    start_date: data.start_date || '',
+    deadline:   data.deadline || '',
+    brand:      data.brand || null,
+    img:        data.img || '',
+    url:        data.url || '',
+    participants: 0,
+    avatar:     CAT_EMOJI[data.cat] || '🛍️',
+    caption:    data.caption || '',
+    scraped_at: new Date().toISOString(),
+    source:     'manual',
+    published:  true,  // 관리자가 직접 등록한 것은 바로 공개
+  }
+
+  posts.unshift(newPost)
+  savePosts(posts)
+
+  return NextResponse.json({ success: true, post: newPost }, { status: 201 })
+}

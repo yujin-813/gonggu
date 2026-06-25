@@ -1,0 +1,25 @@
+node_modules/
+.next/
+tsconfig.tsbuildinfo
+*.pyc
+__pycache__/
+
+# 데이터 파일 (로컬 전용, 서버에서 data/ 디렉토리 사용)
+posts.json
+scraper_status.json
+data/
+
+# 환경 변수 / 인증 정보 (절대 커밋 금지)
+.env
+.env.local
+.instagram_session
+
+# 업로드 이미지 (버전 관리 불필요)
+public/uploads/
+
+# 레거시 파일 (정리 필요)
+gonggu-app.html
+server.py
+
+# 인스타그램 추적 계정 목록 (개인정보)
+tracked_profiles.json
