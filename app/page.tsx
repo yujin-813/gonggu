@@ -7,23 +7,6 @@ import PostCard from '@/components/PostCard'
 import Toast from '@/components/Toast'
 import type { Post, Category, SortOrder } from '@/lib/types'
 
-function fmtDate(offsetDays: number) {
-  const d = new Date()
-  d.setDate(d.getDate() + offsetDays)
-  return d.toISOString().split('T')[0]
-}
-
-const SAMPLE_DATA: Post[] = [
-  { id: 1, title: '드뮤어 린넨 반팔 원피스 4컬러 공구', account: '@daily_ootd_kr', cat: 'fashion', price: 38000, origPrice: 62000, start_date: fmtDate(-3), deadline: fmtDate(1), img: 'https://images.unsplash.com/photo-1594938298603-c8148c4b4571?w=600&q=80', url: '', participants: 142, avatar: '👗', source: 'manual' },
-  { id: 2, title: '[공동구매] 제주 흑돼지 삼겹살 2kg 특가!', account: '@foodlover_mina', cat: 'food', price: 29900, origPrice: 48000, start_date: fmtDate(-1), deadline: fmtDate(3), img: 'https://images.unsplash.com/photo-1529692236671-f1f6cf9683ba?w=600&q=80', url: '', participants: 287, avatar: '🍱', source: 'manual' },
-  { id: 3, title: '설화수 윤조에센스 + 퍼펙팅 크림 세트 공구', account: '@beauty_haul_jisoo', cat: 'beauty', price: 89000, origPrice: 145000, start_date: fmtDate(-5), deadline: fmtDate(0), img: 'https://images.unsplash.com/photo-1596462502278-27bfdc403348?w=600&q=80', url: '', participants: 94, avatar: '💄', source: 'manual' },
-  { id: 4, title: '무형광 대나무 수건 10장 세트 공동구매', account: '@eco_home_life', cat: 'life', price: 22000, origPrice: 35000, start_date: fmtDate(0), deadline: fmtDate(7), img: 'https://images.unsplash.com/photo-1583241800698-e8ab01830a14?w=600&q=80', url: '', participants: 56, avatar: '🏠', source: 'manual' },
-  { id: 5, title: '어린이 비타민 구미 공구 🐻', account: '@kids_health_mom', cat: 'kids', price: 15900, origPrice: 26000, start_date: fmtDate(-2), deadline: fmtDate(2), img: 'https://images.unsplash.com/photo-1587854692152-cbe660dbde88?w=600&q=80', url: '', participants: 201, avatar: '🧸', source: 'manual' },
-  { id: 6, title: '고양이 자동 급수기 + 사료 디스펜서 공구', account: '@catmom_diary', cat: 'pet', price: 34500, origPrice: 58000, start_date: fmtDate(-1), deadline: fmtDate(5), img: 'https://images.unsplash.com/photo-1514888286974-6c03e2ca1dba?w=600&q=80', url: '', participants: 73, avatar: '🐾', source: 'manual' },
-  { id: 7, title: '삼성 갤럭시 버즈3 프로 공동구매 (정품)', account: '@tech_pick_seoul', cat: 'digital', price: 178000, origPrice: 249000, start_date: fmtDate(-10), deadline: fmtDate(-2), img: 'https://images.unsplash.com/photo-1590658268037-6bf12165a8df?w=600&q=80', url: '', participants: 330, avatar: '📱', source: 'manual' },
-  { id: 8, title: '오메가3 + 루테인 6개월치 공구 최저가', account: '@health_pick_kr', cat: 'health', price: 42000, origPrice: 72000, start_date: fmtDate(-2), deadline: fmtDate(10), img: 'https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=600&q=80', url: '', participants: 158, avatar: '💊', source: 'manual' },
-]
-
 function daysLeft(deadline?: string): number {
   if (!deadline) return 999
   const today = new Date()
@@ -55,9 +38,9 @@ export default function Home() {
       const res = await fetch('/api/posts?per_page=200')
       if (!res.ok) throw new Error()
       const data = await res.json()
-      setPosts(data.posts?.length ? data.posts : SAMPLE_DATA)
+      setPosts(data.posts ?? [])
     } catch {
-      setPosts(SAMPLE_DATA)
+      setPosts([])
     } finally {
       setLoading(false)
     }
