@@ -46,7 +46,7 @@ function LoginScreen({ onLogin }: { onLogin: () => void }) {
       }}>
         <div style={{ textAlign: 'center', marginBottom: 28 }}>
           <div style={{ fontSize: 40, marginBottom: 8 }}>🛍️</div>
-          <div style={{ fontWeight: 700, fontSize: 20, color: '#1e293b' }}>공구모아 관리자</div>
+          <div style={{ fontWeight: 700, fontSize: 20, color: '#1e293b' }}>딜조아 관리자</div>
           <div style={{ fontSize: 13, color: '#94a3b8', marginTop: 4 }}>비밀번호를 입력하세요</div>
         </div>
         <form onSubmit={submit}>
@@ -210,7 +210,7 @@ export default function AdminPage() {
     <div style={{ minHeight: '100vh', background: '#f8fafc', fontFamily: "'Noto Sans KR', sans-serif" }}>
       {/* 헤더 */}
       <header style={{ background: '#1a1a2e', color: '#fff', padding: '16px 24px', display: 'flex', alignItems: 'center', gap: 16, position: 'sticky', top: 0, zIndex: 100 }}>
-        <div style={{ fontWeight: 700, fontSize: 20 }}>🛍️ 공구모아 관리자</div>
+        <div style={{ fontWeight: 700, fontSize: 20 }}>🛍️ 딜조아 관리자</div>
         <div className="admin-header-right">
           <a href="/" target="_blank" rel="noopener noreferrer" style={{ color: '#a5b4fc', fontSize: 13, textDecoration: 'none' }}>
             고객 페이지 보기 →

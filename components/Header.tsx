@@ -9,7 +9,7 @@ export default function Header({ searchQuery, onSearch, onBookmarkView, viewingB
   return (
     <header>
       <div className="header-inner">
-        <div className="logo">공구모아 <span>🛍️</span></div>
+        <div className="logo">딜조아 <span>🛍️</span></div>
         <input
           className="search-bar"
           type="search"

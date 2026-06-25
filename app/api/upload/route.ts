@@ -30,7 +30,7 @@ export async function POST(request: NextRequest) {
 
   const bytes  = await file.arrayBuffer()
   const buffer = Buffer.from(bytes)
-  await writeFile(filepath, buffer)
+  await writeFile(filepath, buffer, { mode: 0o644 })
 
   return NextResponse.json({ url: `/uploads/${filename}` })
 }
