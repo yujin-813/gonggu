@@ -47,9 +47,10 @@ interface PostCardProps {
   post: Post
   isBookmarked: boolean
   onToggleBookmark: (id: number) => void
+  onJoin?: (id: number) => void
 }
 
-export default function PostCard({ post, isBookmarked, onToggleBookmark }: PostCardProps) {
+export default function PostCard({ post, isBookmarked, onToggleBookmark, onJoin }: PostCardProps) {
   const [imgFailed, setImgFailed] = useState(false)
   const badge = badgeInfo(post.deadline)
   const dt = periodText(post.start_date, post.deadline)
@@ -124,7 +125,7 @@ export default function PostCard({ post, isBookmarked, onToggleBookmark }: PostC
           </div>
           <button
             className={`btn-join ${closed || !post.url ? 'closed' : ''}`}
-            onClick={() => !closed && post.url && window.open(post.url, '_blank')}
+            onClick={() => { if (!closed && post.url) { onJoin?.(post.id); window.open(post.url, '_blank') } }}
             disabled={closed || !post.url}
           >
             {closed ? '마감됨' : !post.url ? '링크 없음' : '공구 보기 →'}

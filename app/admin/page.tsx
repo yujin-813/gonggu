@@ -3,6 +3,8 @@ import { useState, useEffect, useCallback } from 'react'
 import type { Post, ScraperStatus } from '@/lib/types'
 import AddPostModal from '@/components/AddPostModal'
 
+interface DayStat { date: string; visitors: number; events: Record<string, number> }
+
 const SESSION_KEY = 'gonggu-admin-ok'
 
 function LoginScreen({ onLogin }: { onLogin: () => void }) {
@@ -116,6 +118,7 @@ export default function AdminPage() {
   const [scraping, setScraping]       = useState(false)
   const [filter, setFilter]           = useState<'all' | 'published' | 'hidden'>('all')
   const [searchQ, setSearchQ]         = useState('')
+  const [analytics, setAnalytics]     = useState<DayStat[]>([])
 
   // 세션 확인
   useEffect(() => {
@@ -134,12 +137,18 @@ export default function AdminPage() {
     if (r.ok) setStatus(await r.json())
   }, [])
 
+  const fetchAnalytics = useCallback(async () => {
+    const r = await fetch('/api/analytics')
+    if (r.ok) setAnalytics(await r.json())
+  }, [])
+
   useEffect(() => {
     fetchPosts()
     fetchStatus()
+    fetchAnalytics()
     const iv = setInterval(fetchStatus, 5000)
     return () => clearInterval(iv)
-  }, [fetchPosts, fetchStatus])
+  }, [fetchPosts, fetchStatus, fetchAnalytics])
 
   async function togglePublished(p: Post) {
     const next = p.published === false ? true : false
@@ -239,6 +248,9 @@ export default function AdminPage() {
           <StatCard label="숨김 처리" value={hiddenCount} icon="🙈" color="#f97316" />
         </div>
 
+        {/* 방문자 분석 */}
+        <AnalyticsSection data={analytics} />
+
         {/* 스크래퍼 섹션 */}
         <div style={{ background: '#fff', borderRadius: 12, padding: 20, marginBottom: 24, border: '1px solid #e2e8f0' }}>
           <h3 style={{ margin: '0 0 12px', fontSize: 15, fontWeight: 700, color: '#1e293b' }}>🤖 Instagram 스크래퍼</h3>
@@ -323,6 +335,80 @@ function StatCard({ label, value, icon, color }: { label: string; value: number;
         <div style={{ fontSize: 22, fontWeight: 700, color }}>{value}</div>
         <div style={{ fontSize: 12, color: '#64748b' }}>{label}</div>
       </div>
+    </div>
+  )
+}
+
+function AnalyticsSection({ data }: { data: DayStat[] }) {
+  const last7 = data.slice(-7)
+  const today = last7[last7.length - 1]
+  const total7 = last7.reduce((s, d) => s + d.visitors, 0)
+  const total7join = last7.reduce((s, d) => s + (d.events.join || 0), 0)
+  const total7bm = last7.reduce((s, d) => s + (d.events.bookmark || 0), 0)
+  const maxVisitors = Math.max(...last7.map(d => d.visitors), 1)
+
+  function fmtDate(dateStr: string) {
+    const [, m, d] = dateStr.split('-')
+    return `${parseInt(m)}/${parseInt(d)}`
+  }
+
+  return (
+    <div style={{ background: '#fff', borderRadius: 12, padding: 20, marginBottom: 24, border: '1px solid #e2e8f0' }}>
+      <h3 style={{ margin: '0 0 16px', fontSize: 15, fontWeight: 700, color: '#1e293b' }}>📊 방문자 분석</h3>
+
+      {/* 요약 카드 */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(110px, 1fr))', gap: 10, marginBottom: 20 }}>
+        {[
+          { label: '오늘 방문자', value: today?.visitors ?? 0, color: '#6366f1' },
+          { label: '7일 방문자', value: total7, color: '#0ea5e9' },
+          { label: '7일 공구보기', value: total7join, color: '#22c55e' },
+          { label: '7일 찜', value: total7bm, color: '#f43f5e' },
+        ].map(({ label, value, color }) => (
+          <div key={label} style={{ background: '#f8fafc', borderRadius: 10, padding: '12px 14px', textAlign: 'center' }}>
+            <div style={{ fontSize: 22, fontWeight: 700, color }}>{value}</div>
+            <div style={{ fontSize: 11, color: '#64748b', marginTop: 2 }}>{label}</div>
+          </div>
+        ))}
+      </div>
+
+      {/* 7일 바 차트 */}
+      <div style={{ display: 'flex', alignItems: 'flex-end', gap: 6, height: 80 }}>
+        {last7.map((d) => (
+          <div key={d.date} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
+            <div style={{ fontSize: 10, color: '#94a3b8', fontWeight: 600 }}>
+              {d.visitors > 0 ? d.visitors : ''}
+            </div>
+            <div
+              style={{
+                width: '100%',
+                background: d.date === today?.date ? '#6366f1' : '#c7d2fe',
+                borderRadius: '4px 4px 0 0',
+                height: `${Math.max((d.visitors / maxVisitors) * 52, d.visitors > 0 ? 4 : 0)}px`,
+                minHeight: d.visitors > 0 ? 4 : 0,
+                transition: 'height 0.3s',
+              }}
+            />
+            <div style={{ fontSize: 9, color: '#94a3b8', whiteSpace: 'nowrap' }}>{fmtDate(d.date)}</div>
+          </div>
+        ))}
+      </div>
+
+      {/* 오늘 이벤트 상세 */}
+      {today && Object.keys(today.events).length > 0 && (
+        <div style={{ marginTop: 16, display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+          {[
+            { key: 'view', label: '페이지뷰', icon: '👁' },
+            { key: 'join', label: '공구보기', icon: '🛒' },
+            { key: 'bookmark', label: '찜', icon: '❤️' },
+            { key: 'category', label: '카테고리', icon: '🏷' },
+            { key: 'search', label: '검색', icon: '🔍' },
+          ].filter(e => today.events[e.key]).map(e => (
+            <div key={e.key} style={{ background: '#f1f5f9', borderRadius: 8, padding: '6px 12px', fontSize: 12, color: '#475569' }}>
+              {e.icon} {e.label} <strong>{today.events[e.key]}</strong>회
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   )
 }

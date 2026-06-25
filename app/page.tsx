@@ -16,6 +16,20 @@ function daysLeft(deadline?: string): number {
   return Math.ceil((d.getTime() - today.getTime()) / (1000 * 60 * 60 * 24))
 }
 
+function getSession(): string {
+  let id = sessionStorage.getItem('_dj_sid')
+  if (!id) { id = Math.random().toString(36).slice(2, 10); sessionStorage.setItem('_dj_sid', id) }
+  return id
+}
+
+function track(type: string) {
+  fetch('/api/analytics', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ type, sessionId: getSession() }),
+  }).catch(() => {})
+}
+
 export default function Home() {
   const [posts, setPosts] = useState<Post[]>([])
   const [bookmarks, setBookmarks] = useState<Set<number>>(new Set())
@@ -30,6 +44,7 @@ export default function Home() {
     const saved = JSON.parse(localStorage.getItem('gonggu_bookmarks') || '[]')
     setBookmarks(new Set(saved))
     fetchPosts()
+    track('view')
   }, [])
 
   async function fetchPosts() {
@@ -59,6 +74,7 @@ export default function Home() {
       } else {
         next.add(id)
         showToast('❤️ 찜 목록에 추가했어요!')
+        track('bookmark')
       }
       saveBookmarks(next)
       return next
@@ -138,7 +154,7 @@ export default function Home() {
         </div>
       ) : (
         <>
-          <CategoryFilter current={currentCat} onSelect={cat => { setCurrentCat(cat); setViewingBookmarks(false) }} />
+          <CategoryFilter current={currentCat} onSelect={cat => { setCurrentCat(cat); setViewingBookmarks(false); if (cat !== 'all') track('category') }} />
           <div className="topbar">
             <span className="count-text">총 <strong>{sorted.length}</strong>개의 공구</span>
             <select
@@ -173,6 +189,7 @@ export default function Home() {
               post={post}
               isBookmarked={bookmarks.has(post.id)}
               onToggleBookmark={toggleBookmark}
+              onJoin={() => track('join')}
             />
           ))
         )}
