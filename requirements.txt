@@ -2,3 +2,4 @@ instaloader>=4.11
 requests>=2.31
 flask>=3.0
 flask-cors>=4.0
+browser_cookie3>=0.19
