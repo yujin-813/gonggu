@@ -585,11 +585,11 @@ function AdminPostRow({ post: p, onToggle, onDelete, onEdit, periodLabel, dLeft 
 
   return (
     <div style={{
-      background: '#fff',
-      border: `1px solid ${published ? '#e2e8f0' : '#fed7aa'}`,
+      background: published ? '#f0fdf4' : '#fffbeb',
+      border: `2px solid ${published ? '#86efac' : '#fcd34d'}`,
+      borderLeft: `5px solid ${published ? '#22c55e' : '#f59e0b'}`,
       borderRadius: 12,
       padding: '12px 16px',
-      opacity: published ? 1 : 0.78,
     }}>
       <div className="admin-row">
         {/* 썸네일 */}

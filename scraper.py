@@ -604,7 +604,7 @@ def scrape_profiles(L, profiles, limit, existing_posts, seen, config=None):
     for username in profiles:
         print(f"\n👤 @{username} 스크래핑 중...")
 
-        if _HAS_REQUESTS and cookies:
+        if _HAS_REQUESTS:
             try:
                 posts = _fetch_profile_posts_api(username, cookies, limit, seen, loader=L, config=cfg)
                 new_posts += posts
