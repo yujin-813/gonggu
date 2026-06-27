@@ -8,9 +8,9 @@
 # 1. EC2 접속
 #    ssh -i your-key.pem ubuntu@<EC2_IP>
 #
-# 2. Node.js / PM2 설치 (없으면)
+# 2. Node.js / PM2 / Python 설치 (없으면)
 #    curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
-#    sudo apt-get install -y nodejs
+#    sudo apt-get install -y nodejs python3 python3-venv python3-pip
 #    sudo npm install -g pm2
 #
 # 3. 저장소 클론
@@ -55,6 +55,14 @@ npm ci --production=false
 
 echo "▶ 빌드..."
 npm run build
+
+echo "▶ 파이썬 스크래퍼 환경 구성..."
+if [ ! -d venv ]; then
+  python3 -m venv venv
+fi
+venv/bin/pip install -q --upgrade pip
+venv/bin/pip install -q -r requirements.txt
+echo "  ✓ instaloader 등 파이썬 의존성 설치 완료"
 
 echo "▶ 데이터 디렉토리 확인..."
 mkdir -p public/uploads data
