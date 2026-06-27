@@ -3,6 +3,8 @@ node_modules/
 tsconfig.tsbuildinfo
 *.pyc
 __pycache__/
+venv/
+.venv/
 
 # 데이터 파일 (로컬 전용, 서버에서 data/ 디렉토리 사용)
 posts.json
@@ -14,8 +16,9 @@ data/
 .env.local
 .instagram_session
 
-# 업로드 이미지 (버전 관리 불필요)
+# 업로드/수집 이미지 (버전 관리 불필요)
 public/uploads/
+public/scraped/
 
 # 레거시 파일 (정리 필요)
 gonggu-app.html

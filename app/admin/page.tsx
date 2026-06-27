@@ -5,8 +5,6 @@ import AddPostModal from '@/components/AddPostModal'
 
 interface DayStat { date: string; visitors: number; events: Record<string, number> }
 
-const SESSION_KEY = 'gonggu-admin-ok'
-
 function LoginScreen({ onLogin }: { onLogin: () => void }) {
   const [pw, setPw]       = useState('')
   const [error, setError] = useState('')
@@ -23,7 +21,6 @@ function LoginScreen({ onLogin }: { onLogin: () => void }) {
         body: JSON.stringify({ password: pw }),
       })
       if (r.ok) {
-        sessionStorage.setItem(SESSION_KEY, '1')
         onLogin()
       } else {
         setError('비밀번호가 틀렸습니다')
@@ -116,13 +113,22 @@ export default function AdminPage() {
   const [editingPost, setEditingPost]   = useState<Post | null>(null)
   const [loading, setLoading]         = useState(true)
   const [scraping, setScraping]       = useState(false)
-  const [filter, setFilter]           = useState<'all' | 'published' | 'hidden'>('all')
+  const [filter, setFilter]           = useState<'all' | 'review' | 'published' | 'hidden'>('all')
   const [searchQ, setSearchQ]         = useState('')
   const [analytics, setAnalytics]     = useState<DayStat[]>([])
+  const [profiles, setProfiles]       = useState<string[]>([])
+  const [newProfile, setNewProfile]   = useState('')
+  const [includeKws, setIncludeKws]   = useState<string[]>([])
+  const [excludeKws, setExcludeKws]   = useState<string[]>([])
+  const [newInclude, setNewInclude]   = useState('')
+  const [newExclude, setNewExclude]   = useState('')
 
-  // 세션 확인
+  // 세션 확인 (httpOnly 쿠키는 JS로 읽을 수 없으므로 서버에 확인)
   useEffect(() => {
-    setAuthed(sessionStorage.getItem(SESSION_KEY) === '1')
+    fetch('/api/auth')
+      .then(r => r.json())
+      .then(d => setAuthed(!!d.authed))
+      .catch(() => setAuthed(false))
   }, [])
 
   const fetchPosts = useCallback(async () => {
@@ -142,13 +148,66 @@ export default function AdminPage() {
     if (r.ok) setAnalytics(await r.json())
   }, [])
 
+  const fetchProfiles = useCallback(async () => {
+    const r = await fetch('/api/profiles')
+    if (r.ok) { const d = await r.json(); setProfiles(d.profiles || []) }
+  }, [])
+
+  const fetchConfig = useCallback(async () => {
+    const r = await fetch('/api/scraper-config')
+    if (r.ok) {
+      const d = await r.json()
+      setIncludeKws(d.include_keywords || [])
+      setExcludeKws(d.exclude_keywords || [])
+    }
+  }, [])
+
+  async function addProfile() {
+    const handle = newProfile.trim()
+    if (!handle) return
+    const r = await fetch('/api/profiles', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ handle }),
+    })
+    if (r.ok) { setNewProfile(''); await fetchProfiles() }
+    else { const d = await r.json().catch(() => ({})); alert(d.error || '추가 실패') }
+  }
+
+  async function removeProfile(handle: string) {
+    if (!confirm(`'@${handle}' 계정을 삭제할까요?`)) return
+    await fetch(`/api/profiles?handle=${encodeURIComponent(handle)}`, { method: 'DELETE' })
+    await fetchProfiles()
+  }
+
+  async function addKeyword(type: 'include' | 'exclude') {
+    const kw = (type === 'include' ? newInclude : newExclude).trim()
+    if (!kw) return
+    const r = await fetch('/api/scraper-config', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ type, keyword: kw }),
+    })
+    if (r.ok) {
+      type === 'include' ? setNewInclude('') : setNewExclude('')
+      await fetchConfig()
+    }
+  }
+
+  async function removeKeyword(type: 'include' | 'exclude', kw: string) {
+    await fetch(`/api/scraper-config?type=${type}&keyword=${encodeURIComponent(kw)}`, { method: 'DELETE' })
+    await fetchConfig()
+  }
+
   useEffect(() => {
     fetchPosts()
     fetchStatus()
     fetchAnalytics()
+    fetchProfiles()
+    fetchConfig()
     const iv = setInterval(fetchStatus, 5000)
     return () => clearInterval(iv)
-  }, [fetchPosts, fetchStatus, fetchAnalytics])
+  }, [fetchPosts, fetchStatus, fetchAnalytics, fetchProfiles, fetchConfig])
 
   async function togglePublished(p: Post) {
     const next = p.published === false ? true : false
@@ -198,9 +257,13 @@ export default function AdminPage() {
     setTimeout(async () => { await fetchPosts(); setScraping(false) }, 3000)
   }
 
+  // 자동 수집분(인포크·인스타)이 검수 대기 상태인 것
+  const isReview = (p: Post) => p.published === false && p.source !== 'manual'
+
   const visible = posts.filter(p => {
     const matchFilter =
       filter === 'all' ? true :
+      filter === 'review' ? isReview(p) :
       filter === 'published' ? p.published !== false :
       p.published === false
     const q = searchQ.toLowerCase()
@@ -210,6 +273,7 @@ export default function AdminPage() {
 
   const publishedCount = posts.filter(p => p.published !== false).length
   const hiddenCount    = posts.filter(p => p.published === false).length
+  const reviewCount    = posts.filter(isReview).length
 
   // 인증 확인 중 (hydration 전)
   if (authed === null) return null
@@ -225,7 +289,7 @@ export default function AdminPage() {
             고객 페이지 보기 →
           </a>
           <button
-            onClick={() => { sessionStorage.removeItem(SESSION_KEY); setAuthed(false) }}
+            onClick={async () => { await fetch('/api/auth', { method: 'DELETE' }); setAuthed(false) }}
             style={{ background: 'transparent', border: '1px solid #475569', color: '#94a3b8', borderRadius: 6, padding: '4px 10px', cursor: 'pointer', fontSize: 12 }}
           >
             로그아웃
@@ -245,44 +309,139 @@ export default function AdminPage() {
         <div className="admin-stats">
           <StatCard label="전체 공구" value={posts.length} icon="📦" color="#6366f1" />
           <StatCard label="공개 중" value={publishedCount} icon="✅" color="#22c55e" />
+          <StatCard label="검수 대기" value={reviewCount} icon="📝" color="#eab308" />
           <StatCard label="숨김 처리" value={hiddenCount} icon="🙈" color="#f97316" />
         </div>
 
         {/* 방문자 분석 */}
         <AnalyticsSection data={analytics} />
 
-        {/* 스크래퍼 섹션 */}
+        {/* 인스타그램 스크래퍼 (공구 게시글 수집) */}
         <div style={{ background: '#fff', borderRadius: 12, padding: 20, marginBottom: 24, border: '1px solid #e2e8f0' }}>
-          <h3 style={{ margin: '0 0 12px', fontSize: 15, fontWeight: 700, color: '#1e293b' }}>🤖 Instagram 스크래퍼</h3>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8, marginBottom: 12 }}>
+            <h3 style={{ margin: 0, fontSize: 15, fontWeight: 700, color: '#1e293b' }}>📸 인스타그램 공구 수집</h3>
+            <button
+              onClick={startScrape}
+              disabled={scraping || status?.running || profiles.length === 0}
+              style={{ background: scraping || status?.running || profiles.length === 0 ? '#94a3b8' : '#6366f1', color: '#fff', border: 'none', borderRadius: 8, padding: '8px 16px', cursor: scraping ? 'wait' : profiles.length === 0 ? 'not-allowed' : 'pointer', fontWeight: 600, fontSize: 13 }}
+            >
+              {scraping || status?.running ? '수집 중...' : '🔄 지금 수집'}
+            </button>
+          </div>
+
+          {/* 상태 */}
           {status && (
             <div style={{ fontSize: 13, color: '#64748b', marginBottom: 12 }}>
               {status.running ? (
-                <span style={{ color: '#6366f1', fontWeight: 600 }}>⏳ 스크래핑 중...</span>
+                <span style={{ color: '#6366f1', fontWeight: 600 }}>⏳ 수집 중...</span>
               ) : status.last_run ? (
-                <>마지막 실행: {new Date(status.last_run).toLocaleString('ko-KR')}{status.error && <span style={{ color: '#ef4444', marginLeft: 8 }}>❌ {status.error}</span>}</>
-              ) : '아직 실행된 적 없음'}
+                <>마지막 수집: {new Date(status.last_run).toLocaleString('ko-KR')}
+                  {' · '}신규 <strong>{status.last_count}</strong>개 검수대기
+                  {status.error && <span style={{ color: '#ef4444', marginLeft: 8 }}>❌ {status.error}</span>}
+                </>
+              ) : '아직 수집한 적 없음'}
             </div>
           )}
-          <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-            <button
-              onClick={startScrape}
-              disabled={scraping || status?.running}
-              style={{ background: scraping || status?.running ? '#94a3b8' : '#6366f1', color: '#fff', border: 'none', borderRadius: 8, padding: '8px 16px', cursor: scraping ? 'wait' : 'pointer', fontWeight: 600, fontSize: 13 }}
-            >
-              {scraping || status?.running ? '스크래핑 중...' : '🔄 스크래핑 시작'}
+
+          {/* 인스타 계정 등록 */}
+          <div style={{ display: 'flex', gap: 8, marginBottom: 10, flexWrap: 'wrap' }}>
+            <input
+              type="text"
+              value={newProfile}
+              onChange={e => setNewProfile(e.target.value)}
+              onKeyDown={e => { if (e.key === 'Enter') addProfile() }}
+              placeholder="인스타 계정 또는 URL (예: __siu.mom)"
+              style={{ flex: 1, minWidth: 200, padding: '8px 12px', borderRadius: 8, border: '1.5px solid #e2e8f0', fontSize: 13, outline: 'none' }}
+            />
+            <button onClick={addProfile}
+              style={{ background: '#6366f1', color: '#fff', border: 'none', borderRadius: 8, padding: '8px 16px', fontWeight: 600, cursor: 'pointer', fontSize: 13 }}>
+              ＋ 계정 추가
             </button>
-            {status?.error && !status?.running && (
-              <span style={{ fontSize: 12, color: '#ef4444' }}>
-                ⚠️ {status.error.includes('1') ? '로그인 실패 — .env.local 계정 정보를 확인하세요' : status.error}
-              </span>
-            )}
+          </div>
+
+          {/* 등록된 계정 목록 */}
+          {profiles.length === 0 ? (
+            <p style={{ fontSize: 12, color: '#94a3b8', margin: '4px 0 0' }}>등록된 인스타 계정이 없습니다. 공구를 올리는 인플루언서 계정을 추가하세요.</p>
+          ) : (
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+              {profiles.map(h => (
+                <span key={h} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: '#f1f5f9', borderRadius: 16, padding: '4px 6px 4px 12px', fontSize: 12, color: '#475569' }}>
+                  @{h}
+                  <button onClick={() => removeProfile(h)} title="삭제"
+                    style={{ background: '#e2e8f0', border: 'none', borderRadius: '50%', width: 18, height: 18, cursor: 'pointer', color: '#64748b', fontSize: 12, lineHeight: 1 }}>×</button>
+                </span>
+              ))}
+            </div>
+          )}
+
+          {status?.error && !status?.running && (
+            <p style={{ fontSize: 12, color: '#ef4444', margin: '10px 0 0' }}>
+              ⚠️ {status.error.includes('로그인') ? '로그인 실패 — 터미널에서 세션 설정이 필요합니다 (아래 안내)' : status.error}
+            </p>
+          )}
+          <p style={{ fontSize: 11, color: '#94a3b8', margin: '10px 0 0' }}>
+            ※ 캡션에 공구/기간 신호가 있는 게시글만 <strong>검수 대기</strong>로 수집됩니다. &apos;공구 보기&apos;는 해당 인스타 게시글로 연결됩니다. 최초 1회 터미널에서 로그인 세션 설정이 필요합니다.
+          </p>
+        </div>
+
+        {/* 키워드 설정 */}
+        <div style={{ background: '#fff', borderRadius: 12, padding: 20, marginBottom: 24, border: '1px solid #e2e8f0' }}>
+          <h3 style={{ margin: '0 0 14px', fontSize: 15, fontWeight: 700, color: '#1e293b' }}>⚙️ 수집 키워드 설정</h3>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>
+            {/* 포함 키워드 */}
+            <div>
+              <div style={{ fontSize: 13, fontWeight: 600, color: '#16a34a', marginBottom: 8 }}>✅ 추가 포함 키워드</div>
+              <p style={{ fontSize: 11, color: '#94a3b8', margin: '0 0 8px' }}>이 단어가 캡션에 있으면 공구로 수집</p>
+              <div style={{ display: 'flex', gap: 6, marginBottom: 8 }}>
+                <input value={newInclude} onChange={e => setNewInclude(e.target.value)}
+                  onKeyDown={e => { if (e.key === 'Enter') addKeyword('include') }}
+                  placeholder="예: 오픈런, 단독판매"
+                  style={{ flex: 1, padding: '7px 10px', borderRadius: 7, border: '1.5px solid #e2e8f0', fontSize: 12, outline: 'none' }} />
+                <button onClick={() => addKeyword('include')}
+                  style={{ background: '#16a34a', color: '#fff', border: 'none', borderRadius: 7, padding: '7px 12px', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>추가</button>
+              </div>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5 }}>
+                {includeKws.map(kw => (
+                  <span key={kw} style={{ display: 'inline-flex', alignItems: 'center', gap: 4, background: '#dcfce7', borderRadius: 12, padding: '3px 6px 3px 10px', fontSize: 12, color: '#15803d' }}>
+                    {kw}
+                    <button onClick={() => removeKeyword('include', kw)}
+                      style={{ background: '#bbf7d0', border: 'none', borderRadius: '50%', width: 16, height: 16, cursor: 'pointer', color: '#166534', fontSize: 11, lineHeight: 1 }}>×</button>
+                  </span>
+                ))}
+                {includeKws.length === 0 && <span style={{ fontSize: 11, color: '#94a3b8' }}>추가된 키워드 없음</span>}
+              </div>
+            </div>
+
+            {/* 제외 키워드 */}
+            <div>
+              <div style={{ fontSize: 13, fontWeight: 600, color: '#dc2626', marginBottom: 8 }}>🚫 추가 제외 키워드</div>
+              <p style={{ fontSize: 11, color: '#94a3b8', margin: '0 0 8px' }}>이 단어가 캡션에 있으면 수집 제외</p>
+              <div style={{ display: 'flex', gap: 6, marginBottom: 8 }}>
+                <input value={newExclude} onChange={e => setNewExclude(e.target.value)}
+                  onKeyDown={e => { if (e.key === 'Enter') addKeyword('exclude') }}
+                  placeholder="예: 체험단모집, 협찬"
+                  style={{ flex: 1, padding: '7px 10px', borderRadius: 7, border: '1.5px solid #e2e8f0', fontSize: 12, outline: 'none' }} />
+                <button onClick={() => addKeyword('exclude')}
+                  style={{ background: '#dc2626', color: '#fff', border: 'none', borderRadius: 7, padding: '7px 12px', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>추가</button>
+              </div>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5 }}>
+                {excludeKws.map(kw => (
+                  <span key={kw} style={{ display: 'inline-flex', alignItems: 'center', gap: 4, background: '#fee2e2', borderRadius: 12, padding: '3px 6px 3px 10px', fontSize: 12, color: '#991b1b' }}>
+                    {kw}
+                    <button onClick={() => removeKeyword('exclude', kw)}
+                      style={{ background: '#fecaca', border: 'none', borderRadius: '50%', width: 16, height: 16, cursor: 'pointer', color: '#7f1d1d', fontSize: 11, lineHeight: 1 }}>×</button>
+                  </span>
+                ))}
+                {excludeKws.length === 0 && <span style={{ fontSize: 11, color: '#94a3b8' }}>추가된 키워드 없음</span>}
+              </div>
+            </div>
           </div>
         </div>
 
         {/* 필터 + 검색 */}
         <div className="admin-filter">
           <div style={{ display: 'flex', gap: 6 }}>
-            {(['all','published','hidden'] as const).map(f => (
+            {(['all','review','published','hidden'] as const).map(f => (
               <button
                 key={f}
                 onClick={() => setFilter(f)}
@@ -292,7 +451,7 @@ export default function AdminPage() {
                   color: filter === f ? '#fff' : '#475569', fontWeight: 600,
                 }}
               >
-                {f === 'all' ? '전체' : f === 'published' ? '공개' : '숨김'}
+                {f === 'all' ? '전체' : f === 'review' ? `검수대기${reviewCount ? ` ${reviewCount}` : ''}` : f === 'published' ? '공개' : '숨김'}
               </button>
             ))}
           </div>
@@ -447,8 +606,11 @@ function AdminPostRow({ post: p, onToggle, onDelete, onEdit, periodLabel, dLeft 
             <span style={{ fontSize: 14, fontWeight: 700, color: '#0f172a', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.title}</span>
             <span style={{ fontSize: 11, background: '#f1f5f9', color: '#64748b', padding: '2px 6px', borderRadius: 10, flexShrink: 0 }}>{CAT_LABEL[p.cat] || p.cat}</span>
           </div>
-          <div style={{ fontSize: 12, color: '#64748b', display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+          <div style={{ fontSize: 12, color: '#64748b', display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
             <span>{p.account}</span>
+            {p.published === false && p.source !== 'manual' && (
+              <span style={{ fontSize: 11, background: '#fef9c3', color: '#a16207', padding: '2px 6px', borderRadius: 10, fontWeight: 600 }}>📝 검수대기</span>
+            )}
             {p.brand && <span style={{ color: '#6366f1', fontWeight: 600 }}>{p.brand}</span>}
             <span style={{ color: expired ? '#ef4444' : '#6366f1' }}>📅 {periodLabel}</span>
             <span style={{ fontWeight: 600, color: '#0f172a' }}>{p.price?.toLocaleString()}원</span>
@@ -458,7 +620,7 @@ function AdminPostRow({ post: p, onToggle, onDelete, onEdit, periodLabel, dLeft 
         {/* 액션 버튼 */}
         <div className="admin-row-actions">
           {p.url && (
-            <a href={p.url} target="_blank" rel="noopener noreferrer"
+            <a href={p.url} target="_blank" rel="noopener noreferrer" title="게시글 보기"
               style={{ padding: '6px 10px', background: '#f1f5f9', borderRadius: 6, fontSize: 12, color: '#475569', textDecoration: 'none', whiteSpace: 'nowrap' }}>
               보기 →
             </a>

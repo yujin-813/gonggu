@@ -78,8 +78,10 @@ export async function POST(request: NextRequest) {
   }
 
   const posts = loadPosts()
+  // 같은 밀리초에 2건이 등록돼도 충돌하지 않도록 기존 최대 id보다 항상 큰 값을 보장
+  const maxId = posts.reduce((m, p) => Math.max(m, p.id || 0), 0)
   const newPost: Post = {
-    id:         Date.now(),
+    id:         Math.max(Date.now(), maxId + 1),
     shortcode:  null,
     title:      data.title,
     account:    data.account.startsWith('@') ? data.account : '@' + data.account,
