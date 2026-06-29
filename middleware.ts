@@ -18,6 +18,9 @@ function isProtected(req: NextRequest): boolean {
   // 인스타 추적 계정 관리 (관리자 전용)
   if (pathname.startsWith('/api/profiles')) return true
 
+  // 인포크 수집 및 소스 관리 (관리자 전용)
+  if (pathname.startsWith('/api/inpock')) return true
+
   // 로컬 수집분 병합 수신 (관리자 전용)
   if (pathname.startsWith('/api/ingest')) return true
 
@@ -58,6 +61,10 @@ export const config = {
     '/api/scrape/:path*',
     '/api/profiles',
     '/api/profiles/:path*',
+    '/api/inpock',
+    '/api/inpock/:path*',
+    '/api/inpock-sources',
+    '/api/inpock-sources/:path*',
     '/api/ingest',
     '/api/upload',
     '/api/analytics',

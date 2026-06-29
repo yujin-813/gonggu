@@ -122,6 +122,10 @@ export default function AdminPage() {
   const [excludeKws, setExcludeKws]   = useState<string[]>([])
   const [newInclude, setNewInclude]   = useState('')
   const [newExclude, setNewExclude]   = useState('')
+  const [inpockSources, setInpockSources] = useState<string[]>([])
+  const [newInpock, setNewInpock]     = useState('')
+  const [inpockStatus, setInpockStatus] = useState<ScraperStatus | null>(null)
+  const [inpockBusy, setInpockBusy]   = useState(false)
 
   // 세션 확인 (httpOnly 쿠키는 JS로 읽을 수 없으므로 서버에 확인)
   useEffect(() => {
@@ -152,6 +156,42 @@ export default function AdminPage() {
     const r = await fetch('/api/profiles')
     if (r.ok) { const d = await r.json(); setProfiles(d.profiles || []) }
   }, [])
+
+  const fetchInpockSources = useCallback(async () => {
+    const r = await fetch('/api/inpock-sources')
+    if (r.ok) { const d = await r.json(); setInpockSources(d.sources || []) }
+  }, [])
+
+  const fetchInpockStatus = useCallback(async () => {
+    const r = await fetch('/api/inpock')
+    if (r.ok) setInpockStatus(await r.json())
+  }, [])
+
+  async function addInpockSource() {
+    const handle = newInpock.trim()
+    if (!handle) return
+    const r = await fetch('/api/inpock-sources', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ handle }),
+    })
+    if (r.ok) { setNewInpock(''); await fetchInpockSources() }
+    else { const d = await r.json().catch(() => ({})); alert(d.error || '추가 실패') }
+  }
+
+  async function removeInpockSource(handle: string) {
+    if (!confirm(`'${handle}' 인플루언서를 삭제할까요?`)) return
+    await fetch(`/api/inpock-sources?handle=${encodeURIComponent(handle)}`, { method: 'DELETE' })
+    await fetchInpockSources()
+  }
+
+  async function startInpock() {
+    setInpockBusy(true)
+    await fetch('/api/inpock', { method: 'POST' })
+    await fetchInpockStatus()
+    // 수집은 시간이 걸리므로 잠시 후 결과 갱신
+    setTimeout(async () => { await fetchPosts(); await fetchInpockStatus(); setInpockBusy(false) }, 8000)
+  }
 
   const fetchConfig = useCallback(async () => {
     const r = await fetch('/api/scraper-config')
@@ -205,9 +245,11 @@ export default function AdminPage() {
     fetchAnalytics()
     fetchProfiles()
     fetchConfig()
-    const iv = setInterval(fetchStatus, 5000)
+    fetchInpockSources()
+    fetchInpockStatus()
+    const iv = setInterval(() => { fetchStatus(); fetchInpockStatus() }, 5000)
     return () => clearInterval(iv)
-  }, [fetchPosts, fetchStatus, fetchAnalytics, fetchProfiles, fetchConfig])
+  }, [fetchPosts, fetchStatus, fetchAnalytics, fetchProfiles, fetchConfig, fetchInpockSources, fetchInpockStatus])
 
   async function togglePublished(p: Post) {
     const next = p.published === false ? true : false
@@ -315,6 +357,73 @@ export default function AdminPage() {
 
         {/* 방문자 분석 */}
         <AnalyticsSection data={analytics} />
+
+        {/* 인포크링크 공구 수집 (메인) */}
+        <div style={{ background: '#fff', borderRadius: 12, padding: 20, marginBottom: 24, border: '1px solid #e2e8f0' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8, marginBottom: 12 }}>
+            <h3 style={{ margin: 0, fontSize: 15, fontWeight: 700, color: '#1e293b' }}>🔗 인포크링크 공구 수집</h3>
+            <button
+              onClick={startInpock}
+              disabled={inpockBusy || inpockStatus?.running || inpockSources.length === 0}
+              style={{
+                background: inpockBusy || inpockStatus?.running || inpockSources.length === 0 ? '#94a3b8' : '#0ea5e9',
+                color: '#fff', border: 'none', borderRadius: 8, padding: '8px 16px',
+                cursor: inpockBusy ? 'wait' : inpockSources.length === 0 ? 'not-allowed' : 'pointer', fontWeight: 600, fontSize: 13,
+              }}
+            >
+              {inpockBusy || inpockStatus?.running ? '수집 중...' : '🔄 지금 수집'}
+            </button>
+          </div>
+
+          {/* 상태 */}
+          {inpockStatus && (
+            <div style={{ fontSize: 13, color: '#64748b', marginBottom: 12 }}>
+              {inpockStatus.running ? (
+                <span style={{ color: '#0ea5e9', fontWeight: 600 }}>⏳ 수집 중...</span>
+              ) : inpockStatus.last_run ? (
+                <>마지막 수집: {new Date(inpockStatus.last_run).toLocaleString('ko-KR')}
+                  {' · '}신규 <strong>{inpockStatus.last_count}</strong>개 검수대기
+                  {!!inpockStatus.skipped_count && <> · 비공구 제외 {inpockStatus.skipped_count}개</>}
+                  {inpockStatus.error && <span style={{ color: '#ef4444', marginLeft: 8 }}>❌ {inpockStatus.error}</span>}
+                </>
+              ) : '아직 수집한 적 없음'}
+            </div>
+          )}
+
+          {/* 인플루언서 등록 */}
+          <div style={{ display: 'flex', gap: 8, marginBottom: 10, flexWrap: 'wrap' }}>
+            <input
+              type="text"
+              value={newInpock}
+              onChange={e => setNewInpock(e.target.value)}
+              onKeyDown={e => { if (e.key === 'Enter') addInpockSource() }}
+              placeholder="인포크 핸들 또는 링크 (예: unidongdong 또는 link.inpock.co.kr/unidongdong)"
+              style={{ flex: 1, minWidth: 220, padding: '8px 12px', borderRadius: 8, border: '1.5px solid #e2e8f0', fontSize: 13, outline: 'none' }}
+            />
+            <button onClick={addInpockSource}
+              style={{ background: '#6366f1', color: '#fff', border: 'none', borderRadius: 8, padding: '8px 16px', fontWeight: 600, cursor: 'pointer', fontSize: 13 }}>
+              ＋ 인플루언서 추가
+            </button>
+          </div>
+
+          {/* 등록된 인플루언서 목록 */}
+          {inpockSources.length === 0 ? (
+            <p style={{ fontSize: 12, color: '#94a3b8', margin: '4px 0 0' }}>등록된 인플루언서가 없습니다. 인포크 링크를 추가하세요.</p>
+          ) : (
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+              {inpockSources.map(h => (
+                <span key={h} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: '#f1f5f9', borderRadius: 16, padding: '4px 6px 4px 12px', fontSize: 12, color: '#475569' }}>
+                  {h}
+                  <button onClick={() => removeInpockSource(h)} title="삭제"
+                    style={{ background: '#e2e8f0', border: 'none', borderRadius: '50%', width: 18, height: 18, cursor: 'pointer', color: '#64748b', fontSize: 12, lineHeight: 1 }}>×</button>
+                </span>
+              ))}
+            </div>
+          )}
+          <p style={{ fontSize: 11, color: '#94a3b8', margin: '10px 0 0' }}>
+            ※ 공구만 골라 <strong>검수 대기</strong>로 수집됩니다 (카톡·카페·상시판매 자동 제외). 가격·기간을 보완한 뒤 공개하세요.
+          </p>
+        </div>
 
         {/* 인스타그램 스크래퍼 (공구 게시글 수집) */}
         <div style={{ background: '#fff', borderRadius: 12, padding: 20, marginBottom: 24, border: '1px solid #e2e8f0' }}>

@@ -26,3 +26,9 @@ server.py
 
 # 인스타그램 추적 계정 목록 (개인정보)
 tracked_profiles.json
+
+# 배포용 SSH 키 (절대 커밋 금지)
+.deploy_key*
+
+# 로컬 전용 동기화 스크립트 (EC2 IP 포함)
+sync-to-ec2.sh

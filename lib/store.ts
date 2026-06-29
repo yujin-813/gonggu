@@ -77,3 +77,33 @@ export function saveProfiles(profiles: string[]): void {
   ensureDir()
   atomicWrite(PROFILES_FILE, JSON.stringify(profiles, null, 2))
 }
+
+// 인포크 소스 (inpock.py가 읽는 inpock_sources.json, 핸들 문자열 배열)
+const INPOCK_SOURCES_FILE = path.join(DATA_DIR, 'inpock_sources.json')
+const INPOCK_STATUS_FILE  = path.join(DATA_DIR, 'inpock_status.json')
+
+export function loadInpockSources(): string[] {
+  ensureDir()
+  if (!fs.existsSync(INPOCK_SOURCES_FILE)) return []
+  try { return JSON.parse(fs.readFileSync(INPOCK_SOURCES_FILE, 'utf-8')) }
+  catch { return [] }
+}
+
+export function saveInpockSources(sources: string[]): void {
+  ensureDir()
+  atomicWrite(INPOCK_SOURCES_FILE, JSON.stringify(sources, null, 2))
+}
+
+export function loadInpockStatus(): ScraperStatus {
+  ensureDir()
+  if (!fs.existsSync(INPOCK_STATUS_FILE)) {
+    return { running: false, last_run: null, last_count: 0, error: null }
+  }
+  try { return JSON.parse(fs.readFileSync(INPOCK_STATUS_FILE, 'utf-8')) }
+  catch { return { running: false, last_run: null, last_count: 0, error: null } }
+}
+
+export function saveInpockStatus(status: ScraperStatus): void {
+  ensureDir()
+  atomicWrite(INPOCK_STATUS_FILE, JSON.stringify(status, null, 2))
+}

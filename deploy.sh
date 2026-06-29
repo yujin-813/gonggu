@@ -64,8 +64,9 @@ venv/bin/pip install -q --upgrade pip
 venv/bin/pip install -q -r requirements.txt
 echo "  ✓ instaloader 등 파이썬 의존성 설치 완료"
 
-echo "▶ 데이터 디렉토리 확인..."
-mkdir -p public/uploads data
+echo "▶ 데이터/이미지 디렉토리 확인..."
+# scraped 디렉토리는 빌드·시작 전에 존재해야 Next가 정적 경로로 등록한다
+mkdir -p public/uploads public/scraped data
 
 echo "▶ PM2 재시작..."
 pm2 reload gonggu || pm2 start ecosystem.config.js

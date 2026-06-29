@@ -27,6 +27,7 @@ export interface ScraperStatus {
   running: boolean
   last_run?: string | null
   last_count: number
+  skipped_count?: number   // 인포크 수집 시 비공구로 제외된 수
   error?: string | null
 }
 
