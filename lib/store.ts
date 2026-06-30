@@ -1,6 +1,6 @@
 import fs from 'fs'
 import path from 'path'
-import type { Post, ScraperStatus } from './types'
+import type { Post, ScraperStatus, InfluencerSource } from './types'
 
 // 배포 환경에서 git pull로 덮어쓰이지 않도록 data/ 디렉토리 사용
 const DATA_DIR    = path.join(process.cwd(), 'data')
@@ -78,9 +78,10 @@ export function saveProfiles(profiles: string[]): void {
   atomicWrite(PROFILES_FILE, JSON.stringify(profiles, null, 2))
 }
 
-// 인포크 소스 (inpock.py가 읽는 inpock_sources.json, 핸들 문자열 배열)
-const INPOCK_SOURCES_FILE = path.join(DATA_DIR, 'inpock_sources.json')
-const INPOCK_STATUS_FILE  = path.join(DATA_DIR, 'inpock_status.json')
+// 인포크 소스 (inpock.py가 읽는 inpock_sources.json, 핸들 문자열 배열 — 레거시)
+const INPOCK_SOURCES_FILE      = path.join(DATA_DIR, 'inpock_sources.json')
+const INPOCK_STATUS_FILE       = path.join(DATA_DIR, 'inpock_status.json')
+const INFLUENCER_SOURCES_FILE  = path.join(DATA_DIR, 'influencer_sources.json')
 
 export function loadInpockSources(): string[] {
   ensureDir()
@@ -106,4 +107,36 @@ export function loadInpockStatus(): ScraperStatus {
 export function saveInpockStatus(status: ScraperStatus): void {
   ensureDir()
   atomicWrite(INPOCK_STATUS_FILE, JSON.stringify(status, null, 2))
+}
+
+// 인플루언서 소스 — collector.py가 읽는 influencer_sources.json (InfluencerSource[])
+// 없으면 기존 inpock_sources.json(string[])에서 마이그레이션한다.
+export function loadInfluencerSources(): InfluencerSource[] {
+  ensureDir()
+  if (fs.existsSync(INFLUENCER_SOURCES_FILE)) {
+    try { return JSON.parse(fs.readFileSync(INFLUENCER_SOURCES_FILE, 'utf-8')) }
+    catch { return [] }
+  }
+  if (fs.existsSync(INPOCK_SOURCES_FILE)) {
+    try {
+      const handles: string[] = JSON.parse(fs.readFileSync(INPOCK_SOURCES_FILE, 'utf-8'))
+      const now = new Date().toISOString()
+      const migrated: InfluencerSource[] = handles.map(h => ({
+        id: `inpock_${h}`,
+        url: `https://link.inpock.co.kr/${h}`,
+        source_type: 'inpock' as const,
+        handle: h,
+        influencer_name: h,
+        added_at: now,
+      }))
+      atomicWrite(INFLUENCER_SOURCES_FILE, JSON.stringify(migrated, null, 2))
+      return migrated
+    } catch { return [] }
+  }
+  return []
+}
+
+export function saveInfluencerSources(sources: InfluencerSource[]): void {
+  ensureDir()
+  atomicWrite(INFLUENCER_SOURCES_FILE, JSON.stringify(sources, null, 2))
 }

@@ -259,40 +259,53 @@ def classify_status(title, store_url, price, img):
     return "needs_review", reasons
 
 
-def block_to_post(b, ig_handle, price, domain, profile_url, store_url):
+def block_to_post(b, ig_handle, price, domain, profile_url, store_url, source_obj=None):
     sc = f"inpock_{b['id']}"
     title = (b.get("title") or "").strip()
     img   = resolve_img(b.get("image"), sc)
     status, review_reason = classify_status(title, store_url, price, img)
     return {
-        "id":           abs(hash(sc)) % (10 ** 9),
-        "shortcode":    sc,
-        "title":        title,
-        "account":      f"@{ig_handle}",
-        "cat":          "life",
-        "price":        price,
-        "origPrice":    None,
-        "start_date":   "",
-        "deadline":     b.get("open_until") or "",
-        "brand":        None,
-        "img":          img,
-        "url":          profile_url,
-        "store_url":    store_url,
-        "store_domain": domain or "",
-        "participants": 0,
-        "avatar":       "🛍️",
-        "caption":      "",
-        "scraped_at":   datetime.now().isoformat(),
-        "source":       "inpock",
-        "status":       status,
-        "review_reason": review_reason,
-        "published":    False,
-        "is_open":      bool(b.get("is_open", True)),
+        "id":              abs(hash(sc)) % (10 ** 9),
+        "shortcode":       sc,
+        "title":           title,
+        "account":         f"@{ig_handle}",
+        "cat":             "life",
+        "price":           price,
+        "origPrice":       None,
+        "start_date":      "",
+        "deadline":        b.get("open_until") or "",
+        "brand":           None,
+        "img":             img,
+        "url":             profile_url,
+        "store_url":       store_url,
+        "store_domain":    domain or "",
+        "participants":    0,
+        "avatar":          "🛍️",
+        "caption":         "",
+        "scraped_at":      datetime.now().isoformat(),
+        "source":          "inpock",
+        "status":          status,
+        "review_reason":   review_reason,
+        "published":       False,
+        "is_open":         bool(b.get("is_open", True)),
+        "source_type":     source_obj.get("source_type", "inpock") if source_obj else "inpock",
+        "source_url":      source_obj.get("url") if source_obj else None,
+        "influencer_name": source_obj.get("influencer_name") if source_obj else ig_handle,
+        "influencer_handle": source_obj.get("handle") if source_obj else ig_handle,
+        "original_link":   b.get("url"),
+        "extracted_link":  store_url,
+        "collection_status": "collected",
+        "collection_error": None,
     }
 
 
 # ── 수집 ──────────────────────────────────────────────────────────────────────
-def collect(handles):
+def collect(handles, source_obj=None, write_result=True):
+    """handles: 수집할 인포크 핸들 목록.
+    source_obj: collector.py 에서 전달하는 InfluencerSource 딕셔너리 (optional).
+    write_result: False 면 inpock_status.json 을 직접 기록하지 않는다
+                  (collector.py 가 집계 후 한 번만 기록하기 위해 사용).
+    """
     posts = load_posts()
     by_sc = {p["shortcode"]: p for p in posts if p.get("shortcode")}
     new_count = 0
@@ -331,13 +344,14 @@ def collect(handles):
                 print(f"  - (제외) {b['title'][:34]} [{domain}]")
                 continue
 
-            posts.insert(0, block_to_post(b, ig_handle, price, domain, profile_url, final_url or url_abs))
+            posts.insert(0, block_to_post(b, ig_handle, price, domain, profile_url, final_url or url_abs, source_obj))
             by_sc[sc] = posts[0]
             new_count += 1
             print(f"  + {b['title'][:34]} [{domain}]")
 
     save_posts(posts)
-    write_status(new_count, skipped_count)
+    if write_result:
+        write_status(new_count, skipped_count)
     print(f"\n{'=' * 50}")
     print(f"✅ 완료! 신규 검수대기: {new_count}개 | 비공구 제외: {skipped_count}개")
     print(f"{'=' * 50}")

@@ -1,6 +1,6 @@
 'use client'
 import { useState, useEffect, useCallback } from 'react'
-import type { Post, ScraperStatus } from '@/lib/types'
+import type { Post, ScraperStatus, InfluencerSource } from '@/lib/types'
 import AddPostModal from '@/components/AddPostModal'
 
 interface DayStat { date: string; visitors: number; events: Record<string, number> }
@@ -118,8 +118,9 @@ export default function AdminPage() {
   const [excludeKws, setExcludeKws]   = useState<string[]>([])
   const [newInclude, setNewInclude]   = useState('')
   const [newExclude, setNewExclude]   = useState('')
-  const [inpockSources, setInpockSources] = useState<string[]>([])
-  const [newInpock, setNewInpock]     = useState('')
+  const [influencerSources, setInfluencerSources] = useState<InfluencerSource[]>([])
+  const [newSourceUrl, setNewSourceUrl] = useState('')
+  const [newSourceName, setNewSourceName] = useState('')
   const [inpockStatus, setInpockStatus] = useState<ScraperStatus | null>(null)
   const [inpockBusy, setInpockBusy]   = useState(false)
   const [instPostUrl, setInstPostUrl] = useState('')
@@ -146,9 +147,9 @@ export default function AdminPage() {
     if (r.ok) setAnalytics(await r.json())
   }, [])
 
-  const fetchInpockSources = useCallback(async () => {
+  const fetchInfluencerSources = useCallback(async () => {
     const r = await fetch('/api/inpock-sources')
-    if (r.ok) { const d = await r.json(); setInpockSources(d.sources || []) }
+    if (r.ok) { const d = await r.json(); setInfluencerSources(d.sources || []) }
   }, [])
 
   const fetchInpockStatus = useCallback(async () => {
@@ -156,22 +157,22 @@ export default function AdminPage() {
     if (r.ok) setInpockStatus(await r.json())
   }, [])
 
-  async function addInpockSource() {
-    const handle = newInpock.trim()
-    if (!handle) return
+  async function addInfluencerSource() {
+    const url = newSourceUrl.trim()
+    if (!url) return
     const r = await fetch('/api/inpock-sources', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ handle }),
+      body: JSON.stringify({ url, influencer_name: newSourceName.trim() }),
     })
-    if (r.ok) { setNewInpock(''); await fetchInpockSources() }
+    if (r.ok) { setNewSourceUrl(''); setNewSourceName(''); await fetchInfluencerSources() }
     else { const d = await r.json().catch(() => ({})); alert(d.error || '추가 실패') }
   }
 
-  async function removeInpockSource(handle: string) {
-    if (!confirm(`'${handle}' 인플루언서를 삭제할까요?`)) return
-    await fetch(`/api/inpock-sources?handle=${encodeURIComponent(handle)}`, { method: 'DELETE' })
-    await fetchInpockSources()
+  async function removeInfluencerSource(id: string, name: string) {
+    if (!confirm(`'${name}' 인플루언서를 삭제할까요?`)) return
+    await fetch(`/api/inpock-sources?id=${encodeURIComponent(id)}`, { method: 'DELETE' })
+    await fetchInfluencerSources()
   }
 
   async function startInpock() {
@@ -241,11 +242,11 @@ export default function AdminPage() {
     fetchPosts()
     fetchAnalytics()
     fetchConfig()
-    fetchInpockSources()
+    fetchInfluencerSources()
     fetchInpockStatus()
     const iv = setInterval(() => { fetchInpockStatus() }, 5000)
     return () => clearInterval(iv)
-  }, [fetchPosts, fetchAnalytics, fetchConfig, fetchInpockSources, fetchInpockStatus])
+  }, [fetchPosts, fetchAnalytics, fetchConfig, fetchInfluencerSources, fetchInpockStatus])
 
   async function togglePublished(p: Post) {
     const isPublished = p.status === 'published' || (!p.status && p.published !== false)
@@ -353,17 +354,17 @@ export default function AdminPage() {
         {/* 방문자 분석 */}
         <AnalyticsSection data={analytics} />
 
-        {/* 인포크링크 공구 수집 (메인) */}
+        {/* 인플루언서 링크 수집 (메인) */}
         <div style={{ background: '#fff', borderRadius: 12, padding: 20, marginBottom: 24, border: '1px solid #e2e8f0' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8, marginBottom: 12 }}>
-            <h3 style={{ margin: 0, fontSize: 15, fontWeight: 700, color: '#1e293b' }}>🔗 인포크링크 공구 수집</h3>
+            <h3 style={{ margin: 0, fontSize: 15, fontWeight: 700, color: '#1e293b' }}>🔗 인플루언서 링크 수집</h3>
             <button
               onClick={startInpock}
-              disabled={inpockBusy || inpockStatus?.running || inpockSources.length === 0}
+              disabled={inpockBusy || inpockStatus?.running || influencerSources.length === 0}
               style={{
-                background: inpockBusy || inpockStatus?.running || inpockSources.length === 0 ? '#94a3b8' : '#0ea5e9',
+                background: inpockBusy || inpockStatus?.running || influencerSources.length === 0 ? '#94a3b8' : '#0ea5e9',
                 color: '#fff', border: 'none', borderRadius: 8, padding: '8px 16px',
-                cursor: inpockBusy ? 'wait' : inpockSources.length === 0 ? 'not-allowed' : 'pointer', fontWeight: 600, fontSize: 13,
+                cursor: inpockBusy ? 'wait' : influencerSources.length === 0 ? 'not-allowed' : 'pointer', fontWeight: 600, fontSize: 13,
               }}
             >
               {inpockBusy || inpockStatus?.running ? '수집 중...' : '🔄 지금 수집'}
@@ -385,38 +386,55 @@ export default function AdminPage() {
             </div>
           )}
 
-          {/* 인플루언서 등록 */}
+          {/* 인플루언서 링크 등록 */}
           <div style={{ display: 'flex', gap: 8, marginBottom: 10, flexWrap: 'wrap' }}>
             <input
               type="text"
-              value={newInpock}
-              onChange={e => setNewInpock(e.target.value)}
-              onKeyDown={e => { if (e.key === 'Enter') addInpockSource() }}
-              placeholder="인포크 핸들 또는 링크 (예: unidongdong 또는 link.inpock.co.kr/unidongdong)"
-              style={{ flex: 1, minWidth: 220, padding: '8px 12px', borderRadius: 8, border: '1.5px solid #e2e8f0', fontSize: 13, outline: 'none' }}
+              value={newSourceUrl}
+              onChange={e => setNewSourceUrl(e.target.value)}
+              onKeyDown={e => { if (e.key === 'Enter') addInfluencerSource() }}
+              placeholder="링크 URL (예: link.inpock.co.kr/handle, linktr.ee/handle)"
+              style={{ flex: 2, minWidth: 200, padding: '8px 12px', borderRadius: 8, border: '1.5px solid #e2e8f0', fontSize: 13, outline: 'none' }}
             />
-            <button onClick={addInpockSource}
+            <input
+              type="text"
+              value={newSourceName}
+              onChange={e => setNewSourceName(e.target.value)}
+              onKeyDown={e => { if (e.key === 'Enter') addInfluencerSource() }}
+              placeholder="인플루언서 이름 (선택)"
+              style={{ flex: 1, minWidth: 120, padding: '8px 12px', borderRadius: 8, border: '1.5px solid #e2e8f0', fontSize: 13, outline: 'none' }}
+            />
+            <button onClick={addInfluencerSource}
               style={{ background: '#6366f1', color: '#fff', border: 'none', borderRadius: 8, padding: '8px 16px', fontWeight: 600, cursor: 'pointer', fontSize: 13 }}>
-              ＋ 인플루언서 추가
+              ＋ 추가
             </button>
           </div>
 
           {/* 등록된 인플루언서 목록 */}
-          {inpockSources.length === 0 ? (
-            <p style={{ fontSize: 12, color: '#94a3b8', margin: '4px 0 0' }}>등록된 인플루언서가 없습니다. 인포크 링크를 추가하세요.</p>
+          {influencerSources.length === 0 ? (
+            <p style={{ fontSize: 12, color: '#94a3b8', margin: '4px 0 0' }}>등록된 인플루언서가 없습니다. 링크를 추가하세요.</p>
           ) : (
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-              {inpockSources.map(h => (
-                <span key={h} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: '#f1f5f9', borderRadius: 16, padding: '4px 6px 4px 12px', fontSize: 12, color: '#475569' }}>
-                  {h}
-                  <button onClick={() => removeInpockSource(h)} title="삭제"
-                    style={{ background: '#e2e8f0', border: 'none', borderRadius: '50%', width: 18, height: 18, cursor: 'pointer', color: '#64748b', fontSize: 12, lineHeight: 1 }}>×</button>
-                </span>
-              ))}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              {influencerSources.map(s => {
+                const typeColor: Record<string, string> = {
+                  inpock: '#6366f1', linktree: '#22c55e', littly: '#f97316',
+                  smartstore: '#0ea5e9', instagram: '#ec4899', unknown: '#94a3b8', custom: '#64748b',
+                }
+                const color = typeColor[s.source_type] || '#94a3b8'
+                return (
+                  <div key={s.id} style={{ display: 'flex', alignItems: 'center', gap: 8, background: '#f8fafc', borderRadius: 8, padding: '6px 10px' }}>
+                    <span style={{ fontSize: 10, background: color, color: '#fff', borderRadius: 6, padding: '2px 6px', fontWeight: 700, flexShrink: 0 }}>{s.source_type}</span>
+                    <span style={{ fontSize: 13, fontWeight: 600, color: '#1e293b', flexShrink: 0 }}>{s.influencer_name}</span>
+                    <span style={{ fontSize: 11, color: '#94a3b8', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>{s.url}</span>
+                    <button onClick={() => removeInfluencerSource(s.id, s.influencer_name)} title="삭제"
+                      style={{ background: '#e2e8f0', border: 'none', borderRadius: '50%', width: 18, height: 18, cursor: 'pointer', color: '#64748b', fontSize: 12, lineHeight: 1, flexShrink: 0 }}>×</button>
+                  </div>
+                )
+              })}
             </div>
           )}
           <p style={{ fontSize: 11, color: '#94a3b8', margin: '10px 0 0' }}>
-            ※ 공구만 골라 <strong>검수 대기</strong>로 수집됩니다 (카톡·카페·상시판매 자동 제외). 가격·기간을 보완한 뒤 공개하세요.
+            ※ 인포크 링크는 공구만 골라 <strong>검수 대기</strong>로 수집됩니다 (카톡·카페·상시판매 자동 제외). 가격·기간을 보완한 뒤 공개하세요.
           </p>
         </div>
 

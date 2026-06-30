@@ -1,5 +1,15 @@
 export type Category = 'fashion' | 'beauty' | 'food' | 'life' | 'kids' | 'health' | 'pet' | 'digital'
 export type SortOrder = 'latest' | 'deadline' | 'discount' | 'popular'
+export type LinkSourceType = 'inpock' | 'linktree' | 'littly' | 'smartstore' | 'instagram' | 'custom' | 'unknown'
+
+export interface InfluencerSource {
+  id: string
+  url: string
+  source_type: LinkSourceType
+  handle: string
+  influencer_name: string
+  added_at: string
+}
 
 export interface Post {
   id: number
@@ -25,6 +35,14 @@ export interface Post {
   status?: 'candidate' | 'needs_review' | 'ready' | 'published' | 'excluded'
   review_reason?: string[]
   published?: boolean
+  source_type?: LinkSourceType
+  source_url?: string | null
+  influencer_name?: string | null
+  influencer_handle?: string | null
+  original_link?: string | null
+  extracted_link?: string | null
+  collection_status?: string | null
+  collection_error?: string | null
 }
 
 export interface ScraperStatus {
