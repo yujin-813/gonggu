@@ -19,6 +19,8 @@ import sys
 from datetime import datetime
 from pathlib import Path
 
+import os
+
 import requests
 
 # ── 경로 ──────────────────────────────────────────────────────────────────────
@@ -131,112 +133,291 @@ def price_from_stickers(stickers):
     return 0
 
 
+def _clean_text(html):
+    text = re.sub(r'<script[^>]*>.*?</script>', ' ', html, flags=re.S)
+    text = re.sub(r'<style[^>]*>.*?</style>', ' ', text, flags=re.S)
+    text = re.sub(r'<[^>]+>', ' ', text)
+    text = re.sub(r'&nbsp;', ' ', text)
+    text = re.sub(r'&[a-z]+;', '', text)
+    return re.sub(r'\s+', ' ', text).strip()
+
+
+def _find_price_candidates(text):
+    candidates = []
+    for pat, label in [
+        (r'(?:공구가|할인가|판매가|특가|정가|원가)[^\d]*([\d,]{3,})\s*원', "label_price"),
+        (r'([\d,]{3,})\s*원', "원_pattern"),
+        (r'₩\s*([\d,]{3,})', "won_symbol"),
+    ]:
+        for m in re.finditer(pat, text):
+            raw = m.group(1).replace(',', '')
+            try:
+                val = int(raw)
+                if 1000 <= val <= 10_000_000:
+                    snippet = text[max(0, m.start()-15):m.end()+15].strip()
+                    candidates.append({"value": val, "source": label, "context": snippet})
+            except Exception:
+                pass
+    return candidates
+
+
+def _find_deadline_candidates(text):
+    candidates = []
+    for pat, label in [
+        (r'(\d{4})[.\-/](\d{1,2})[.\-/](\d{1,2})', "iso_date"),
+        (r'(\d{1,2})[월]\s*(\d{1,2})[일]', "korean_date"),
+        (r'~\s*(\d{1,2})[./](\d{1,2})', "tilde_date"),
+        (r'(\d{1,2})[./](\d{1,2})\s*(?:까지|마감)', "until_date"),
+    ]:
+        for m in re.finditer(pat, text):
+            snippet = text[max(0, m.start()-20):m.end()+20].strip()
+            candidates.append({"raw": m.group(0), "source": label, "context": snippet})
+    return candidates
+
+
+def _parse_deadline_candidate(raw):
+    raw = raw.strip()
+    m = re.match(r'(\d{4})[.\-/](\d{1,2})[.\-/](\d{1,2})', raw)
+    if m:
+        return f"{m.group(1)}-{m.group(2).zfill(2)}-{m.group(3).zfill(2)}"
+    m = re.match(r'(\d{1,2})[월]\s*(\d{1,2})[일]', raw)
+    if m:
+        year = datetime.now().year
+        return f"{year}-{m.group(1).zfill(2)}-{m.group(2).zfill(2)}"
+    m = re.match(r'~?\s*(\d{1,2})[./](\d{1,2})', raw)
+    if m:
+        year = datetime.now().year
+        return f"{year}-{m.group(1).zfill(2)}-{m.group(2).zfill(2)}"
+    return None
+
+
+def _ai_extract(price_candidates, deadline_candidates, sample_text):
+    api_key = os.environ.get("ANTHROPIC_API_KEY", "")
+    if not api_key:
+        return None, None, "low", "no_api_key"
+    try:
+        import anthropic
+        client = anthropic.Anthropic(api_key=api_key)
+        price_ctx = "\n".join(f"- {c['context']}" for c in price_candidates[:5]) or "(없음)"
+        deadline_ctx = "\n".join(f"- {c['context']}" for c in deadline_candidates[:5]) or "(없음)"
+        prompt = (
+            "다음은 한국 쇼핑몰 상품 페이지에서 추출한 텍스트입니다.\n"
+            f"가격 후보 문장:\n{price_ctx}\n\n"
+            f"마감일 후보 문장:\n{deadline_ctx}\n\n"
+            f"페이지 일부:\n{sample_text[:800]}\n\n"
+            "공구/판매 가격(원 단위 정수)과 마감일(YYYY-MM-DD)을 추출하세요.\n"
+            "확실하지 않으면 null로 반환하세요.\n"
+            '{"price": <숫자 또는 null>, "deadline": "<날짜 또는 null>", "confidence": "high|medium|low"} 형식 JSON만 반환하세요.'
+        )
+        resp = client.messages.create(
+            model="claude-haiku-4-5-20251001",
+            max_tokens=100,
+            messages=[{"role": "user", "content": prompt}],
+        )
+        text = resp.content[0].text.strip()
+        found = re.search(r'\{.*\}', text, re.S)
+        if not found:
+            return None, None, "low", "parse_error"
+        data = json.loads(found.group(0))
+        price = data.get("price")
+        deadline = data.get("deadline")
+        conf = data.get("confidence", "low")
+        if price and not (isinstance(price, (int, float)) and 1000 <= price <= 10_000_000):
+            price = None
+        if deadline and not re.match(r'\d{4}-\d{2}-\d{2}', str(deadline)):
+            deadline = None
+        return (int(price) if price else None), (str(deadline) if deadline else None), conf, "ai"
+    except Exception as e:
+        return None, None, "low", f"ai_error:{str(e)[:80]}"
+
+
 def fetch_product_info(url, domain):
-    """구매 페이지에서 상품 정보 추출. 전략 1: JSON-LD Product, 2: OG tags, 3: JS JSON keys."""
+    debug = {
+        "purchase_url_found": bool(url),
+        "page_fetch_status": None,
+        "jsonld_found": False,
+        "price_candidates": [],
+        "deadline_candidates": [],
+        "selected_price": None,
+        "selected_deadline": None,
+        "extraction_method": None,
+        "extraction_confidence": None,
+        "extraction_error": None,
+    }
+
     if not url or not domain:
-        return {}
+        debug["extraction_error"] = "URL 없음"
+        return {}, debug
+
     skip = ("instagram.com", "youtube.com", "youtu.be", "kakao.com",
             "naver.com/cafe", "band.us", "t.me", "forms.gle", "docs.google.com")
     if any(s in url for s in skip):
-        return {}
+        debug["extraction_error"] = "지원되지 않는 도메인"
+        return {}, debug
+
     try:
         r = requests.get(url, headers={"User-Agent": UA}, timeout=10)
+        debug["page_fetch_status"] = r.status_code
         if r.status_code != 200:
-            return {}
+            debug["extraction_error"] = f"HTTP {r.status_code}"
+            return {}, debug
         html = r.text
-        result = {}
+    except Exception as e:
+        debug["extraction_error"] = str(e)[:120]
+        return {}, debug
 
-        for m in re.finditer(
-            r'<script[^>]+type=["\']application/ld\+json["\'][^>]*>(.*?)</script>',
-            html, re.S,
-        ):
-            try:
-                data = json.loads(m.group(1))
-                items = data if isinstance(data, list) else [data]
-                for item in items:
-                    if item.get("@type") != "Product":
-                        continue
-                    if not result.get("title") and item.get("name"):
-                        result["title"] = item["name"].strip()
-                    if not result.get("img"):
-                        raw = item.get("image")
-                        if isinstance(raw, list): raw = raw[0]
-                        if isinstance(raw, dict): raw = raw.get("url", "")
-                        if raw: result["img"] = raw
-                    offers = item.get("offers", {})
-                    if isinstance(offers, list): offers = offers[0] if offers else {}
-                    price = offers.get("price") or offers.get("lowPrice")
-                    if price and not result.get("price"):
-                        try:
-                            val = int(float(str(price).replace(",", "").replace(" ", "")))
-                            if 1000 <= val <= 10_000_000:
+    result = {}
+
+    # Strategy 1: JSON-LD
+    for m in re.finditer(
+        r'<script[^>]+type=["\']application/ld\+json["\'][^>]*>(.*?)</script>',
+        html, re.S,
+    ):
+        try:
+            data = json.loads(m.group(1))
+            items = data if isinstance(data, list) else [data]
+            for item in items:
+                if item.get("@type") != "Product":
+                    continue
+                debug["jsonld_found"] = True
+                if not result.get("title") and item.get("name"):
+                    result["title"] = item["name"].strip()
+                if not result.get("img"):
+                    raw = item.get("image")
+                    if isinstance(raw, list): raw = raw[0]
+                    if isinstance(raw, dict): raw = raw.get("url", "")
+                    if raw: result["img"] = raw
+                offers = item.get("offers", {})
+                if isinstance(offers, list): offers = offers[0] if offers else {}
+                price = offers.get("price") or offers.get("lowPrice")
+                if price:
+                    try:
+                        val = int(float(str(price).replace(",", "").replace(" ", "")))
+                        if 1000 <= val <= 10_000_000:
+                            debug["price_candidates"].append({"value": val, "source": "jsonld", "context": "JSON-LD offers.price"})
+                            if not result.get("price"):
                                 result["price"] = val
-                        except Exception:
-                            pass
-                    for key in ("availabilityEnds", "priceValidUntil"):
-                        raw_d = offers.get(key)
-                        if raw_d and not result.get("deadline"):
-                            dm = re.match(r"(\d{4}-\d{2}-\d{2})", str(raw_d))
-                            if dm:
+                                debug["extraction_method"] = "jsonld"
+                                debug["extraction_confidence"] = "high"
+                    except Exception:
+                        pass
+                for key in ("availabilityEnds", "priceValidUntil"):
+                    raw_d = offers.get(key)
+                    if raw_d:
+                        dm = re.match(r"(\d{4}-\d{2}-\d{2})", str(raw_d))
+                        if dm:
+                            debug["deadline_candidates"].append({"raw": dm.group(1), "source": "jsonld", "context": f"JSON-LD offers.{key}"})
+                            if not result.get("deadline"):
                                 result["deadline"] = dm.group(1)
+        except Exception:
+            continue
+
+    # Strategy 2: Meta / OG tags + JS JSON keys
+    if not result.get("title"):
+        for pat in (
+            r'<meta[^>]+property=["\']og:title["\'][^>]+content=["\']([^"\']+)["\']',
+            r'<meta[^>]+content=["\']([^"\']+)["\'][^>]+property=["\']og:title["\']',
+        ):
+            mt = re.search(pat, html, re.I)
+            if mt: result["title"] = mt.group(1).strip(); break
+    if not result.get("img"):
+        for pat in (
+            r'<meta[^>]+property=["\']og:image["\'][^>]+content=["\']([^"\']+)["\']',
+            r'<meta[^>]+content=["\']([^"\']+)["\'][^>]+property=["\']og:image["\']',
+        ):
+            mt = re.search(pat, html, re.I)
+            if mt: result["img"] = mt.group(1).strip(); break
+    for pat in (
+        r'<meta[^>]+property=["\']og:price:amount["\'][^>]+content=["\']([0-9,. ]+)["\']',
+        r'<meta[^>]+content=["\']([0-9,. ]+)["\'][^>]+property=["\']og:price:amount["\']',
+        r'<meta[^>]+property=["\']product:price:amount["\'][^>]+content=["\']([0-9,. ]+)["\']',
+        r'<meta[^>]+content=["\']([0-9,. ]+)["\'][^>]+property=["\']product:price:amount["\']',
+    ):
+        mt = re.search(pat, html, re.I)
+        if mt:
+            try:
+                val = int(float(mt.group(1).replace(",", "").replace(" ", "")))
+                if 1000 <= val <= 10_000_000:
+                    debug["price_candidates"].append({"value": val, "source": "meta_tag", "context": "og:price"})
+                    if not result.get("price"):
+                        result["price"] = val
+                        if not debug["extraction_method"]:
+                            debug["extraction_method"] = "meta"
+                            debug["extraction_confidence"] = "high"
+                    break
+            except Exception:
+                continue
+    for pat in (
+        r'["\']salePrice["\']\s*:\s*(\d{4,8})',
+        r'["\']sale_price["\']\s*:\s*(\d{4,8})',
+        r'["\']discountedPrice["\']\s*:\s*(\d{4,8})',
+        r'["\']finalPrice["\']\s*:\s*(\d{4,8})',
+        r'["\']goodsPrice["\']\s*:\s*(\d{4,8})',
+        r'["\']sellPrice["\']\s*:\s*(\d{4,8})',
+    ):
+        mt = re.search(pat, html)
+        if mt:
+            try:
+                val = int(mt.group(1))
+                if 1000 <= val <= 10_000_000:
+                    debug["price_candidates"].append({"value": val, "source": "js_json", "context": "script key match"})
+                    if not result.get("price"):
+                        result["price"] = val
+                        if not debug["extraction_method"]:
+                            debug["extraction_method"] = "js_json"
+                            debug["extraction_confidence"] = "medium"
+                    break
             except Exception:
                 continue
 
-        if not result.get("title"):
-            for pat in (
-                r'<meta[^>]+property=["\']og:title["\'][^>]+content=["\']([^"\']+)["\']',
-                r'<meta[^>]+content=["\']([^"\']+)["\'][^>]+property=["\']og:title["\']',
-            ):
-                mt = re.search(pat, html, re.I)
-                if mt:
-                    result["title"] = mt.group(1).strip()
-                    break
-        if not result.get("img"):
-            for pat in (
-                r'<meta[^>]+property=["\']og:image["\'][^>]+content=["\']([^"\']+)["\']',
-                r'<meta[^>]+content=["\']([^"\']+)["\'][^>]+property=["\']og:image["\']',
-            ):
-                mt = re.search(pat, html, re.I)
-                if mt:
-                    result["img"] = mt.group(1).strip()
-                    break
-        if not result.get("price"):
-            for pat in (
-                r'<meta[^>]+property=["\']og:price:amount["\'][^>]+content=["\']([0-9,. ]+)["\']',
-                r'<meta[^>]+content=["\']([0-9,. ]+)["\'][^>]+property=["\']og:price:amount["\']',
-                r'<meta[^>]+property=["\']product:price:amount["\'][^>]+content=["\']([0-9,. ]+)["\']',
-                r'<meta[^>]+content=["\']([0-9,. ]+)["\'][^>]+property=["\']product:price:amount["\']',
-            ):
-                mt = re.search(pat, html, re.I)
-                if mt:
-                    try:
-                        val = int(float(mt.group(1).replace(",", "").replace(" ", "")))
-                        if 1000 <= val <= 10_000_000:
-                            result["price"] = val
-                            break
-                    except Exception:
-                        continue
-        if not result.get("price"):
-            for pat in (
-                r'["\']salePrice["\']\s*:\s*(\d{4,8})',
-                r'["\']sale_price["\']\s*:\s*(\d{4,8})',
-                r'["\']discountedPrice["\']\s*:\s*(\d{4,8})',
-                r'["\']finalPrice["\']\s*:\s*(\d{4,8})',
-                r'["\']goodsPrice["\']\s*:\s*(\d{4,8})',
-                r'["\']sellPrice["\']\s*:\s*(\d{4,8})',
-            ):
-                mt = re.search(pat, html)
-                if mt:
-                    try:
-                        val = int(mt.group(1))
-                        if 1000 <= val <= 10_000_000:
-                            result["price"] = val
-                            break
-                    except Exception:
-                        continue
-        return result
-    except Exception:
-        return {}
+    # Strategy 3: Clean HTML text regex
+    clean = _clean_text(html)
+    price_cands = _find_price_candidates(clean)
+    deadline_cands = _find_deadline_candidates(clean)
+    debug["price_candidates"].extend(price_cands)
+    debug["deadline_candidates"].extend(deadline_cands)
+
+    if not result.get("price") and price_cands:
+        labeled = [c for c in price_cands if c["source"] == "label_price"]
+        chosen = labeled[0] if labeled else min(price_cands, key=lambda c: c["value"])
+        result["price"] = chosen["value"]
+        if not debug["extraction_method"]:
+            debug["extraction_method"] = "text_regex"
+            debug["extraction_confidence"] = "medium"
+
+    if not result.get("deadline") and deadline_cands:
+        for cand in deadline_cands:
+            parsed = _parse_deadline_candidate(cand["raw"])
+            if parsed:
+                result["deadline"] = parsed
+                break
+
+    # Strategy 4: AI fallback
+    needs_ai = not result.get("price") or not result.get("deadline")
+    if needs_ai:
+        ai_price, ai_deadline, ai_conf, ai_method = _ai_extract(
+            debug["price_candidates"], debug["deadline_candidates"], clean[:1500]
+        )
+        if ai_method != "no_api_key":
+            if ai_price and not result.get("price"):
+                result["price"] = ai_price
+                debug["price_candidates"].append({"value": ai_price, "source": "ai", "context": "AI extracted"})
+                if not debug["extraction_method"]:
+                    debug["extraction_method"] = "ai"
+                    debug["extraction_confidence"] = ai_conf
+            if ai_deadline and not result.get("deadline"):
+                result["deadline"] = ai_deadline
+                debug["deadline_candidates"].append({"raw": ai_deadline, "source": "ai", "context": "AI extracted"})
+            if ai_method.startswith("ai_error"):
+                debug["extraction_error"] = ai_method
+
+    debug["selected_price"] = result.get("price")
+    debug["selected_deadline"] = result.get("deadline")
+    if result.get("price") and not debug["extraction_method"]:
+        debug["extraction_method"] = "unknown"
+        debug["extraction_confidence"] = "low"
+
+    return result, debug
 
 
 def is_product(domain, price, title=""):
@@ -284,7 +465,7 @@ def classify_status(title, purchase_url, price, deadline):
     return "needs_review", reasons
 
 
-def block_to_post(b, ig_handle, price, domain, profile_url, purchase_url, deadline, product_info=None, source_obj=None):
+def block_to_post(b, ig_handle, price, domain, profile_url, purchase_url, deadline, product_info=None, debug_info=None, source_obj=None):
     sc = f"inpock_{b['id']}"
     pi = product_info or {}
     title = (b.get("title") or "").strip() or pi.get("title", "")
@@ -313,6 +494,8 @@ def block_to_post(b, ig_handle, price, domain, profile_url, purchase_url, deadli
         "scraped_at":      datetime.now().isoformat(),
         "source":          "inpock",
         "is_always_on":    False,
+        "is_evergreen_deal": False,
+        "extraction_debug": debug_info,
         "status":          status,
         "review_reason":   review_reason,
         "published":       False,
@@ -370,9 +553,7 @@ def collect(handles, source_obj=None, write_result=True):
             final_url, domain = resolve_link(url_abs)
             purchase_url = final_url or url_abs
 
-            product_info = {}
-            if purchase_url and domain:
-                product_info = fetch_product_info(purchase_url, domain)
+            product_info, debug_info = fetch_product_info(purchase_url, domain) if (purchase_url and domain) else ({}, {})
             if not price and product_info.get("price"):
                 price = product_info["price"]
             if not deadline and product_info.get("deadline"):
@@ -383,7 +564,7 @@ def collect(handles, source_obj=None, write_result=True):
                 print(f"  - (제외) {b.get('title', '')[:34]} [{domain}]")
                 continue
 
-            posts.insert(0, block_to_post(b, ig_handle, price, domain, profile_url, purchase_url, deadline, product_info, source_obj))
+            posts.insert(0, block_to_post(b, ig_handle, price, domain, profile_url, purchase_url, deadline, product_info, debug_info, source_obj))
             by_sc[sc] = posts[0]
             new_count += 1
             print(f"  + {b['title'][:34]} [{domain}]")

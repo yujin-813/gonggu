@@ -95,7 +95,7 @@ function fmt(dateStr?: string) {
 function periodLabel(p: Post) {
   if (p.start_date && p.deadline) return `${fmt(p.start_date)} ~ ${fmt(p.deadline)}`
   if (p.deadline) return `~ ${fmt(p.deadline)}`
-  if (p.is_always_on) return '상시딜'
+  if (p.is_evergreen_deal || p.is_always_on) return '상시딜'
   return '마감일 미확인'
 }
 
@@ -285,8 +285,8 @@ export default function AdminPage() {
     })
   }
 
-  async function toggleAlwaysOn(p: Post) {
-    const next = !p.is_always_on
+  async function toggleEvergreenDeal(p: Post) {
+    const next = !(p.is_evergreen_deal || p.is_always_on)
     const onlyDeadlineMissing =
       p.status === 'needs_review' &&
       (p.review_reason || []).length > 0 &&
@@ -295,13 +295,13 @@ export default function AdminPage() {
     const nextReviewReason = next && onlyDeadlineMissing ? [] : (p.review_reason || [])
     setPosts(prev =>
       prev.map(x =>
-        x.id === p.id ? { ...x, is_always_on: next, status: nextStatus, review_reason: nextReviewReason } : x
+        x.id === p.id ? { ...x, is_evergreen_deal: next, is_always_on: next, status: nextStatus, review_reason: nextReviewReason } : x
       )
     )
     await fetch(`/api/posts/${p.id}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ is_always_on: next, status: nextStatus, review_reason: nextReviewReason }),
+      body: JSON.stringify({ is_evergreen_deal: next, is_always_on: next, status: nextStatus, review_reason: nextReviewReason }),
     })
   }
 
@@ -536,7 +536,7 @@ export default function AdminPage() {
               </div>
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                {visible.map(p => <AdminPostRow key={p.id} post={p} onToggle={togglePublished} onDelete={deletePost} onEdit={setEditingPost} onToggleAlwaysOn={toggleAlwaysOn} periodLabel={periodLabel(p)} dLeft={daysLeft(p.deadline)} />)}
+                {visible.map(p => <AdminPostRow key={p.id} post={p} onToggle={togglePublished} onDelete={deletePost} onEdit={setEditingPost} onToggleAlwaysOn={toggleEvergreenDeal} periodLabel={periodLabel(p)} dLeft={daysLeft(p.deadline)} />)}
               </div>
             )}
           </>
@@ -728,6 +728,16 @@ function AdminPostRow({ post: p, onToggle, onDelete, onEdit, onToggleAlwaysOn, p
             {p.brand && <span style={{ color: '#6366f1', fontWeight: 600 }}>{p.brand}</span>}
             <span style={{ color: expired ? '#ef4444' : '#6366f1' }}>📅 {periodLabel}</span>
             <span style={{ fontWeight: 600, color: '#0f172a' }}>{p.price?.toLocaleString()}원</span>
+            {p.extraction_debug && (
+              <span
+                title={JSON.stringify(p.extraction_debug, null, 2)}
+                style={{ fontSize: 10, background: '#f0f9ff', color: '#0369a1', padding: '1px 5px', borderRadius: 8, cursor: 'help' }}>
+                🔍 {(p.extraction_debug as Record<string,unknown>).extraction_method as string || '추출'}
+                {(p.extraction_debug as Record<string,unknown>).extraction_error
+                  ? ' ⚠️'
+                  : (p.extraction_debug as Record<string,unknown>).extraction_confidence === 'high' ? ' ✓' : ''}
+              </span>
+            )}
           </div>
         </div>
 
@@ -751,8 +761,8 @@ function AdminPostRow({ post: p, onToggle, onDelete, onEdit, onToggleAlwaysOn, p
           <button onClick={() => onToggleAlwaysOn(p)}
             title="상시딜로 설정하면 마감일 없이도 공개 가능"
             style={{ padding: '6px 10px', borderRadius: 8, border: 'none', cursor: 'pointer', fontSize: 11, fontWeight: 600, whiteSpace: 'nowrap',
-              background: p.is_always_on ? '#fef3c7' : '#f1f5f9', color: p.is_always_on ? '#92400e' : '#94a3b8' }}>
-            {p.is_always_on ? '⏰ 상시딜' : '상시딜'}
+              background: (p.is_evergreen_deal || p.is_always_on) ? '#fef3c7' : '#f1f5f9', color: (p.is_evergreen_deal || p.is_always_on) ? '#92400e' : '#94a3b8' }}>
+            {(p.is_evergreen_deal || p.is_always_on) ? '⏰ 상시딜' : '상시딜'}
           </button>
           <button onClick={() => onDelete(p.id)}
             style={{ padding: '6px 10px', background: '#fee2e2', color: '#dc2626', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 12, fontWeight: 600 }}>

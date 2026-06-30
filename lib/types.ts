@@ -51,6 +51,8 @@ export interface Post {
   influencer_id?: string | null
   purchase_url?: string | null
   is_always_on?: boolean
+  is_evergreen_deal?: boolean
+  extraction_debug?: Record<string, unknown> | null
 }
 
 export interface ScraperStatus {

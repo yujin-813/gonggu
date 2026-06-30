@@ -57,7 +57,7 @@ export default function PostCard({ post, isBookmarked, onToggleBookmark, onJoin,
   const [showCompare, setShowCompare] = useState(false)
   const compareCount = siblings.length
   const badge = badgeInfo(post.deadline)
-  const dt = !post.deadline && post.is_always_on
+  const dt = !post.deadline && (post.is_evergreen_deal || post.is_always_on)
     ? { cls: '', txt: '📅 상시딜' }
     : periodText(post.start_date, post.deadline)
   const closed = daysLeft(post.deadline) < 0
