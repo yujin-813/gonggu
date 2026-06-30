@@ -486,7 +486,7 @@ def resolve_img(img, shortcode):
     return src
 
 
-def classify_status(title, purchase_url, price, deadline):
+def classify_status(title, purchase_url, price, deadline, extraction_confidence=None):
     reasons = []
     if not price:
         reasons.append("가격 미입력")
@@ -497,7 +497,11 @@ def classify_status(title, purchase_url, price, deadline):
     if not title:
         return "excluded", ["상품명 없음"]
     if purchase_url and price and deadline:
-        return "ready", []
+        # JSON-LD/meta(high)만 자동 승인, 그 외는 사람이 확인
+        if extraction_confidence == "high":
+            return "ready", []
+        reasons.append("추출 데이터 확인 필요")
+        return "needs_review", reasons
     return "needs_review", reasons
 
 
@@ -507,7 +511,8 @@ def block_to_post(b, ig_handle, price, domain, profile_url, purchase_url, deadli
     title = (b.get("title") or "").strip() or pi.get("title", "")
     img_src = b.get("image") or pi.get("img", "")
     img = resolve_img(img_src, sc)
-    status, review_reason = classify_status(title, purchase_url, price, deadline)
+    confidence = (debug_info or {}).get("extraction_confidence")
+    status, review_reason = classify_status(title, purchase_url, price, deadline, confidence)
     return {
         "id":              abs(hash(sc)) % (10 ** 9),
         "shortcode":       sc,
