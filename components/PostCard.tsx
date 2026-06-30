@@ -116,9 +116,9 @@ export default function PostCard({ post, isBookmarked, onToggleBookmark, onJoin,
           {post.origPrice && post.origPrice > post.price && (
             post.market_url
               ? <a href={post.market_url} target="_blank" rel="noopener noreferrer" className="price-orig" style={{ textDecoration: 'none' }}>
-                  시중가 {post.origPrice.toLocaleString()}원 →
+                  네이버쇼핑 {post.origPrice.toLocaleString()}원 →
                 </a>
-              : <span className="price-orig">시중가 {post.origPrice.toLocaleString()}원</span>
+              : <span className="price-orig">정가 {post.origPrice.toLocaleString()}원</span>
           )}
         </div>
 

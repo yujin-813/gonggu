@@ -297,7 +297,7 @@ export default function AddPostModal({ onClose, onSubmit, editPost, existingGrou
           </div>
           <div>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
-              <label style={{ margin: 0 }}>시중가 (원, 선택)</label>
+              <label style={{ margin: 0 }}>네이버쇼핑 가격 (원, 선택)</label>
               <button
                 type="button"
                 onClick={async () => {
@@ -318,13 +318,13 @@ export default function AddPostModal({ onClose, onSubmit, editPost, existingGrou
                   cursor: title.trim() ? 'pointer' : 'default', padding: 0,
                 }}
               >
-                {marketSearching ? '검색 중...' : '🔍 네이버 시중가 검색'}
+                {marketSearching ? '검색 중...' : '🔍 네이버쇼핑 검색'}
               </button>
             </div>
             <input type="number" value={origPrice} onChange={e => { setOrigPrice(e.target.value); if (!e.target.value) setMarketUrl('') }} placeholder="60000" />
             {marketUrl && origPrice && (
               <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 4 }}>
-                <span style={{ fontSize: 11, color: '#16a34a' }}>✅ 시중가 링크 연결됨</span>
+                <span style={{ fontSize: 11, color: '#16a34a' }}>✅ 네이버쇼핑 링크 연결됨</span>
                 <a href={marketUrl} target="_blank" rel="noopener noreferrer" style={{ fontSize: 11, color: '#6366f1' }}>미리보기 →</a>
                 <button type="button" onClick={() => { setMarketUrl(''); }} style={{ fontSize: 11, color: '#94a3b8', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>링크 제거</button>
               </div>
