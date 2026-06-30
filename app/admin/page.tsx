@@ -111,7 +111,7 @@ export default function AdminPage() {
   const [showAddModal, setShowAddModal] = useState(false)
   const [editingPost, setEditingPost]   = useState<Post | null>(null)
   const [loading, setLoading]         = useState(true)
-  const [filter, setFilter]           = useState<'all' | 'candidates' | 'published' | 'hidden'>('all')
+  const [filter, setFilter]           = useState<'all' | 'candidate' | 'needs_review' | 'ready' | 'published' | 'excluded'>('all')
   const [searchQ, setSearchQ]         = useState('')
   const [analytics, setAnalytics]     = useState<DayStat[]>([])
   const [includeKws, setIncludeKws]   = useState<string[]>([])
@@ -248,12 +248,14 @@ export default function AdminPage() {
   }, [fetchPosts, fetchAnalytics, fetchConfig, fetchInpockSources, fetchInpockStatus])
 
   async function togglePublished(p: Post) {
-    const next = p.published === false ? true : false
-    setPosts(prev => prev.map(x => x.id === p.id ? { ...x, published: next } : x))
+    const isPublished = p.status === 'published' || (!p.status && p.published !== false)
+    const nextStatus: Post['status'] = isPublished ? 'ready' : 'published'
+    const nextPublished = !isPublished
+    setPosts(prev => prev.map(x => x.id === p.id ? { ...x, published: nextPublished, status: nextStatus } : x))
     await fetch(`/api/posts/${p.id}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ published: next }),
+      body: JSON.stringify({ published: nextPublished, status: nextStatus }),
     })
   }
 
@@ -288,22 +290,27 @@ export default function AdminPage() {
     }
   }
 
-  const isCandidate = (p: Post) => p.source === 'inpock'
+  const effectiveStatus = (p: Post): Post['status'] => {
+    if (p.status) return p.status
+    // 기존 데이터 호환: status 필드 없는 경우
+    if (p.source === 'inpock') return 'candidate'
+    return p.published !== false ? 'published' : 'ready'
+  }
 
   const visible = posts.filter(p => {
-    const matchFilter =
-      filter === 'all'        ? !isCandidate(p) :
-      filter === 'candidates' ? isCandidate(p) :
-      filter === 'published'  ? !isCandidate(p) && p.published !== false :
-      !isCandidate(p) && p.published === false
+    const st = effectiveStatus(p)
+    const matchFilter = filter === 'all' ? true : st === filter
     const q = searchQ.toLowerCase()
     const matchQ = !q || p.title.toLowerCase().includes(q) || p.account.toLowerCase().includes(q)
     return matchFilter && matchQ
   })
 
-  const publishedCount   = posts.filter(p => !isCandidate(p) && p.published !== false).length
-  const hiddenCount      = posts.filter(p => !isCandidate(p) && p.published === false).length
-  const candidatesCount  = posts.filter(isCandidate).length
+  const countBy = (s: Post['status']) => posts.filter(p => effectiveStatus(p) === s).length
+  const candidateCount   = countBy('candidate')
+  const needsReviewCount = countBy('needs_review')
+  const readyCount       = countBy('ready')
+  const publishedCount   = countBy('published')
+  const excludedCount    = countBy('excluded')
 
   // 인증 확인 중 (hydration 전)
   if (authed === null) return null
@@ -337,10 +344,10 @@ export default function AdminPage() {
 
         {/* 통계 카드 */}
         <div className="admin-stats">
-          <StatCard label="전체 공구" value={posts.length} icon="📦" color="#6366f1" />
-          <StatCard label="공개 중" value={publishedCount} icon="✅" color="#22c55e" />
-          <StatCard label="공구 후보" value={candidatesCount} icon="📝" color="#eab308" />
-          <StatCard label="숨김 처리" value={hiddenCount} icon="🙈" color="#f97316" />
+          <StatCard label="공개됨"    value={publishedCount}   icon="✅" color="#22c55e" />
+          <StatCard label="공개 가능" value={readyCount}        icon="🟢" color="#6366f1" />
+          <StatCard label="검수 필요" value={needsReviewCount}  icon="⚠️" color="#f97316" />
+          <StatCard label="공구 후보" value={candidateCount}    icon="📝" color="#eab308" />
         </div>
 
         {/* 방문자 분석 */}
@@ -471,19 +478,19 @@ export default function AdminPage() {
         <div className="admin-filter">
           <div style={{ display: 'flex', gap: 6 }}>
             {([
-              { key: 'all',        label: '공구 전체' },
-              { key: 'candidates', label: `공구 후보${candidatesCount ? ` ${candidatesCount}` : ''}` },
-              { key: 'published',  label: '공개' },
-              { key: 'hidden',     label: '숨김' },
-            ] as const).map(({ key, label }) => (
+              { key: 'all',          label: '전체',                       color: '#6366f1' },
+              { key: 'candidate',    label: `공구 후보 ${candidateCount}`,   color: '#eab308' },
+              { key: 'needs_review', label: `검수 필요 ${needsReviewCount}`, color: '#f97316' },
+              { key: 'ready',        label: `공개 가능 ${readyCount}`,       color: '#22c55e' },
+              { key: 'published',    label: `공개됨 ${publishedCount}`,      color: '#0ea5e9' },
+              { key: 'excluded',     label: `제외 ${excludedCount}`,         color: '#94a3b8' },
+            ] as const).map(({ key, label, color }) => (
               <button
                 key={key}
                 onClick={() => setFilter(key)}
                 style={{
                   padding: '6px 14px', borderRadius: 20, border: 'none', cursor: 'pointer', fontSize: 13,
-                  background: filter === key
-                    ? key === 'candidates' ? '#eab308' : '#6366f1'
-                    : '#e2e8f0',
+                  background: filter === key ? color : '#e2e8f0',
                   color: filter === key ? '#fff' : '#475569', fontWeight: 600,
                 }}
               >
@@ -623,7 +630,7 @@ function AdminPostRow({ post: p, onToggle, onDelete, onEdit, periodLabel, dLeft 
   periodLabel: string
   dLeft: number
 }) {
-  const published = p.published !== false
+  const published = p.status === 'published' || (!p.status && p.published !== false)
   const expired   = dLeft < 0
 
   return (
@@ -651,9 +658,13 @@ function AdminPostRow({ post: p, onToggle, onDelete, onEdit, periodLabel, dLeft 
           </div>
           <div style={{ fontSize: 12, color: '#64748b', display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
             <span>{p.account}</span>
-            {p.source === 'inpock' && (
-              <span style={{ fontSize: 11, background: '#fef9c3', color: '#a16207', padding: '2px 6px', borderRadius: 10, fontWeight: 600 }}>📝 공구 후보</span>
-            )}
+            {p.status === 'candidate'    && <span style={{ fontSize: 11, background: '#fef9c3', color: '#a16207',  padding: '2px 6px', borderRadius: 10, fontWeight: 600 }}>📝 공구 후보</span>}
+            {p.status === 'needs_review' && <span style={{ fontSize: 11, background: '#fff7ed', color: '#c2410c',  padding: '2px 6px', borderRadius: 10, fontWeight: 600 }}>⚠️ 검수 필요</span>}
+            {p.status === 'ready'        && <span style={{ fontSize: 11, background: '#dcfce7', color: '#15803d',  padding: '2px 6px', borderRadius: 10, fontWeight: 600 }}>🟢 공개 가능</span>}
+            {p.status === 'excluded'     && <span style={{ fontSize: 11, background: '#f1f5f9', color: '#64748b',  padding: '2px 6px', borderRadius: 10, fontWeight: 600 }}>🚫 제외</span>}
+            {p.review_reason && p.review_reason.length > 0 && p.review_reason.map((r, i) => (
+              <span key={i} style={{ fontSize: 10, background: '#fee2e2', color: '#dc2626', padding: '1px 5px', borderRadius: 8 }}>{r}</span>
+            ))}
             {p.brand && <span style={{ color: '#6366f1', fontWeight: 600 }}>{p.brand}</span>}
             <span style={{ color: expired ? '#ef4444' : '#6366f1' }}>📅 {periodLabel}</span>
             <span style={{ fontWeight: 600, color: '#0f172a' }}>{p.price?.toLocaleString()}원</span>

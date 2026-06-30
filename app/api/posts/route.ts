@@ -27,9 +27,11 @@ export async function GET(request: NextRequest) {
 
   let posts = loadPosts()
 
-  // 고객 페이지: published가 false인 항목 제외 (undefined는 true로 취급)
+  // 고객 페이지: status='published' 또는 status 없는 기존 데이터는 published 필드로 판단
   if (!adminMode) {
-    posts = posts.filter(p => p.published !== false)
+    posts = posts.filter(p =>
+      p.status === 'published' || (!p.status && p.published !== false)
+    )
   }
 
   if (cat && cat !== 'all') posts = posts.filter(p => p.cat === cat)
@@ -88,8 +90,10 @@ export async function POST(request: NextRequest) {
     cat:        data.cat,
     price:      parseInt(data.price),
     origPrice:  data.origPrice ? parseInt(data.origPrice) : null,
-    group_key:  data.group_key?.trim() || null,
-    market_url: data.market_url?.trim() || null,
+    group_key:     data.group_key?.trim() || null,
+    market_url:    data.market_url?.trim() || null,
+    status:        data.status || 'ready',
+    review_reason: data.review_reason || [],
     start_date: data.start_date || '',
     deadline:   data.deadline || '',
     brand:      data.brand || null,

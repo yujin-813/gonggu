@@ -240,30 +240,54 @@ def resolve_img(img, shortcode):
     return src
 
 
+def classify_status(title, store_url, price, img):
+    """수집 결과를 기계적 규칙으로 자동 분류."""
+    reasons = []
+    if not title:
+        reasons.append("상품명 없음")
+    if not store_url:
+        reasons.append("구매 링크 없음")
+    if not price:
+        reasons.append("가격 없음")
+    if not img:
+        reasons.append("이미지 없음")
+
+    if not title or not store_url:
+        return "excluded", reasons
+    if price and img:
+        return "ready", []
+    return "needs_review", reasons
+
+
 def block_to_post(b, ig_handle, price, domain, profile_url, store_url):
     sc = f"inpock_{b['id']}"
+    title = (b.get("title") or "").strip()
+    img   = resolve_img(b.get("image"), sc)
+    status, review_reason = classify_status(title, store_url, price, img)
     return {
-        "id":         abs(hash(sc)) % (10 ** 9),
-        "shortcode":  sc,
-        "title":      (b.get("title") or "").strip(),
-        "account":    f"@{ig_handle}",
-        "cat":        "life",                       # 분류 불가 → 기본값, 관리자 보정
-        "price":      price,
-        "origPrice":  None,
-        "start_date": "",
-        "deadline":   b.get("open_until") or "",
-        "brand":      None,
-        "img":        resolve_img(b.get("image"), sc),
-        "url":        profile_url,                   # '공구 보기' → 인스타 프로필
-        "store_url":  store_url,                     # 실제 구매처 (검수용)
+        "id":           abs(hash(sc)) % (10 ** 9),
+        "shortcode":    sc,
+        "title":        title,
+        "account":      f"@{ig_handle}",
+        "cat":          "life",
+        "price":        price,
+        "origPrice":    None,
+        "start_date":   "",
+        "deadline":     b.get("open_until") or "",
+        "brand":        None,
+        "img":          img,
+        "url":          profile_url,
+        "store_url":    store_url,
         "store_domain": domain or "",
         "participants": 0,
-        "avatar":     "🛍️",
-        "caption":    "",
-        "scraped_at": datetime.now().isoformat(),
-        "source":     "inpock",
-        "published":  False,                         # 검수 대기
-        "is_open":    bool(b.get("is_open", True)),
+        "avatar":       "🛍️",
+        "caption":      "",
+        "scraped_at":   datetime.now().isoformat(),
+        "source":       "inpock",
+        "status":       status,
+        "review_reason": review_reason,
+        "published":    False,
+        "is_open":      bool(b.get("is_open", True)),
     }
 
 
