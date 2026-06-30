@@ -187,6 +187,24 @@ def fetch_store_price(url, domain):
                 except Exception:
                     continue
 
+        # 전략 3: 스크립트 내 JSON 가격 키 (무신사 등 SPA 쇼핑몰)
+        for pattern in (
+            r'["\']salePrice["\']\s*:\s*(\d{4,8})',
+            r'["\']sale_price["\']\s*:\s*(\d{4,8})',
+            r'["\']discountedPrice["\']\s*:\s*(\d{4,8})',
+            r'["\']finalPrice["\']\s*:\s*(\d{4,8})',
+            r'["\']goodsPrice["\']\s*:\s*(\d{4,8})',
+            r'["\']sellPrice["\']\s*:\s*(\d{4,8})',
+        ):
+            m = re.search(pattern, html)
+            if m:
+                try:
+                    val = int(m.group(1))
+                    if 1000 <= val <= 10_000_000:
+                        return val
+                except Exception:
+                    continue
+
     except Exception:
         pass
     return 0
