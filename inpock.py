@@ -132,19 +132,27 @@ def price_from_stickers(stickers):
 
 
 def fetch_store_price(url, domain):
-    """지원 쇼핑몰 상세 페이지에서 가격 파싱. 실패 시 0 반환.
-    현재 지원: smartstore.naver.com (JSON-LD 구조 데이터)."""
+    """구매 페이지에서 가격 파싱. 실패 시 0 반환.
+    전략 1: JSON-LD @type=Product (smartstore, 29cm, musinsa 등 표준)
+    전략 2: Open Graph / meta 태그 (og:price:amount, product:price:amount)
+    두 방법 모두 사이트가 SEO용으로 공개하는 데이터이므로 차단 위험 없음."""
     if not url or not domain:
         return 0
-    if "smartstore.naver.com" not in domain:
+    # 쇼핑몰이 아닌 도메인은 시도하지 않음
+    skip = ("instagram.com", "youtube.com", "youtu.be", "kakao.com",
+            "naver.com/cafe", "band.us", "t.me", "forms.gle", "docs.google.com")
+    if any(s in url for s in skip):
         return 0
     try:
-        r = requests.get(url, headers={"User-Agent": UA}, timeout=8)
+        r = requests.get(url, headers={"User-Agent": UA}, timeout=10)
         if r.status_code != 200:
             return 0
+        html = r.text
+
+        # 전략 1: JSON-LD structured data
         for m in re.finditer(
             r'<script[^>]+type=["\']application/ld\+json["\'][^>]*>(.*?)</script>',
-            r.text, re.S,
+            html, re.S,
         ):
             try:
                 data = json.loads(m.group(1))
@@ -152,13 +160,33 @@ def fetch_store_price(url, domain):
                 for item in items:
                     if item.get("@type") == "Product":
                         offers = item.get("offers", {})
+                        # offers가 리스트인 경우도 처리
+                        if isinstance(offers, list):
+                            offers = offers[0] if offers else {}
                         price = offers.get("price") or offers.get("lowPrice")
                         if price:
-                            val = int(float(str(price).replace(",", "")))
+                            val = int(float(str(price).replace(",", "").replace(" ", "")))
                             if 1000 <= val <= 10_000_000:
                                 return val
             except Exception:
                 continue
+
+        # 전략 2: Open Graph / meta 태그
+        for pattern in (
+            r'<meta[^>]+property=["\']og:price:amount["\'][^>]+content=["\']([0-9,. ]+)["\']',
+            r'<meta[^>]+content=["\']([0-9,. ]+)["\'][^>]+property=["\']og:price:amount["\']',
+            r'<meta[^>]+property=["\']product:price:amount["\'][^>]+content=["\']([0-9,. ]+)["\']',
+            r'<meta[^>]+content=["\']([0-9,. ]+)["\'][^>]+property=["\']product:price:amount["\']',
+        ):
+            m = re.search(pattern, html, re.I)
+            if m:
+                try:
+                    val = int(float(m.group(1).replace(",", "").replace(" ", "")))
+                    if 1000 <= val <= 10_000_000:
+                        return val
+                except Exception:
+                    continue
+
     except Exception:
         pass
     return 0
