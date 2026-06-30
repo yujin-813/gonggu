@@ -325,33 +325,27 @@ export default function AdminPage() {
           >
             로그아웃
           </button>
-          {false && (
-            <button
-              onClick={() => setShowAddModal(true)}
-              style={{ background: '#6366f1', color: '#fff', border: 'none', borderRadius: 8, padding: '8px 16px', fontWeight: 700, cursor: 'pointer', fontSize: 14 }}
-            >
-              ＋ 공구 등록
-            </button>
-          )}
+          <button
+            onClick={() => setShowAddModal(true)}
+            style={{ background: '#6366f1', color: '#fff', border: 'none', borderRadius: 8, padding: '8px 16px', fontWeight: 700, cursor: 'pointer', fontSize: 14 }}
+          >
+            ＋ 공구 등록
+          </button>
         </div>
       </header>
 
       <div style={{ maxWidth: 1100, margin: '0 auto', padding: '24px 16px' }}>
 
-        {false && (
-          <>
-            {/* 통계 카드 */}
-            <div className="admin-stats">
-              <StatCard label="전체 공구" value={posts.length} icon="📦" color="#6366f1" />
-              <StatCard label="공개 중" value={publishedCount} icon="✅" color="#22c55e" />
-              <StatCard label="검수 대기" value={reviewCount} icon="📝" color="#eab308" />
-              <StatCard label="숨김 처리" value={hiddenCount} icon="🙈" color="#f97316" />
-            </div>
+        {/* 통계 카드 */}
+        <div className="admin-stats">
+          <StatCard label="전체 공구" value={posts.length} icon="📦" color="#6366f1" />
+          <StatCard label="공개 중" value={publishedCount} icon="✅" color="#22c55e" />
+          <StatCard label="검수 대기" value={reviewCount} icon="📝" color="#eab308" />
+          <StatCard label="숨김 처리" value={hiddenCount} icon="🙈" color="#f97316" />
+        </div>
 
-            {/* 방문자 분석 */}
-            <AnalyticsSection data={analytics} />
-          </>
-        )}
+        {/* 방문자 분석 */}
+        <AnalyticsSection data={analytics} />
 
         {/* 인포크링크 공구 수집 (메인) */}
         <div style={{ background: '#fff', borderRadius: 12, padding: 20, marginBottom: 24, border: '1px solid #e2e8f0' }}>
@@ -420,94 +414,108 @@ export default function AdminPage() {
           </p>
         </div>
 
-        {false && (
-          <>
-            {/* 인스타 게시글 직접 추가 */}
-            <div style={{ background: '#fff', borderRadius: 12, padding: 20, marginBottom: 24, border: '1px solid #e2e8f0' }}>
-              <h3 style={{ margin: '0 0 8px', fontSize: 15, fontWeight: 700, color: '#1e293b' }}>📸 인스타 게시글 직접 추가</h3>
-              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                <input type="url" value={instPostUrl} onChange={e => { setInstPostUrl(e.target.value); setInstPostMsg('') }}
-                  onKeyDown={e => { if (e.key === 'Enter') addInstPost() }} placeholder="https://www.instagram.com/p/ABC123..."
-                  style={{ flex: 1, minWidth: 240, padding: '8px 12px', borderRadius: 8, border: '1.5px solid #e2e8f0', fontSize: 13, outline: 'none' }} />
-                <button onClick={addInstPost} disabled={instPostBusy || !instPostUrl.trim()}
-                  style={{ background: instPostBusy || !instPostUrl.trim() ? '#94a3b8' : '#6366f1', color: '#fff', border: 'none', borderRadius: 8, padding: '8px 18px', fontWeight: 600, fontSize: 13, cursor: 'pointer' }}>
-                  {instPostBusy ? '수집 중...' : '수집'}
-                </button>
+        {/* 키워드 설정 */}
+        <div style={{ background: '#fff', borderRadius: 12, padding: 20, marginBottom: 24, border: '1px solid #e2e8f0' }}>
+          <h3 style={{ margin: '0 0 14px', fontSize: 15, fontWeight: 700, color: '#1e293b' }}>⚙️ 수집 키워드 설정</h3>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>
+            {/* 포함 키워드 */}
+            <div>
+              <div style={{ fontSize: 13, fontWeight: 600, color: '#16a34a', marginBottom: 8 }}>✅ 추가 포함 키워드</div>
+              <p style={{ fontSize: 11, color: '#94a3b8', margin: '0 0 8px' }}>이 단어가 캡션에 있으면 공구로 수집</p>
+              <div style={{ display: 'flex', gap: 6, marginBottom: 8 }}>
+                <input value={newInclude} onChange={e => setNewInclude(e.target.value)}
+                  onKeyDown={e => { if (e.key === 'Enter') addKeyword('include') }}
+                  placeholder="예: 오픈런, 단독판매"
+                  style={{ flex: 1, padding: '7px 10px', borderRadius: 7, border: '1.5px solid #e2e8f0', fontSize: 12, outline: 'none' }} />
+                <button onClick={() => addKeyword('include')}
+                  style={{ background: '#16a34a', color: '#fff', border: 'none', borderRadius: 7, padding: '7px 12px', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>추가</button>
               </div>
-              {instPostMsg && <p style={{ fontSize: 12, margin: '8px 0 0', color: instPostMsg.startsWith('✅') ? '#16a34a' : '#ef4444' }}>{instPostMsg}</p>}
-            </div>
-
-            {/* 키워드 설정 */}
-            <div style={{ background: '#fff', borderRadius: 12, padding: 20, marginBottom: 24, border: '1px solid #e2e8f0' }}>
-              <h3 style={{ margin: '0 0 14px', fontSize: 15, fontWeight: 700, color: '#1e293b' }}>⚙️ 수집 키워드 설정</h3>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>
-                <div>
-                  <div style={{ fontSize: 13, fontWeight: 600, color: '#16a34a', marginBottom: 8 }}>✅ 추가 포함 키워드</div>
-                  <div style={{ display: 'flex', gap: 6, marginBottom: 8 }}>
-                    <input value={newInclude} onChange={e => setNewInclude(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') addKeyword('include') }} placeholder="예: 오픈런"
-                      style={{ flex: 1, padding: '7px 10px', borderRadius: 7, border: '1.5px solid #e2e8f0', fontSize: 12, outline: 'none' }} />
-                    <button onClick={() => addKeyword('include')} style={{ background: '#16a34a', color: '#fff', border: 'none', borderRadius: 7, padding: '7px 12px', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>추가</button>
-                  </div>
-                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5 }}>
-                    {includeKws.map(kw => (
-                      <span key={kw} style={{ display: 'inline-flex', alignItems: 'center', gap: 4, background: '#dcfce7', borderRadius: 12, padding: '3px 6px 3px 10px', fontSize: 12, color: '#15803d' }}>
-                        {kw}<button onClick={() => removeKeyword('include', kw)} style={{ background: '#bbf7d0', border: 'none', borderRadius: '50%', width: 16, height: 16, cursor: 'pointer', color: '#166534', fontSize: 11, lineHeight: 1 }}>×</button>
-                      </span>
-                    ))}
-                  </div>
-                </div>
-                <div>
-                  <div style={{ fontSize: 13, fontWeight: 600, color: '#dc2626', marginBottom: 8 }}>🚫 추가 제외 키워드</div>
-                  <div style={{ display: 'flex', gap: 6, marginBottom: 8 }}>
-                    <input value={newExclude} onChange={e => setNewExclude(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') addKeyword('exclude') }} placeholder="예: 협찬"
-                      style={{ flex: 1, padding: '7px 10px', borderRadius: 7, border: '1.5px solid #e2e8f0', fontSize: 12, outline: 'none' }} />
-                    <button onClick={() => addKeyword('exclude')} style={{ background: '#dc2626', color: '#fff', border: 'none', borderRadius: 7, padding: '7px 12px', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>추가</button>
-                  </div>
-                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5 }}>
-                    {excludeKws.map(kw => (
-                      <span key={kw} style={{ display: 'inline-flex', alignItems: 'center', gap: 4, background: '#fee2e2', borderRadius: 12, padding: '3px 6px 3px 10px', fontSize: 12, color: '#991b1b' }}>
-                        {kw}<button onClick={() => removeKeyword('exclude', kw)} style={{ background: '#fecaca', border: 'none', borderRadius: '50%', width: 16, height: 16, cursor: 'pointer', color: '#7f1d1d', fontSize: 11, lineHeight: 1 }}>×</button>
-                      </span>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* 필터 + 검색 */}
-            <div className="admin-filter">
-              <div style={{ display: 'flex', gap: 6 }}>
-                {(['all','review','published','hidden'] as const).map(f => (
-                  <button key={f} onClick={() => setFilter(f)}
-                    style={{ padding: '6px 14px', borderRadius: 20, border: 'none', cursor: 'pointer', fontSize: 13, background: filter === f ? '#6366f1' : '#e2e8f0', color: filter === f ? '#fff' : '#475569', fontWeight: 600 }}>
-                    {f === 'all' ? '전체' : f === 'review' ? `검수대기${reviewCount ? ` ${reviewCount}` : ''}` : f === 'published' ? '공개' : '숨김'}
-                  </button>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5 }}>
+                {includeKws.map(kw => (
+                  <span key={kw} style={{ display: 'inline-flex', alignItems: 'center', gap: 4, background: '#dcfce7', borderRadius: 12, padding: '3px 6px 3px 10px', fontSize: 12, color: '#15803d' }}>
+                    {kw}
+                    <button onClick={() => removeKeyword('include', kw)}
+                      style={{ background: '#bbf7d0', border: 'none', borderRadius: '50%', width: 16, height: 16, cursor: 'pointer', color: '#166534', fontSize: 11, lineHeight: 1 }}>×</button>
+                  </span>
                 ))}
+                {includeKws.length === 0 && <span style={{ fontSize: 11, color: '#94a3b8' }}>추가된 키워드 없음</span>}
               </div>
-              <input type="text" value={searchQ} onChange={e => setSearchQ(e.target.value)} placeholder="제목 / 계정 검색..." className="admin-filter-search" />
-              <span style={{ fontSize: 13, color: '#94a3b8', marginLeft: 'auto' }}>{visible.length}개</span>
             </div>
 
-            {/* 공구 목록 테이블 */}
-            {loading ? (
-              <div style={{ textAlign: 'center', padding: 60, color: '#94a3b8' }}>불러오는 중...</div>
-            ) : visible.length === 0 ? (
-              <div style={{ textAlign: 'center', padding: 60, color: '#94a3b8' }}><div style={{ fontSize: 48, marginBottom: 12 }}>📭</div><div>등록된 공구가 없습니다</div></div>
-            ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                {visible.map(p => <AdminPostRow key={p.id} post={p} onToggle={togglePublished} onDelete={deletePost} onEdit={setEditingPost} periodLabel={periodLabel(p)} dLeft={daysLeft(p.deadline)} />)}
+            {/* 제외 키워드 */}
+            <div>
+              <div style={{ fontSize: 13, fontWeight: 600, color: '#dc2626', marginBottom: 8 }}>🚫 추가 제외 키워드</div>
+              <p style={{ fontSize: 11, color: '#94a3b8', margin: '0 0 8px' }}>이 단어가 캡션에 있으면 수집 제외</p>
+              <div style={{ display: 'flex', gap: 6, marginBottom: 8 }}>
+                <input value={newExclude} onChange={e => setNewExclude(e.target.value)}
+                  onKeyDown={e => { if (e.key === 'Enter') addKeyword('exclude') }}
+                  placeholder="예: 체험단모집, 협찬"
+                  style={{ flex: 1, padding: '7px 10px', borderRadius: 7, border: '1.5px solid #e2e8f0', fontSize: 12, outline: 'none' }} />
+                <button onClick={() => addKeyword('exclude')}
+                  style={{ background: '#dc2626', color: '#fff', border: 'none', borderRadius: 7, padding: '7px 12px', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>추가</button>
               </div>
-            )}
-          </>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5 }}>
+                {excludeKws.map(kw => (
+                  <span key={kw} style={{ display: 'inline-flex', alignItems: 'center', gap: 4, background: '#fee2e2', borderRadius: 12, padding: '3px 6px 3px 10px', fontSize: 12, color: '#991b1b' }}>
+                    {kw}
+                    <button onClick={() => removeKeyword('exclude', kw)}
+                      style={{ background: '#fecaca', border: 'none', borderRadius: '50%', width: 16, height: 16, cursor: 'pointer', color: '#7f1d1d', fontSize: 11, lineHeight: 1 }}>×</button>
+                  </span>
+                ))}
+                {excludeKws.length === 0 && <span style={{ fontSize: 11, color: '#94a3b8' }}>추가된 키워드 없음</span>}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* 필터 + 검색 */}
+        <div className="admin-filter">
+          <div style={{ display: 'flex', gap: 6 }}>
+            {(['all','review','published','hidden'] as const).map(f => (
+              <button
+                key={f}
+                onClick={() => setFilter(f)}
+                style={{
+                  padding: '6px 14px', borderRadius: 20, border: 'none', cursor: 'pointer', fontSize: 13,
+                  background: filter === f ? '#6366f1' : '#e2e8f0',
+                  color: filter === f ? '#fff' : '#475569', fontWeight: 600,
+                }}
+              >
+                {f === 'all' ? '전체' : f === 'review' ? `검수대기${reviewCount ? ` ${reviewCount}` : ''}` : f === 'published' ? '공개' : '숨김'}
+              </button>
+            ))}
+          </div>
+          <input
+            type="text"
+            value={searchQ}
+            onChange={e => setSearchQ(e.target.value)}
+            placeholder="제목 / 계정 검색..."
+            className="admin-filter-search"
+          />
+          <span style={{ fontSize: 13, color: '#94a3b8', marginLeft: 'auto' }}>{visible.length}개</span>
+        </div>
+
+        {/* 공구 목록 테이블 */}
+        {loading ? (
+          <div style={{ textAlign: 'center', padding: 60, color: '#94a3b8' }}>불러오는 중...</div>
+        ) : visible.length === 0 ? (
+          <div style={{ textAlign: 'center', padding: 60, color: '#94a3b8' }}>
+            <div style={{ fontSize: 48, marginBottom: 12 }}>📭</div>
+            <div>등록된 공구가 없습니다</div>
+          </div>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            {visible.map(p => <AdminPostRow key={p.id} post={p} onToggle={togglePublished} onDelete={deletePost} onEdit={setEditingPost} periodLabel={periodLabel(p)} dLeft={daysLeft(p.deadline)} />)}
+          </div>
         )}
       </div>
 
-      {false && (() => {
+      {(() => {
         const existingGroups = [...new Set(posts.map(p => p.group_key).filter(Boolean) as string[])]
         return (
           <>
             {showAddModal && <AddPostModal onClose={() => setShowAddModal(false)} onSubmit={addPost} existingGroups={existingGroups} />}
-            {editingPost  && <AddPostModal onClose={() => setEditingPost(null)} onSubmit={updatePost} editPost={editingPost ?? undefined} existingGroups={existingGroups} />}
+            {editingPost  && <AddPostModal onClose={() => setEditingPost(null)} onSubmit={updatePost} editPost={editingPost} existingGroups={existingGroups} />}
           </>
         )
       })()}
