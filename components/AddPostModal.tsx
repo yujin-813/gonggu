@@ -51,11 +51,14 @@ export default function AddPostModal({ onClose, onSubmit, editPost, existingGrou
   const [cat,       setCat]       = useState<Category>('fashion')
   const [startDate, setStartDate] = useState(todayStr())
   const [endDate,   setEndDate]   = useState(defaultDate(7))
-  const [price,       setPrice]       = useState('')
-  const [origPrice,   setOrigPrice]   = useState('')
-  const [groupKey,    setGroupKey]    = useState('')
-  const [newGroupMode, setNewGroupMode] = useState(false)
+  const [price,         setPrice]         = useState('')
+  const [origPrice,     setOrigPrice]     = useState('')
+  const [groupKey,      setGroupKey]      = useState('')
+  const [newGroupMode,  setNewGroupMode]  = useState(false)
   const [newGroupInput, setNewGroupInput] = useState('')
+
+  const [marketSearching, setMarketSearching] = useState(false)
+  const [marketResults,   setMarketResults]   = useState<{ title: string; lprice: number; mallName: string }[]>([])
 
   const [imgFile,    setImgFile]    = useState<File | null>(null)
   const [imgPreview, setImgPreview] = useState('')   // blob URL or existing img URL
@@ -290,8 +293,62 @@ export default function AddPostModal({ onClose, onSubmit, editPost, existingGrou
             <input type="number" value={price} onChange={e => setPrice(e.target.value)} placeholder="45000" />
           </div>
           <div>
-            <label>시중가 (원, 선택)</label>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+              <label style={{ margin: 0 }}>시중가 (원, 선택)</label>
+              <button
+                type="button"
+                onClick={async () => {
+                  if (!title.trim()) return
+                  setMarketSearching(true)
+                  setMarketResults([])
+                  try {
+                    const r = await fetch(`/api/market-price?q=${encodeURIComponent(title.trim())}`)
+                    const d = await r.json()
+                    setMarketResults(d.items ?? [])
+                  } catch {}
+                  finally { setMarketSearching(false) }
+                }}
+                disabled={marketSearching || !title.trim()}
+                style={{
+                  background: 'none', border: 'none', fontSize: 12,
+                  color: title.trim() ? '#6366f1' : '#94a3b8',
+                  cursor: title.trim() ? 'pointer' : 'default', padding: 0,
+                }}
+              >
+                {marketSearching ? '검색 중...' : '🔍 네이버 시중가 검색'}
+              </button>
+            </div>
             <input type="number" value={origPrice} onChange={e => setOrigPrice(e.target.value)} placeholder="60000" />
+            {marketResults.length > 0 && (
+              <div style={{ marginTop: 6, border: '1.5px solid #e2e8f0', borderRadius: 8, overflow: 'hidden' }}>
+                {marketResults.map((item, i) => (
+                  <button
+                    key={i}
+                    type="button"
+                    onClick={() => { setOrigPrice(String(item.lprice)); setMarketResults([]) }}
+                    style={{
+                      display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                      width: '100%', padding: '8px 12px', background: i % 2 === 0 ? '#f8fafc' : '#fff',
+                      border: 'none', borderBottom: i < marketResults.length - 1 ? '1px solid #f1f5f9' : 'none',
+                      cursor: 'pointer', textAlign: 'left', gap: 8,
+                    }}
+                  >
+                    <span style={{ fontSize: 12, color: '#0f172a', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.title}</span>
+                    <span style={{ fontSize: 12, fontWeight: 700, color: '#e11d48', flexShrink: 0 }}>{item.lprice.toLocaleString()}원</span>
+                  </button>
+                ))}
+                <button
+                  type="button"
+                  onClick={() => setMarketResults([])}
+                  style={{ width: '100%', padding: '6px', background: '#f1f5f9', border: 'none', fontSize: 11, color: '#94a3b8', cursor: 'pointer' }}
+                >
+                  닫기
+                </button>
+              </div>
+            )}
+            {marketResults.length === 0 && !marketSearching && origPrice === '' && title.trim() && (
+              <p style={{ fontSize: 11, color: '#94a3b8', margin: '4px 0 0' }}>상품명 입력 후 검색하거나 직접 입력하세요</p>
+            )}
           </div>
         </div>
 
