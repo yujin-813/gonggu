@@ -21,7 +21,7 @@ export interface Post {
   brand?: string | null
   group_key?: string | null
   market_url?: string | null
-  source?: 'manual' | 'scraper'
+  source?: 'manual' | 'scraper' | 'inpock'
   published?: boolean
 }
 

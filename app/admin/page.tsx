@@ -111,7 +111,7 @@ export default function AdminPage() {
   const [showAddModal, setShowAddModal] = useState(false)
   const [editingPost, setEditingPost]   = useState<Post | null>(null)
   const [loading, setLoading]         = useState(true)
-  const [filter, setFilter]           = useState<'all' | 'review' | 'published' | 'hidden'>('all')
+  const [filter, setFilter]           = useState<'all' | 'candidates' | 'published' | 'hidden'>('all')
   const [searchQ, setSearchQ]         = useState('')
   const [analytics, setAnalytics]     = useState<DayStat[]>([])
   const [includeKws, setIncludeKws]   = useState<string[]>([])
@@ -288,23 +288,22 @@ export default function AdminPage() {
     }
   }
 
-  // 자동 수집분(인포크·인스타)이 검수 대기 상태인 것
-  const isReview = (p: Post) => p.published === false && p.source !== 'manual'
+  const isCandidate = (p: Post) => p.source === 'inpock'
 
   const visible = posts.filter(p => {
     const matchFilter =
-      filter === 'all' ? true :
-      filter === 'review' ? isReview(p) :
-      filter === 'published' ? p.published !== false :
-      p.published === false
+      filter === 'all'        ? !isCandidate(p) :
+      filter === 'candidates' ? isCandidate(p) :
+      filter === 'published'  ? !isCandidate(p) && p.published !== false :
+      !isCandidate(p) && p.published === false
     const q = searchQ.toLowerCase()
     const matchQ = !q || p.title.toLowerCase().includes(q) || p.account.toLowerCase().includes(q)
     return matchFilter && matchQ
   })
 
-  const publishedCount = posts.filter(p => p.published !== false).length
-  const hiddenCount    = posts.filter(p => p.published === false).length
-  const reviewCount    = posts.filter(isReview).length
+  const publishedCount   = posts.filter(p => !isCandidate(p) && p.published !== false).length
+  const hiddenCount      = posts.filter(p => !isCandidate(p) && p.published === false).length
+  const candidatesCount  = posts.filter(isCandidate).length
 
   // 인증 확인 중 (hydration 전)
   if (authed === null) return null
@@ -340,7 +339,7 @@ export default function AdminPage() {
         <div className="admin-stats">
           <StatCard label="전체 공구" value={posts.length} icon="📦" color="#6366f1" />
           <StatCard label="공개 중" value={publishedCount} icon="✅" color="#22c55e" />
-          <StatCard label="검수 대기" value={reviewCount} icon="📝" color="#eab308" />
+          <StatCard label="공구 후보" value={candidatesCount} icon="📝" color="#eab308" />
           <StatCard label="숨김 처리" value={hiddenCount} icon="🙈" color="#f97316" />
         </div>
 
@@ -471,17 +470,24 @@ export default function AdminPage() {
         {/* 필터 + 검색 */}
         <div className="admin-filter">
           <div style={{ display: 'flex', gap: 6 }}>
-            {(['all','review','published','hidden'] as const).map(f => (
+            {([
+              { key: 'all',        label: '공구 전체' },
+              { key: 'candidates', label: `공구 후보${candidatesCount ? ` ${candidatesCount}` : ''}` },
+              { key: 'published',  label: '공개' },
+              { key: 'hidden',     label: '숨김' },
+            ] as const).map(({ key, label }) => (
               <button
-                key={f}
-                onClick={() => setFilter(f)}
+                key={key}
+                onClick={() => setFilter(key)}
                 style={{
                   padding: '6px 14px', borderRadius: 20, border: 'none', cursor: 'pointer', fontSize: 13,
-                  background: filter === f ? '#6366f1' : '#e2e8f0',
-                  color: filter === f ? '#fff' : '#475569', fontWeight: 600,
+                  background: filter === key
+                    ? key === 'candidates' ? '#eab308' : '#6366f1'
+                    : '#e2e8f0',
+                  color: filter === key ? '#fff' : '#475569', fontWeight: 600,
                 }}
               >
-                {f === 'all' ? '전체' : f === 'review' ? `검수대기${reviewCount ? ` ${reviewCount}` : ''}` : f === 'published' ? '공개' : '숨김'}
+                {label}
               </button>
             ))}
           </div>
@@ -645,8 +651,8 @@ function AdminPostRow({ post: p, onToggle, onDelete, onEdit, periodLabel, dLeft 
           </div>
           <div style={{ fontSize: 12, color: '#64748b', display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
             <span>{p.account}</span>
-            {p.published === false && p.source !== 'manual' && (
-              <span style={{ fontSize: 11, background: '#fef9c3', color: '#a16207', padding: '2px 6px', borderRadius: 10, fontWeight: 600 }}>📝 검수대기</span>
+            {p.source === 'inpock' && (
+              <span style={{ fontSize: 11, background: '#fef9c3', color: '#a16207', padding: '2px 6px', borderRadius: 10, fontWeight: 600 }}>📝 공구 후보</span>
             )}
             {p.brand && <span style={{ color: '#6366f1', fontWeight: 600 }}>{p.brand}</span>}
             <span style={{ color: expired ? '#ef4444' : '#6366f1' }}>📅 {periodLabel}</span>
