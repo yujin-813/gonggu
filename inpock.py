@@ -131,6 +131,39 @@ def price_from_stickers(stickers):
     return 0
 
 
+def fetch_store_price(url, domain):
+    """지원 쇼핑몰 상세 페이지에서 가격 파싱. 실패 시 0 반환.
+    현재 지원: smartstore.naver.com (JSON-LD 구조 데이터)."""
+    if not url or not domain:
+        return 0
+    if "smartstore.naver.com" not in domain:
+        return 0
+    try:
+        r = requests.get(url, headers={"User-Agent": UA}, timeout=8)
+        if r.status_code != 200:
+            return 0
+        for m in re.finditer(
+            r'<script[^>]+type=["\']application/ld\+json["\'][^>]*>(.*?)</script>',
+            r.text, re.S,
+        ):
+            try:
+                data = json.loads(m.group(1))
+                items = data if isinstance(data, list) else [data]
+                for item in items:
+                    if item.get("@type") == "Product":
+                        offers = item.get("offers", {})
+                        price = offers.get("price") or offers.get("lowPrice")
+                        if price:
+                            val = int(float(str(price).replace(",", "")))
+                            if 1000 <= val <= 10_000_000:
+                                return val
+            except Exception:
+                continue
+    except Exception:
+        pass
+    return 0
+
+
 def is_product(domain, price, title=""):
     """공구인지 판정. 가격 뱃지가 있으면 도메인 무관 공구. 상시판매·비커머스는 제외.
     도메인을 못 구하면 보수적으로 공구로 간주(검수 대기에서 사람이 판단)."""
@@ -221,6 +254,8 @@ def collect(handles):
             url_abs = b["url"] if b["url"].startswith("http") else INPOCK + b["url"]
             price = price_from_stickers(b.get("stickers"))
             final_url, domain = resolve_link(url_abs)
+            if not price and final_url:
+                price = fetch_store_price(final_url, domain)
             if not is_product(domain, price, b.get("title", "")):
                 skipped_count += 1
                 print(f"  - (제외) {b['title'][:34]} [{domain}]")
