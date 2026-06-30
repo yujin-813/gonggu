@@ -29,7 +29,10 @@ function save(data: AnalyticsData) {
   for (const date of Object.keys(data.daily)) {
     if (date < cutoffStr) delete data.daily[date]
   }
-  fs.writeFileSync(FILE, JSON.stringify(data, null, 2))
+  // 임시 파일에 쓴 뒤 rename — 쓰기 도중 프로세스가 죽어도 기존 파일이 손상되지 않는다.
+  const tmp = `${FILE}.${process.pid}.${Date.now()}.tmp`
+  fs.writeFileSync(tmp, JSON.stringify(data, null, 2))
+  fs.renameSync(tmp, FILE)
 }
 
 export function recordEvent(type: string, sessionId: string) {

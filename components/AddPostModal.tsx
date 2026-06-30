@@ -52,6 +52,7 @@ export default function AddPostModal({ onClose, onSubmit, editPost }: Props) {
   const [endDate,   setEndDate]   = useState(defaultDate(7))
   const [price,     setPrice]     = useState('')
   const [origPrice, setOrigPrice] = useState('')
+  const [groupKey,  setGroupKey]  = useState('')
 
   const [imgFile,    setImgFile]    = useState<File | null>(null)
   const [imgPreview, setImgPreview] = useState('')   // blob URL or existing img URL
@@ -70,6 +71,7 @@ export default function AddPostModal({ onClose, onSubmit, editPost }: Props) {
     setEndDate(editPost.deadline || defaultDate(7))
     setPrice(editPost.price ? String(editPost.price) : '')
     setOrigPrice(editPost.origPrice ? String(editPost.origPrice) : '')
+    setGroupKey(editPost.group_key || '')
     setBrand(editPost.brand || '')
     if (editPost.img && !editPost.img.startsWith('data:')) {
       setImgPreview(editPost.img)
@@ -169,6 +171,7 @@ export default function AddPostModal({ onClose, onSubmit, editPost }: Props) {
         participants: editPost?.participants ?? 0,
         avatar:       CAT_EMOJI[cat] || '🛍️',
         caption:      editPost?.caption || '',
+        group_key:    groupKey.trim() || null,
         published:    editPost?.published ?? true,
       })
     } catch (err) {
@@ -281,10 +284,22 @@ export default function AddPostModal({ onClose, onSubmit, editPost }: Props) {
             <input type="number" value={price} onChange={e => setPrice(e.target.value)} placeholder="45000" />
           </div>
           <div>
-            <label>원가 (원, 선택)</label>
+            <label>시중가 (원, 선택)</label>
             <input type="number" value={origPrice} onChange={e => setOrigPrice(e.target.value)} placeholder="60000" />
           </div>
         </div>
+
+        {/* 가격 비교 그룹 */}
+        <label>
+          비교 그룹
+          <span style={{ fontSize: 12, color: '#94a3b8', fontWeight: 400, marginLeft: 6 }}>(선택 — 같은 상품 가격비교용)</span>
+        </label>
+        <input
+          type="text"
+          value={groupKey}
+          onChange={e => setGroupKey(e.target.value)}
+          placeholder="예: 리넨원피스2025 (같은 상품이면 동일하게 입력)"
+        />
 
         {/* 이미지 업로드 */}
         <label>상품 이미지</label>

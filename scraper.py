@@ -672,6 +672,37 @@ def scrape_hashtags(L, hashtags, limit, existing_posts, seen):
     return new_posts
 
 
+def scrape_single_post(url_or_shortcode):
+    """단일 인스타그램 게시글을 URL 또는 숏코드로 수집."""
+    m = re.search(r'instagram\.com/(?:p|reel)/([A-Za-z0-9_-]+)', url_or_shortcode)
+    shortcode = m.group(1) if m else url_or_shortcode.strip().rstrip('/')
+
+    existing_posts, seen = load_posts()
+    if shortcode in seen:
+        write_status(0, f"이미 수집된 게시글: {shortcode}")
+        print(f"⚠️  이미 수집된 게시글입니다: {shortcode}")
+        return
+
+    L = make_loader()
+    ok = login(L)
+    if not ok:
+        write_status(0, "인스타그램 로그인 실패")
+        return
+
+    try:
+        print(f"🔍 게시글 수집 중: {shortcode}")
+        post = instaloader.Post.from_shortcode(L.context, shortcode)
+        data = post_to_dict(post, shortcode)
+        existing_posts.insert(0, data)
+        save_posts(existing_posts)
+        write_status(1)
+        price_str = f"{data['price']:,}원" if data['price'] else "가격미상"
+        print(f"✅ 수집 완료: {data['title'][:40]} | {price_str}")
+    except Exception as e:
+        write_status(0, str(e))
+        print(f"❌ 수집 실패: {e}")
+
+
 def scrape(profiles=None, hashtags=None, limit=DEFAULT_LIMIT,
            username=None, password=None, interactive=False):
     L = make_loader()
@@ -775,6 +806,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="공구모아 스크래퍼 v2")
     parser.add_argument("--setup",   action="store_true", help="로그인 후 세션 저장 (최초 1회)")
     parser.add_argument("--from-browser", help="브라우저 쿠키로 세션 생성 (chrome/firefox/edge/brave/safari)")
+    parser.add_argument("--post",     help="특정 게시글 URL 또는 숏코드 수집")
     parser.add_argument("--profile", "-p", nargs="+",    help="스크래핑할 계정 (공백으로 구분)")
     parser.add_argument("--hashtag", "-t", nargs="+",    help="스크래핑할 해시태그")
     parser.add_argument("--limit",   "-l", type=int, default=DEFAULT_LIMIT)
@@ -786,6 +818,8 @@ if __name__ == "__main__":
 
     if args.from_browser:
         setup_from_browser(args.from_browser, username=args.username)
+    elif args.post:
+        scrape_single_post(args.post)
     elif args.setup:
         print("\n[세션 설정 모드]")
         username = args.username or os.environ.get("INSTAGRAM_USERNAME", "")

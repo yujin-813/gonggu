@@ -1,6 +1,7 @@
 'use client'
 import { useState } from 'react'
 import type { Post } from '@/lib/types'
+import PriceCompareModal from './PriceCompareModal'
 
 const CAT_LABEL: Record<string, string> = {
   fashion: '👗 패션', beauty: '💄 뷰티', food: '🍱 식품',
@@ -48,10 +49,13 @@ interface PostCardProps {
   isBookmarked: boolean
   onToggleBookmark: (id: number) => void
   onJoin?: (id: number) => void
+  siblings?: Post[]
 }
 
-export default function PostCard({ post, isBookmarked, onToggleBookmark, onJoin }: PostCardProps) {
+export default function PostCard({ post, isBookmarked, onToggleBookmark, onJoin, siblings = [] }: PostCardProps) {
   const [imgFailed, setImgFailed] = useState(false)
+  const [showCompare, setShowCompare] = useState(false)
+  const compareCount = siblings.length
   const badge = badgeInfo(post.deadline)
   const dt = periodText(post.start_date, post.deadline)
   const closed = daysLeft(post.deadline) < 0
@@ -108,11 +112,26 @@ export default function PostCard({ post, isBookmarked, onToggleBookmark, onJoin 
 
         <div className="price-row">
           <span className="price-sale">{post.price.toLocaleString()}원</span>
-          {post.origPrice && (
-            <span className="price-orig">{post.origPrice.toLocaleString()}원</span>
-          )}
           {discount > 0 && <span className="discount-rate">-{discount}%</span>}
+          {post.origPrice && post.origPrice > post.price && (
+            <span className="price-orig">시중가 {post.origPrice.toLocaleString()}원</span>
+          )}
         </div>
+
+        {compareCount > 1 && (
+          <button
+            onClick={() => setShowCompare(true)}
+            style={{
+              width: '100%', marginBottom: 8,
+              background: '#fef9c3', border: '1.5px solid #fbbf24',
+              borderRadius: 8, padding: '6px 0',
+              fontSize: 12, fontWeight: 700, color: '#92400e',
+              cursor: 'pointer',
+            }}
+          >
+            💰 {compareCount}개 가격 비교
+          </button>
+        )}
 
         <div className="card-footer">
           <div>
@@ -132,6 +151,14 @@ export default function PostCard({ post, isBookmarked, onToggleBookmark, onJoin 
           </button>
         </div>
       </div>
+
+      {showCompare && (
+        <PriceCompareModal
+          posts={siblings}
+          onClose={() => setShowCompare(false)}
+          onJoin={onJoin}
+        />
+      )}
     </div>
   )
 }

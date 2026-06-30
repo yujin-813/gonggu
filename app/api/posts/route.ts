@@ -88,6 +88,7 @@ export async function POST(request: NextRequest) {
     cat:        data.cat,
     price:      parseInt(data.price),
     origPrice:  data.origPrice ? parseInt(data.origPrice) : null,
+    group_key:  data.group_key?.trim() || null,
     start_date: data.start_date || '',
     deadline:   data.deadline || '',
     brand:      data.brand || null,

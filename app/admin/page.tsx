@@ -108,16 +108,12 @@ function daysLeft(deadline?: string) {
 export default function AdminPage() {
   const [authed, setAuthed]           = useState<boolean | null>(null)  // null = 확인 중
   const [posts, setPosts]             = useState<Post[]>([])
-  const [status, setStatus]           = useState<ScraperStatus | null>(null)
   const [showAddModal, setShowAddModal] = useState(false)
   const [editingPost, setEditingPost]   = useState<Post | null>(null)
   const [loading, setLoading]         = useState(true)
-  const [scraping, setScraping]       = useState(false)
   const [filter, setFilter]           = useState<'all' | 'review' | 'published' | 'hidden'>('all')
   const [searchQ, setSearchQ]         = useState('')
   const [analytics, setAnalytics]     = useState<DayStat[]>([])
-  const [profiles, setProfiles]       = useState<string[]>([])
-  const [newProfile, setNewProfile]   = useState('')
   const [includeKws, setIncludeKws]   = useState<string[]>([])
   const [excludeKws, setExcludeKws]   = useState<string[]>([])
   const [newInclude, setNewInclude]   = useState('')
@@ -126,6 +122,9 @@ export default function AdminPage() {
   const [newInpock, setNewInpock]     = useState('')
   const [inpockStatus, setInpockStatus] = useState<ScraperStatus | null>(null)
   const [inpockBusy, setInpockBusy]   = useState(false)
+  const [instPostUrl, setInstPostUrl] = useState('')
+  const [instPostBusy, setInstPostBusy] = useState(false)
+  const [instPostMsg, setInstPostMsg] = useState('')
 
   // 세션 확인 (httpOnly 쿠키는 JS로 읽을 수 없으므로 서버에 확인)
   useEffect(() => {
@@ -142,19 +141,9 @@ export default function AdminPage() {
     setLoading(false)
   }, [])
 
-  const fetchStatus = useCallback(async () => {
-    const r = await fetch('/api/scrape/status')
-    if (r.ok) setStatus(await r.json())
-  }, [])
-
   const fetchAnalytics = useCallback(async () => {
     const r = await fetch('/api/analytics')
     if (r.ok) setAnalytics(await r.json())
-  }, [])
-
-  const fetchProfiles = useCallback(async () => {
-    const r = await fetch('/api/profiles')
-    if (r.ok) { const d = await r.json(); setProfiles(d.profiles || []) }
   }, [])
 
   const fetchInpockSources = useCallback(async () => {
@@ -202,22 +191,31 @@ export default function AdminPage() {
     }
   }, [])
 
-  async function addProfile() {
-    const handle = newProfile.trim()
-    if (!handle) return
-    const r = await fetch('/api/profiles', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ handle }),
-    })
-    if (r.ok) { setNewProfile(''); await fetchProfiles() }
-    else { const d = await r.json().catch(() => ({})); alert(d.error || '추가 실패') }
-  }
-
-  async function removeProfile(handle: string) {
-    if (!confirm(`'@${handle}' 계정을 삭제할까요?`)) return
-    await fetch(`/api/profiles?handle=${encodeURIComponent(handle)}`, { method: 'DELETE' })
-    await fetchProfiles()
+  async function addInstPost() {
+    const url = instPostUrl.trim()
+    if (!url) return
+    setInstPostBusy(true)
+    setInstPostMsg('')
+    try {
+      const r = await fetch('/api/instagram-post', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url }),
+      })
+      const d = await r.json()
+      if (r.ok) {
+        const lastLine = (d.output as string || '').split('\n').filter(Boolean).pop()?.trim()
+        setInstPostMsg(`✅ ${lastLine || '수집 완료 — 검수 대기에 추가됨'}`)
+        setInstPostUrl('')
+        await fetchPosts()
+      } else {
+        setInstPostMsg(`❌ ${d.error || '수집 실패'}`)
+      }
+    } catch {
+      setInstPostMsg('❌ 서버 오류')
+    } finally {
+      setInstPostBusy(false)
+    }
   }
 
   async function addKeyword(type: 'include' | 'exclude') {
@@ -241,15 +239,13 @@ export default function AdminPage() {
 
   useEffect(() => {
     fetchPosts()
-    fetchStatus()
     fetchAnalytics()
-    fetchProfiles()
     fetchConfig()
     fetchInpockSources()
     fetchInpockStatus()
-    const iv = setInterval(() => { fetchStatus(); fetchInpockStatus() }, 5000)
+    const iv = setInterval(() => { fetchInpockStatus() }, 5000)
     return () => clearInterval(iv)
-  }, [fetchPosts, fetchStatus, fetchAnalytics, fetchProfiles, fetchConfig, fetchInpockSources, fetchInpockStatus])
+  }, [fetchPosts, fetchAnalytics, fetchConfig, fetchInpockSources, fetchInpockStatus])
 
   async function togglePublished(p: Post) {
     const next = p.published === false ? true : false
@@ -290,13 +286,6 @@ export default function AdminPage() {
       setEditingPost(null)
       await fetchPosts()
     }
-  }
-
-  async function startScrape() {
-    setScraping(true)
-    await fetch('/api/scrape', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ limit: 30 }) })
-    await fetchStatus()
-    setTimeout(async () => { await fetchPosts(); setScraping(false) }, 3000)
   }
 
   // 자동 수집분(인포크·인스타)이 검수 대기 상태인 것
@@ -425,72 +414,40 @@ export default function AdminPage() {
           </p>
         </div>
 
-        {/* 인스타그램 스크래퍼 (공구 게시글 수집) */}
+        {/* 인스타 게시글 직접 추가 */}
         <div style={{ background: '#fff', borderRadius: 12, padding: 20, marginBottom: 24, border: '1px solid #e2e8f0' }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8, marginBottom: 12 }}>
-            <h3 style={{ margin: 0, fontSize: 15, fontWeight: 700, color: '#1e293b' }}>📸 인스타그램 공구 수집</h3>
-            <button
-              onClick={startScrape}
-              disabled={scraping || status?.running || profiles.length === 0}
-              style={{ background: scraping || status?.running || profiles.length === 0 ? '#94a3b8' : '#6366f1', color: '#fff', border: 'none', borderRadius: 8, padding: '8px 16px', cursor: scraping ? 'wait' : profiles.length === 0 ? 'not-allowed' : 'pointer', fontWeight: 600, fontSize: 13 }}
-            >
-              {scraping || status?.running ? '수집 중...' : '🔄 지금 수집'}
-            </button>
-          </div>
-
-          {/* 상태 */}
-          {status && (
-            <div style={{ fontSize: 13, color: '#64748b', marginBottom: 12 }}>
-              {status.running ? (
-                <span style={{ color: '#6366f1', fontWeight: 600 }}>⏳ 수집 중...</span>
-              ) : status.last_run ? (
-                <>마지막 수집: {new Date(status.last_run).toLocaleString('ko-KR')}
-                  {' · '}신규 <strong>{status.last_count}</strong>개 검수대기
-                  {status.error && <span style={{ color: '#ef4444', marginLeft: 8 }}>❌ {status.error}</span>}
-                </>
-              ) : '아직 수집한 적 없음'}
-            </div>
-          )}
-
-          {/* 인스타 계정 등록 */}
-          <div style={{ display: 'flex', gap: 8, marginBottom: 10, flexWrap: 'wrap' }}>
+          <h3 style={{ margin: '0 0 8px', fontSize: 15, fontWeight: 700, color: '#1e293b' }}>📸 인스타 게시글 직접 추가</h3>
+          <p style={{ fontSize: 12, color: '#64748b', margin: '0 0 10px' }}>
+            특정 게시글 URL을 입력하면 수집 후 검수 대기로 추가됩니다.
+            최초 1회 터미널에서 <code style={{ background: '#f1f5f9', padding: '1px 5px', borderRadius: 4 }}>python3 scraper.py --setup</code> 로그인 필요.
+          </p>
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
             <input
-              type="text"
-              value={newProfile}
-              onChange={e => setNewProfile(e.target.value)}
-              onKeyDown={e => { if (e.key === 'Enter') addProfile() }}
-              placeholder="인스타 계정 또는 URL (예: __siu.mom)"
-              style={{ flex: 1, minWidth: 200, padding: '8px 12px', borderRadius: 8, border: '1.5px solid #e2e8f0', fontSize: 13, outline: 'none' }}
+              type="url"
+              value={instPostUrl}
+              onChange={e => { setInstPostUrl(e.target.value); setInstPostMsg('') }}
+              onKeyDown={e => { if (e.key === 'Enter') addInstPost() }}
+              placeholder="https://www.instagram.com/p/ABC123..."
+              style={{ flex: 1, minWidth: 240, padding: '8px 12px', borderRadius: 8, border: '1.5px solid #e2e8f0', fontSize: 13, outline: 'none' }}
             />
-            <button onClick={addProfile}
-              style={{ background: '#6366f1', color: '#fff', border: 'none', borderRadius: 8, padding: '8px 16px', fontWeight: 600, cursor: 'pointer', fontSize: 13 }}>
-              ＋ 계정 추가
+            <button
+              onClick={addInstPost}
+              disabled={instPostBusy || !instPostUrl.trim()}
+              style={{
+                background: instPostBusy || !instPostUrl.trim() ? '#94a3b8' : '#6366f1',
+                color: '#fff', border: 'none', borderRadius: 8, padding: '8px 18px',
+                fontWeight: 600, fontSize: 13,
+                cursor: instPostBusy ? 'wait' : !instPostUrl.trim() ? 'not-allowed' : 'pointer',
+              }}
+            >
+              {instPostBusy ? '수집 중...' : '수집'}
             </button>
           </div>
-
-          {/* 등록된 계정 목록 */}
-          {profiles.length === 0 ? (
-            <p style={{ fontSize: 12, color: '#94a3b8', margin: '4px 0 0' }}>등록된 인스타 계정이 없습니다. 공구를 올리는 인플루언서 계정을 추가하세요.</p>
-          ) : (
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-              {profiles.map(h => (
-                <span key={h} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: '#f1f5f9', borderRadius: 16, padding: '4px 6px 4px 12px', fontSize: 12, color: '#475569' }}>
-                  @{h}
-                  <button onClick={() => removeProfile(h)} title="삭제"
-                    style={{ background: '#e2e8f0', border: 'none', borderRadius: '50%', width: 18, height: 18, cursor: 'pointer', color: '#64748b', fontSize: 12, lineHeight: 1 }}>×</button>
-                </span>
-              ))}
-            </div>
-          )}
-
-          {status?.error && !status?.running && (
-            <p style={{ fontSize: 12, color: '#ef4444', margin: '10px 0 0' }}>
-              ⚠️ {status.error.includes('로그인') ? '로그인 실패 — 터미널에서 세션 설정이 필요합니다 (아래 안내)' : status.error}
+          {instPostMsg && (
+            <p style={{ fontSize: 12, margin: '8px 0 0', color: instPostMsg.startsWith('✅') ? '#16a34a' : '#ef4444' }}>
+              {instPostMsg}
             </p>
           )}
-          <p style={{ fontSize: 11, color: '#94a3b8', margin: '10px 0 0' }}>
-            ※ 캡션에 공구/기간 신호가 있는 게시글만 <strong>검수 대기</strong>로 수집됩니다. &apos;공구 보기&apos;는 해당 인스타 게시글로 연결됩니다. 최초 1회 터미널에서 로그인 세션 설정이 필요합니다.
-          </p>
         </div>
 
         {/* 키워드 설정 */}

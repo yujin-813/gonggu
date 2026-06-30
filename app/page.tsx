@@ -120,6 +120,15 @@ export default function Home() {
 
   const urgentCount = posts.filter(p => { const d = daysLeft(p.deadline); return d >= 0 && d <= 1 }).length
 
+  // group_key가 있는 게시글끼리 묶음 (published 된 것들만)
+  const groupMap = new Map<string, typeof posts>()
+  for (const p of posts) {
+    if (!p.group_key) continue
+    const arr = groupMap.get(p.group_key) ?? []
+    arr.push(p)
+    groupMap.set(p.group_key, arr)
+  }
+
   return (
     <>
       <Header
@@ -190,6 +199,7 @@ export default function Home() {
               isBookmarked={bookmarks.has(post.id)}
               onToggleBookmark={toggleBookmark}
               onJoin={() => track('join')}
+              siblings={post.group_key ? groupMap.get(post.group_key) : undefined}
             />
           ))
         )}
