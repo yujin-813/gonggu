@@ -284,6 +284,11 @@ def fetch_product_info(url, domain):
         debug["extraction_error"] = "지원되지 않는 도메인"
         return {}, debug
 
+    manual_only = ("coupang.com", "gmarket.co.kr", "auction.co.kr")
+    if any(s in url for s in manual_only):
+        debug["extraction_error"] = "수동 입력 필요 (JS 렌더링 전용 사이트)"
+        return {}, debug
+
     try:
         r = requests.get(url, headers={"User-Agent": UA}, timeout=10)
         debug["page_fetch_status"] = r.status_code
