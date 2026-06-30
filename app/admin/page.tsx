@@ -743,8 +743,20 @@ function AdminPostRow({ post: p, onToggle, onDelete, onEdit, onToggleAlwaysOn, p
 
         {/* 액션 버튼 */}
         <div className="admin-row-actions">
-          {p.url && (
-            <a href={p.url} target="_blank" rel="noopener noreferrer" title="게시글 보기"
+          {p.source_url && (
+            <a href={p.source_url} target="_blank" rel="noopener noreferrer" title="인포크/링크트리 원본 보기"
+              style={{ padding: '6px 10px', background: '#ede9fe', borderRadius: 6, fontSize: 12, color: '#7c3aed', textDecoration: 'none', whiteSpace: 'nowrap' }}>
+              원본 →
+            </a>
+          )}
+          {p.purchase_url && (
+            <a href={p.purchase_url} target="_blank" rel="noopener noreferrer" title="구매 페이지 보기"
+              style={{ padding: '6px 10px', background: '#dcfce7', borderRadius: 6, fontSize: 12, color: '#16a34a', textDecoration: 'none', whiteSpace: 'nowrap' }}>
+              구매 →
+            </a>
+          )}
+          {!p.source_url && !p.purchase_url && p.url && (
+            <a href={p.url} target="_blank" rel="noopener noreferrer"
               style={{ padding: '6px 10px', background: '#f1f5f9', borderRadius: 6, fontSize: 12, color: '#475569', textDecoration: 'none', whiteSpace: 'nowrap' }}>
               보기 →
             </a>
