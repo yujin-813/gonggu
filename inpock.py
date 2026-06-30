@@ -14,14 +14,18 @@ __NEXT_DATA__ JSON을 파싱한다. 인스타 API를 거치지 않으므로 차�
 
 import argparse
 import json
+import os
 import re
 import sys
-from datetime import datetime
+from datetime import datetime, date
 from pathlib import Path
 
-import os
-
 import requests
+try:
+    import dateparser
+    _DATEPARSER_OK = True
+except ImportError:
+    _DATEPARSER_OK = False
 
 # ── 경로 ──────────────────────────────────────────────────────────────────────
 BASE_DIR     = Path(__file__).parent
@@ -176,59 +180,84 @@ def _find_deadline_candidates(text):
 
 
 def _parse_deadline_candidate(raw):
+    """문자열을 YYYY-MM-DD로 변환. dateparser → regex 순서로 시도."""
     raw = raw.strip()
+    # ISO 형식은 직접 처리 (빠르고 오인식 없음)
     m = re.match(r'(\d{4})[.\-/](\d{1,2})[.\-/](\d{1,2})', raw)
     if m:
         return f"{m.group(1)}-{m.group(2).zfill(2)}-{m.group(3).zfill(2)}"
+    # dateparser로 한국어 날짜 파싱
+    if _DATEPARSER_OK:
+        parsed = dateparser.parse(
+            raw,
+            languages=["ko"],
+            settings={"PREFER_DATES_FROM": "future", "RETURN_AS_TIMEZONE_AWARE": False},
+        )
+        if parsed:
+            result = parsed.strftime("%Y-%m-%d")
+            # 오늘보다 과거이면 내년으로 조정
+            if result < date.today().strftime("%Y-%m-%d"):
+                parsed = parsed.replace(year=parsed.year + 1)
+                result = parsed.strftime("%Y-%m-%d")
+            return result
+    # regex fallback
     m = re.match(r'(\d{1,2})[월]\s*(\d{1,2})[일]', raw)
     if m:
-        year = datetime.now().year
-        return f"{year}-{m.group(1).zfill(2)}-{m.group(2).zfill(2)}"
+        return f"{date.today().year}-{m.group(1).zfill(2)}-{m.group(2).zfill(2)}"
     m = re.match(r'~?\s*(\d{1,2})[./](\d{1,2})', raw)
     if m:
-        year = datetime.now().year
-        return f"{year}-{m.group(1).zfill(2)}-{m.group(2).zfill(2)}"
+        return f"{date.today().year}-{m.group(1).zfill(2)}-{m.group(2).zfill(2)}"
     return None
 
 
-def _ai_extract(price_candidates, deadline_candidates, sample_text):
-    api_key = os.environ.get("ANTHROPIC_API_KEY", "")
-    if not api_key:
-        return None, None, "low", "no_api_key"
-    try:
-        import anthropic
-        client = anthropic.Anthropic(api_key=api_key)
-        price_ctx = "\n".join(f"- {c['context']}" for c in price_candidates[:5]) or "(없음)"
-        deadline_ctx = "\n".join(f"- {c['context']}" for c in deadline_candidates[:5]) or "(없음)"
-        prompt = (
-            "다음은 한국 쇼핑몰 상품 페이지에서 추출한 텍스트입니다.\n"
-            f"가격 후보 문장:\n{price_ctx}\n\n"
-            f"마감일 후보 문장:\n{deadline_ctx}\n\n"
-            f"페이지 일부:\n{sample_text[:800]}\n\n"
-            "공구/판매 가격(원 단위 정수)과 마감일(YYYY-MM-DD)을 추출하세요.\n"
-            "확실하지 않으면 null로 반환하세요.\n"
-            '{"price": <숫자 또는 null>, "deadline": "<날짜 또는 null>", "confidence": "high|medium|low"} 형식 JSON만 반환하세요.'
-        )
-        resp = client.messages.create(
-            model="claude-haiku-4-5-20251001",
-            max_tokens=100,
-            messages=[{"role": "user", "content": prompt}],
-        )
-        text = resp.content[0].text.strip()
-        found = re.search(r'\{.*\}', text, re.S)
-        if not found:
-            return None, None, "low", "parse_error"
-        data = json.loads(found.group(0))
-        price = data.get("price")
-        deadline = data.get("deadline")
-        conf = data.get("confidence", "low")
-        if price and not (isinstance(price, (int, float)) and 1000 <= price <= 10_000_000):
-            price = None
-        if deadline and not re.match(r'\d{4}-\d{2}-\d{2}', str(deadline)):
-            deadline = None
-        return (int(price) if price else None), (str(deadline) if deadline else None), conf, "ai"
-    except Exception as e:
-        return None, None, "low", f"ai_error:{str(e)[:80]}"
+# ── 도메인별 전용 추출기 ───────────────────────────────────────────────────────
+_DOMAIN_PRICE_PATTERNS = {
+    "11st.co.kr":       [r'"finalDscAmt"\s*:\s*(\d{4,8})', r'"saleAmt"\s*:\s*(\d{4,8})'],
+    "interpark.com":    [r'"discountPrice"\s*:\s*(\d{4,8})', r'"price"\s*:\s*(\d{4,8})'],
+    "ssg.com":          [r'"salePrc"\s*:\s*"?(\d{4,8})"?'],
+    "oliveyoung.co.kr": [r'"finalPrice"\s*:\s*"?(\d{4,8})"?'],
+    "kurly.com":        [r'"sales_price"\s*:\s*(\d{4,8})'],
+    "a-bly.com":        [r'"discountedPrice"\s*:\s*(\d{4,8})'],
+}
+
+_DOMAIN_DEADLINE_PATTERNS = {
+    "smartstore.naver.com": [r'판매기간[^<]*?(\d{4}[.\-]\d{2}[.\-]\d{2})'],
+    "11st.co.kr":           [r'판매종료일[^<]*?(\d{4}[.\-]\d{2}[.\-]\d{2})'],
+    "interpark.com":        [r'"endDate"\s*:\s*"(\d{4}-\d{2}-\d{2})"'],
+}
+
+
+def _extract_from_domain(html, domain):
+    """도메인에 특화된 가격/마감일 패턴 추출. 결과가 없으면 {} 반환."""
+    result = {}
+    for dom, patterns in _DOMAIN_PRICE_PATTERNS.items():
+        if dom in domain:
+            for pat in patterns:
+                m = re.search(pat, html)
+                if m:
+                    try:
+                        val = int(m.group(1))
+                        if 1000 <= val <= 10_000_000:
+                            result["price"] = val
+                            result["price_method"] = f"domain:{dom}"
+                            break
+                    except Exception:
+                        pass
+            if result.get("price"):
+                break
+    for dom, patterns in _DOMAIN_DEADLINE_PATTERNS.items():
+        if dom in domain:
+            for pat in patterns:
+                m = re.search(pat, html)
+                if m:
+                    parsed = _parse_deadline_candidate(m.group(1))
+                    if parsed:
+                        result["deadline"] = parsed
+                        result["deadline_method"] = f"domain:{dom}"
+                        break
+            if result.get("deadline"):
+                break
+    return result
 
 
 def fetch_product_info(url, domain):
@@ -392,24 +421,26 @@ def fetch_product_info(url, domain):
                 result["deadline"] = parsed
                 break
 
-    # Strategy 4: AI fallback
-    needs_ai = not result.get("price") or not result.get("deadline")
-    if needs_ai:
-        ai_price, ai_deadline, ai_conf, ai_method = _ai_extract(
-            debug["price_candidates"], debug["deadline_candidates"], clean[:1500]
-        )
-        if ai_method != "no_api_key":
-            if ai_price and not result.get("price"):
-                result["price"] = ai_price
-                debug["price_candidates"].append({"value": ai_price, "source": "ai", "context": "AI extracted"})
-                if not debug["extraction_method"]:
-                    debug["extraction_method"] = "ai"
-                    debug["extraction_confidence"] = ai_conf
-            if ai_deadline and not result.get("deadline"):
-                result["deadline"] = ai_deadline
-                debug["deadline_candidates"].append({"raw": ai_deadline, "source": "ai", "context": "AI extracted"})
-            if ai_method.startswith("ai_error"):
-                debug["extraction_error"] = ai_method
+    # Strategy 4: 도메인 전용 파서 + dateparser 재파싱
+    domain_info = _extract_from_domain(html, domain)
+    if not result.get("price") and domain_info.get("price"):
+        result["price"] = domain_info["price"]
+        debug["price_candidates"].append({"value": domain_info["price"], "source": domain_info.get("price_method", "domain"), "context": "도메인 전용 파서"})
+        if not debug["extraction_method"]:
+            debug["extraction_method"] = "domain"
+            debug["extraction_confidence"] = "medium"
+    if not result.get("deadline") and domain_info.get("deadline"):
+        result["deadline"] = domain_info["deadline"]
+        debug["deadline_candidates"].append({"raw": domain_info["deadline"], "source": domain_info.get("deadline_method", "domain"), "context": "도메인 전용 파서"})
+
+    # dateparser로 마감일 후보 재파싱 (regex가 파싱 못한 한국어 표현 처리)
+    if not result.get("deadline") and _DATEPARSER_OK:
+        for cand in debug["deadline_candidates"]:
+            parsed = _parse_deadline_candidate(cand["raw"])
+            if parsed:
+                result["deadline"] = parsed
+                debug["deadline_candidates"].append({"raw": parsed, "source": "dateparser_reparse", "context": cand["context"]})
+                break
 
     debug["selected_price"] = result.get("price")
     debug["selected_deadline"] = result.get("deadline")
