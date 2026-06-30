@@ -296,6 +296,7 @@ def block_to_post(b, ig_handle, price, domain, profile_url, store_url, source_ob
         "extracted_link":  store_url,
         "collection_status": "collected",
         "collection_error": None,
+        "influencer_id":   source_obj.get("id") if source_obj else None,
     }
 
 

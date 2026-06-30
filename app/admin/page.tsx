@@ -126,6 +126,10 @@ export default function AdminPage() {
   const [instPostUrl, setInstPostUrl] = useState('')
   const [instPostBusy, setInstPostBusy] = useState(false)
   const [instPostMsg, setInstPostMsg] = useState('')
+  const [adminTab, setAdminTab] = useState<'posts' | 'influencers'>('posts')
+  const [editingInfluencer, setEditingInfluencer] = useState<string | null>(null)
+  const [editInfluencerDraft, setEditInfluencerDraft] = useState<Partial<InfluencerSource>>({})
+  const [influencerBusy, setInfluencerBusy] = useState<string | null>(null)
 
   // 세션 확인 (httpOnly 쿠키는 JS로 읽을 수 없으므로 서버에 확인)
   useEffect(() => {
@@ -179,8 +183,28 @@ export default function AdminPage() {
     setInpockBusy(true)
     await fetch('/api/inpock', { method: 'POST' })
     await fetchInpockStatus()
-    // 수집은 시간이 걸리므로 잠시 후 결과 갱신
     setTimeout(async () => { await fetchPosts(); await fetchInpockStatus(); setInpockBusy(false) }, 8000)
+  }
+
+  async function collectInfluencer(id: string) {
+    setInfluencerBusy(id)
+    await fetch(`/api/inpock?id=${encodeURIComponent(id)}`, { method: 'POST' })
+    setTimeout(async () => {
+      await fetchPosts()
+      await fetchInfluencerSources()
+      setInfluencerBusy(null)
+    }, 8000)
+  }
+
+  async function saveInfluencerEdit(id: string) {
+    await fetch(`/api/inpock-sources?id=${encodeURIComponent(id)}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(editInfluencerDraft),
+    })
+    setEditingInfluencer(null)
+    setEditInfluencerDraft({})
+    await fetchInfluencerSources()
   }
 
   const fetchConfig = useCallback(async () => {
@@ -354,190 +378,186 @@ export default function AdminPage() {
         {/* 방문자 분석 */}
         <AnalyticsSection data={analytics} />
 
-        {/* 인플루언서 링크 수집 (메인) */}
-        <div style={{ background: '#fff', borderRadius: 12, padding: 20, marginBottom: 24, border: '1px solid #e2e8f0' }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8, marginBottom: 12 }}>
-            <h3 style={{ margin: 0, fontSize: 15, fontWeight: 700, color: '#1e293b' }}>🔗 인플루언서 링크 수집</h3>
-            <button
-              onClick={startInpock}
-              disabled={inpockBusy || inpockStatus?.running || influencerSources.length === 0}
+        {/* 탭 메뉴 */}
+        <div style={{ display: 'flex', gap: 4, marginBottom: 20, borderBottom: '2px solid #e2e8f0', paddingBottom: 0 }}>
+          {([
+            { key: 'posts',       label: '공구 관리' },
+            { key: 'influencers', label: '인플루언서 관리' },
+          ] as const).map(({ key, label }) => (
+            <button key={key} onClick={() => setAdminTab(key)}
               style={{
-                background: inpockBusy || inpockStatus?.running || influencerSources.length === 0 ? '#94a3b8' : '#0ea5e9',
-                color: '#fff', border: 'none', borderRadius: 8, padding: '8px 16px',
-                cursor: inpockBusy ? 'wait' : influencerSources.length === 0 ? 'not-allowed' : 'pointer', fontWeight: 600, fontSize: 13,
-              }}
-            >
-              {inpockBusy || inpockStatus?.running ? '수집 중...' : '🔄 지금 수집'}
+                padding: '10px 20px', border: 'none', background: 'none', cursor: 'pointer',
+                fontWeight: 700, fontSize: 14, color: adminTab === key ? '#6366f1' : '#64748b',
+                borderBottom: adminTab === key ? '2px solid #6366f1' : '2px solid transparent',
+                marginBottom: -2,
+              }}>
+              {label}
             </button>
-          </div>
+          ))}
+        </div>
 
-          {/* 상태 */}
-          {inpockStatus && (
-            <div style={{ fontSize: 13, color: '#64748b', marginBottom: 12 }}>
-              {inpockStatus.running ? (
-                <span style={{ color: '#0ea5e9', fontWeight: 600 }}>⏳ 수집 중...</span>
-              ) : inpockStatus.last_run ? (
-                <>마지막 수집: {new Date(inpockStatus.last_run).toLocaleString('ko-KR')}
-                  {' · '}신규 <strong>{inpockStatus.last_count}</strong>개 검수대기
-                  {!!inpockStatus.skipped_count && <> · 비공구 제외 {inpockStatus.skipped_count}개</>}
-                  {inpockStatus.error && <span style={{ color: '#ef4444', marginLeft: 8 }}>❌ {inpockStatus.error}</span>}
-                </>
-              ) : '아직 수집한 적 없음'}
+        {/* 공구 관리 탭 */}
+        {adminTab === 'posts' && (
+          <>
+            {/* 전체 수집 */}
+            <div style={{ background: '#fff', borderRadius: 12, padding: 20, marginBottom: 24, border: '1px solid #e2e8f0' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8, marginBottom: 12 }}>
+                <h3 style={{ margin: 0, fontSize: 15, fontWeight: 700, color: '#1e293b' }}>🔗 전체 수집</h3>
+                <button onClick={startInpock}
+                  disabled={inpockBusy || !!inpockStatus?.running || influencerSources.length === 0}
+                  style={{
+                    background: inpockBusy || inpockStatus?.running || influencerSources.length === 0 ? '#94a3b8' : '#0ea5e9',
+                    color: '#fff', border: 'none', borderRadius: 8, padding: '8px 16px',
+                    cursor: inpockBusy ? 'wait' : influencerSources.length === 0 ? 'not-allowed' : 'pointer', fontWeight: 600, fontSize: 13,
+                  }}>
+                  {inpockBusy || inpockStatus?.running ? '수집 중...' : '🔄 전체 인플루언서 수집'}
+                </button>
+              </div>
+              {inpockStatus && (
+                <div style={{ fontSize: 13, color: '#64748b' }}>
+                  {inpockStatus.running ? (
+                    <span style={{ color: '#0ea5e9', fontWeight: 600 }}>⏳ 수집 중...</span>
+                  ) : inpockStatus.last_run ? (
+                    <>마지막: {new Date(inpockStatus.last_run).toLocaleString('ko-KR')}
+                      {' · '}신규 <strong>{inpockStatus.last_count}</strong>개
+                      {!!inpockStatus.skipped_count && <> · 제외 {inpockStatus.skipped_count}개</>}
+                      {inpockStatus.error && <span style={{ color: '#ef4444', marginLeft: 8 }}>❌ {inpockStatus.error}</span>}
+                    </>
+                  ) : '아직 수집한 적 없음'}
+                </div>
+              )}
             </div>
-          )}
 
-          {/* 인플루언서 링크 등록 */}
-          <div style={{ display: 'flex', gap: 8, marginBottom: 10, flexWrap: 'wrap' }}>
-            <input
-              type="text"
-              value={newSourceUrl}
-              onChange={e => setNewSourceUrl(e.target.value)}
-              onKeyDown={e => { if (e.key === 'Enter') addInfluencerSource() }}
-              placeholder="링크 URL (예: link.inpock.co.kr/handle, linktr.ee/handle)"
-              style={{ flex: 2, minWidth: 200, padding: '8px 12px', borderRadius: 8, border: '1.5px solid #e2e8f0', fontSize: 13, outline: 'none' }}
-            />
-            <input
-              type="text"
-              value={newSourceName}
-              onChange={e => setNewSourceName(e.target.value)}
-              onKeyDown={e => { if (e.key === 'Enter') addInfluencerSource() }}
-              placeholder="인플루언서 이름 (선택)"
-              style={{ flex: 1, minWidth: 120, padding: '8px 12px', borderRadius: 8, border: '1.5px solid #e2e8f0', fontSize: 13, outline: 'none' }}
-            />
-            <button onClick={addInfluencerSource}
-              style={{ background: '#6366f1', color: '#fff', border: 'none', borderRadius: 8, padding: '8px 16px', fontWeight: 600, cursor: 'pointer', fontSize: 13 }}>
-              ＋ 추가
-            </button>
-          </div>
-
-          {/* 등록된 인플루언서 목록 */}
-          {influencerSources.length === 0 ? (
-            <p style={{ fontSize: 12, color: '#94a3b8', margin: '4px 0 0' }}>등록된 인플루언서가 없습니다. 링크를 추가하세요.</p>
-          ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-              {influencerSources.map(s => {
-                const typeColor: Record<string, string> = {
-                  inpock: '#6366f1', linktree: '#22c55e', littly: '#f97316',
-                  smartstore: '#0ea5e9', instagram: '#ec4899', unknown: '#94a3b8', custom: '#64748b',
-                }
-                const color = typeColor[s.source_type] || '#94a3b8'
-                return (
-                  <div key={s.id} style={{ display: 'flex', alignItems: 'center', gap: 8, background: '#f8fafc', borderRadius: 8, padding: '6px 10px' }}>
-                    <span style={{ fontSize: 10, background: color, color: '#fff', borderRadius: 6, padding: '2px 6px', fontWeight: 700, flexShrink: 0 }}>{s.source_type}</span>
-                    <span style={{ fontSize: 13, fontWeight: 600, color: '#1e293b', flexShrink: 0 }}>{s.influencer_name}</span>
-                    <span style={{ fontSize: 11, color: '#94a3b8', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>{s.url}</span>
-                    <button onClick={() => removeInfluencerSource(s.id, s.influencer_name)} title="삭제"
-                      style={{ background: '#e2e8f0', border: 'none', borderRadius: '50%', width: 18, height: 18, cursor: 'pointer', color: '#64748b', fontSize: 12, lineHeight: 1, flexShrink: 0 }}>×</button>
+            {/* 키워드 설정 */}
+            <div style={{ background: '#fff', borderRadius: 12, padding: 20, marginBottom: 24, border: '1px solid #e2e8f0' }}>
+              <h3 style={{ margin: '0 0 14px', fontSize: 15, fontWeight: 700, color: '#1e293b' }}>⚙️ 수집 키워드 설정</h3>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>
+                <div>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: '#16a34a', marginBottom: 8 }}>✅ 추가 포함 키워드</div>
+                  <p style={{ fontSize: 11, color: '#94a3b8', margin: '0 0 8px' }}>이 단어가 캡션에 있으면 공구로 수집</p>
+                  <div style={{ display: 'flex', gap: 6, marginBottom: 8 }}>
+                    <input value={newInclude} onChange={e => setNewInclude(e.target.value)}
+                      onKeyDown={e => { if (e.key === 'Enter') addKeyword('include') }}
+                      placeholder="예: 오픈런, 단독판매"
+                      style={{ flex: 1, padding: '7px 10px', borderRadius: 7, border: '1.5px solid #e2e8f0', fontSize: 12, outline: 'none' }} />
+                    <button onClick={() => addKeyword('include')}
+                      style={{ background: '#16a34a', color: '#fff', border: 'none', borderRadius: 7, padding: '7px 12px', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>추가</button>
                   </div>
-                )
-              })}
-            </div>
-          )}
-          <p style={{ fontSize: 11, color: '#94a3b8', margin: '10px 0 0' }}>
-            ※ 인포크 링크는 공구만 골라 <strong>검수 대기</strong>로 수집됩니다 (카톡·카페·상시판매 자동 제외). 가격·기간을 보완한 뒤 공개하세요.
-          </p>
-        </div>
-
-        {/* 키워드 설정 */}
-        <div style={{ background: '#fff', borderRadius: 12, padding: 20, marginBottom: 24, border: '1px solid #e2e8f0' }}>
-          <h3 style={{ margin: '0 0 14px', fontSize: 15, fontWeight: 700, color: '#1e293b' }}>⚙️ 수집 키워드 설정</h3>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>
-            {/* 포함 키워드 */}
-            <div>
-              <div style={{ fontSize: 13, fontWeight: 600, color: '#16a34a', marginBottom: 8 }}>✅ 추가 포함 키워드</div>
-              <p style={{ fontSize: 11, color: '#94a3b8', margin: '0 0 8px' }}>이 단어가 캡션에 있으면 공구로 수집</p>
-              <div style={{ display: 'flex', gap: 6, marginBottom: 8 }}>
-                <input value={newInclude} onChange={e => setNewInclude(e.target.value)}
-                  onKeyDown={e => { if (e.key === 'Enter') addKeyword('include') }}
-                  placeholder="예: 오픈런, 단독판매"
-                  style={{ flex: 1, padding: '7px 10px', borderRadius: 7, border: '1.5px solid #e2e8f0', fontSize: 12, outline: 'none' }} />
-                <button onClick={() => addKeyword('include')}
-                  style={{ background: '#16a34a', color: '#fff', border: 'none', borderRadius: 7, padding: '7px 12px', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>추가</button>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5 }}>
+                    {includeKws.map(kw => (
+                      <span key={kw} style={{ display: 'inline-flex', alignItems: 'center', gap: 4, background: '#dcfce7', borderRadius: 12, padding: '3px 6px 3px 10px', fontSize: 12, color: '#15803d' }}>
+                        {kw}
+                        <button onClick={() => removeKeyword('include', kw)}
+                          style={{ background: '#bbf7d0', border: 'none', borderRadius: '50%', width: 16, height: 16, cursor: 'pointer', color: '#166534', fontSize: 11, lineHeight: 1 }}>×</button>
+                      </span>
+                    ))}
+                    {includeKws.length === 0 && <span style={{ fontSize: 11, color: '#94a3b8' }}>추가된 키워드 없음</span>}
+                  </div>
+                </div>
+                <div>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: '#dc2626', marginBottom: 8 }}>🚫 추가 제외 키워드</div>
+                  <p style={{ fontSize: 11, color: '#94a3b8', margin: '0 0 8px' }}>이 단어가 캡션에 있으면 수집 제외</p>
+                  <div style={{ display: 'flex', gap: 6, marginBottom: 8 }}>
+                    <input value={newExclude} onChange={e => setNewExclude(e.target.value)}
+                      onKeyDown={e => { if (e.key === 'Enter') addKeyword('exclude') }}
+                      placeholder="예: 체험단모집, 협찬"
+                      style={{ flex: 1, padding: '7px 10px', borderRadius: 7, border: '1.5px solid #e2e8f0', fontSize: 12, outline: 'none' }} />
+                    <button onClick={() => addKeyword('exclude')}
+                      style={{ background: '#dc2626', color: '#fff', border: 'none', borderRadius: 7, padding: '7px 12px', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>추가</button>
+                  </div>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5 }}>
+                    {excludeKws.map(kw => (
+                      <span key={kw} style={{ display: 'inline-flex', alignItems: 'center', gap: 4, background: '#fee2e2', borderRadius: 12, padding: '3px 6px 3px 10px', fontSize: 12, color: '#991b1b' }}>
+                        {kw}
+                        <button onClick={() => removeKeyword('exclude', kw)}
+                          style={{ background: '#fecaca', border: 'none', borderRadius: '50%', width: 16, height: 16, cursor: 'pointer', color: '#7f1d1d', fontSize: 11, lineHeight: 1 }}>×</button>
+                      </span>
+                    ))}
+                    {excludeKws.length === 0 && <span style={{ fontSize: 11, color: '#94a3b8' }}>추가된 키워드 없음</span>}
+                  </div>
+                </div>
               </div>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5 }}>
-                {includeKws.map(kw => (
-                  <span key={kw} style={{ display: 'inline-flex', alignItems: 'center', gap: 4, background: '#dcfce7', borderRadius: 12, padding: '3px 6px 3px 10px', fontSize: 12, color: '#15803d' }}>
-                    {kw}
-                    <button onClick={() => removeKeyword('include', kw)}
-                      style={{ background: '#bbf7d0', border: 'none', borderRadius: '50%', width: 16, height: 16, cursor: 'pointer', color: '#166534', fontSize: 11, lineHeight: 1 }}>×</button>
-                  </span>
+            </div>
+
+            {/* 필터 + 검색 */}
+            <div className="admin-filter">
+              <div style={{ display: 'flex', gap: 6 }}>
+                {([
+                  { key: 'all',          label: '전체',                       color: '#6366f1' },
+                  { key: 'candidate',    label: `공구 후보 ${candidateCount}`,   color: '#eab308' },
+                  { key: 'needs_review', label: `검수 필요 ${needsReviewCount}`, color: '#f97316' },
+                  { key: 'ready',        label: `공개 가능 ${readyCount}`,       color: '#22c55e' },
+                  { key: 'published',    label: `공개됨 ${publishedCount}`,      color: '#0ea5e9' },
+                  { key: 'excluded',     label: `제외 ${excludedCount}`,         color: '#94a3b8' },
+                ] as const).map(({ key, label, color }) => (
+                  <button key={key} onClick={() => setFilter(key)}
+                    style={{
+                      padding: '6px 14px', borderRadius: 20, border: 'none', cursor: 'pointer', fontSize: 13,
+                      background: filter === key ? color : '#e2e8f0',
+                      color: filter === key ? '#fff' : '#475569', fontWeight: 600,
+                    }}>
+                    {label}
+                  </button>
                 ))}
-                {includeKws.length === 0 && <span style={{ fontSize: 11, color: '#94a3b8' }}>추가된 키워드 없음</span>}
               </div>
+              <input type="text" value={searchQ} onChange={e => setSearchQ(e.target.value)}
+                placeholder="제목 / 계정 검색..." className="admin-filter-search" />
+              <span style={{ fontSize: 13, color: '#94a3b8', marginLeft: 'auto' }}>{visible.length}개</span>
             </div>
 
-            {/* 제외 키워드 */}
-            <div>
-              <div style={{ fontSize: 13, fontWeight: 600, color: '#dc2626', marginBottom: 8 }}>🚫 추가 제외 키워드</div>
-              <p style={{ fontSize: 11, color: '#94a3b8', margin: '0 0 8px' }}>이 단어가 캡션에 있으면 수집 제외</p>
-              <div style={{ display: 'flex', gap: 6, marginBottom: 8 }}>
-                <input value={newExclude} onChange={e => setNewExclude(e.target.value)}
-                  onKeyDown={e => { if (e.key === 'Enter') addKeyword('exclude') }}
-                  placeholder="예: 체험단모집, 협찬"
-                  style={{ flex: 1, padding: '7px 10px', borderRadius: 7, border: '1.5px solid #e2e8f0', fontSize: 12, outline: 'none' }} />
-                <button onClick={() => addKeyword('exclude')}
-                  style={{ background: '#dc2626', color: '#fff', border: 'none', borderRadius: 7, padding: '7px 12px', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>추가</button>
+            {/* 공구 목록 */}
+            {loading ? (
+              <div style={{ textAlign: 'center', padding: 60, color: '#94a3b8' }}>불러오는 중...</div>
+            ) : visible.length === 0 ? (
+              <div style={{ textAlign: 'center', padding: 60, color: '#94a3b8' }}>
+                <div style={{ fontSize: 48, marginBottom: 12 }}>📭</div>
+                <div>등록된 공구가 없습니다</div>
               </div>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5 }}>
-                {excludeKws.map(kw => (
-                  <span key={kw} style={{ display: 'inline-flex', alignItems: 'center', gap: 4, background: '#fee2e2', borderRadius: 12, padding: '3px 6px 3px 10px', fontSize: 12, color: '#991b1b' }}>
-                    {kw}
-                    <button onClick={() => removeKeyword('exclude', kw)}
-                      style={{ background: '#fecaca', border: 'none', borderRadius: '50%', width: 16, height: 16, cursor: 'pointer', color: '#7f1d1d', fontSize: 11, lineHeight: 1 }}>×</button>
-                  </span>
-                ))}
-                {excludeKws.length === 0 && <span style={{ fontSize: 11, color: '#94a3b8' }}>추가된 키워드 없음</span>}
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                {visible.map(p => <AdminPostRow key={p.id} post={p} onToggle={togglePublished} onDelete={deletePost} onEdit={setEditingPost} periodLabel={periodLabel(p)} dLeft={daysLeft(p.deadline)} />)}
               </div>
-            </div>
-          </div>
-        </div>
+            )}
+          </>
+        )}
 
-        {/* 필터 + 검색 */}
-        <div className="admin-filter">
-          <div style={{ display: 'flex', gap: 6 }}>
-            {([
-              { key: 'all',          label: '전체',                       color: '#6366f1' },
-              { key: 'candidate',    label: `공구 후보 ${candidateCount}`,   color: '#eab308' },
-              { key: 'needs_review', label: `검수 필요 ${needsReviewCount}`, color: '#f97316' },
-              { key: 'ready',        label: `공개 가능 ${readyCount}`,       color: '#22c55e' },
-              { key: 'published',    label: `공개됨 ${publishedCount}`,      color: '#0ea5e9' },
-              { key: 'excluded',     label: `제외 ${excludedCount}`,         color: '#94a3b8' },
-            ] as const).map(({ key, label, color }) => (
-              <button
-                key={key}
-                onClick={() => setFilter(key)}
-                style={{
-                  padding: '6px 14px', borderRadius: 20, border: 'none', cursor: 'pointer', fontSize: 13,
-                  background: filter === key ? color : '#e2e8f0',
-                  color: filter === key ? '#fff' : '#475569', fontWeight: 600,
-                }}
-              >
-                {label}
-              </button>
-            ))}
-          </div>
-          <input
-            type="text"
-            value={searchQ}
-            onChange={e => setSearchQ(e.target.value)}
-            placeholder="제목 / 계정 검색..."
-            className="admin-filter-search"
+        {/* 인플루언서 관리 탭 */}
+        {adminTab === 'influencers' && (
+          <InfluencerManager
+            sources={influencerSources}
+            inpockStatus={inpockStatus}
+            inpockBusy={inpockBusy}
+            influencerBusy={influencerBusy}
+            editingInfluencer={editingInfluencer}
+            editInfluencerDraft={editInfluencerDraft}
+            newSourceUrl={newSourceUrl}
+            newSourceName={newSourceName}
+            onNewUrlChange={setNewSourceUrl}
+            onNewNameChange={setNewSourceName}
+            onAdd={addInfluencerSource}
+            onRemove={removeInfluencerSource}
+            onCollectAll={startInpock}
+            onCollectOne={collectInfluencer}
+            onEditStart={(src) => { setEditingInfluencer(src.id); setEditInfluencerDraft({ influencer_name: src.influencer_name, instagram_handle: src.instagram_handle, category: src.category, collection_status: src.collection_status, memo: src.memo }) }}
+            onEditChange={(patch) => setEditInfluencerDraft(prev => ({ ...prev, ...patch }))}
+            onEditSave={saveInfluencerEdit}
+            onEditCancel={() => { setEditingInfluencer(null); setEditInfluencerDraft({}) }}
+            influencerStats={(src) => {
+              const sp = posts.filter(p =>
+                p.influencer_id === src.id ||
+                p.source_url === src.url ||
+                (p.influencer_handle && p.influencer_handle === src.handle)
+              )
+              return {
+                total:        sp.length,
+                candidate:    sp.filter(p => effectiveStatus(p) === 'candidate').length,
+                needs_review: sp.filter(p => effectiveStatus(p) === 'needs_review').length,
+                ready:        sp.filter(p => effectiveStatus(p) === 'ready').length,
+                published:    sp.filter(p => effectiveStatus(p) === 'published').length,
+                excluded:     sp.filter(p => effectiveStatus(p) === 'excluded').length,
+              }
+            }}
           />
-          <span style={{ fontSize: 13, color: '#94a3b8', marginLeft: 'auto' }}>{visible.length}개</span>
-        </div>
-
-        {/* 공구 목록 테이블 */}
-        {loading ? (
-          <div style={{ textAlign: 'center', padding: 60, color: '#94a3b8' }}>불러오는 중...</div>
-        ) : visible.length === 0 ? (
-          <div style={{ textAlign: 'center', padding: 60, color: '#94a3b8' }}>
-            <div style={{ fontSize: 48, marginBottom: 12 }}>📭</div>
-            <div>등록된 공구가 없습니다</div>
-          </div>
-        ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-            {visible.map(p => <AdminPostRow key={p.id} post={p} onToggle={togglePublished} onDelete={deletePost} onEdit={setEditingPost} periodLabel={periodLabel(p)} dLeft={daysLeft(p.deadline)} />)}
-          </div>
         )}
       </div>
 
@@ -546,7 +566,7 @@ export default function AdminPage() {
         return (
           <>
             {showAddModal && <AddPostModal onClose={() => setShowAddModal(false)} onSubmit={addPost} existingGroups={existingGroups} />}
-            {editingPost  && <AddPostModal onClose={() => setEditingPost(null)} onSubmit={updatePost} editPost={editingPost} existingGroups={existingGroups} />}
+            {editingPost  && <AddPostModal onClose={() => setEditingPost(null)} onSubmit={updatePost} editPost={editingPost ?? undefined} existingGroups={existingGroups} />}
           </>
         )
       })()}
@@ -712,6 +732,225 @@ function AdminPostRow({ post: p, onToggle, onDelete, onEdit, periodLabel, dLeft 
           </button>
         </div>
       </div>
+    </div>
+  )
+}
+
+const SOURCE_TYPE_COLORS: Record<string, string> = {
+  inpock: '#6366f1', linktree: '#22c55e', littly: '#f97316',
+  smartstore: '#0ea5e9', instagram: '#ec4899', unknown: '#94a3b8', custom: '#64748b',
+}
+
+const CAT_OPTIONS = [
+  { value: '', label: '카테고리 없음' },
+  { value: 'fashion', label: '👗 패션' },
+  { value: 'beauty', label: '💄 뷰티' },
+  { value: 'food', label: '🍱 식품' },
+  { value: 'life', label: '🏠 생활용품' },
+  { value: 'kids', label: '🧸 유아동' },
+  { value: 'health', label: '💊 건강' },
+  { value: 'pet', label: '🐾 반려동물' },
+  { value: 'digital', label: '📱 디지털' },
+]
+
+interface InfluencerManagerProps {
+  sources: InfluencerSource[]
+  inpockStatus: ScraperStatus | null
+  inpockBusy: boolean
+  influencerBusy: string | null
+  editingInfluencer: string | null
+  editInfluencerDraft: Partial<InfluencerSource>
+  newSourceUrl: string
+  newSourceName: string
+  onNewUrlChange: (v: string) => void
+  onNewNameChange: (v: string) => void
+  onAdd: () => void
+  onRemove: (id: string, name: string) => void
+  onCollectAll: () => void
+  onCollectOne: (id: string) => void
+  onEditStart: (src: InfluencerSource) => void
+  onEditChange: (patch: Partial<InfluencerSource>) => void
+  onEditSave: (id: string) => void
+  onEditCancel: () => void
+  influencerStats: (src: InfluencerSource) => { total: number; candidate: number; needs_review: number; ready: number; published: number; excluded: number }
+}
+
+function InfluencerManager({
+  sources, inpockStatus, inpockBusy, influencerBusy, editingInfluencer, editInfluencerDraft,
+  newSourceUrl, newSourceName, onNewUrlChange, onNewNameChange,
+  onAdd, onRemove, onCollectAll, onCollectOne, onEditStart, onEditChange, onEditSave, onEditCancel,
+  influencerStats,
+}: InfluencerManagerProps) {
+  const inputStyle: React.CSSProperties = {
+    padding: '7px 10px', borderRadius: 8, border: '1.5px solid #e2e8f0', fontSize: 13, outline: 'none', width: '100%', boxSizing: 'border-box',
+  }
+
+  return (
+    <div>
+      <div style={{ background: '#fff', borderRadius: 12, padding: 20, marginBottom: 20, border: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap' }}>
+        <button onClick={onCollectAll}
+          disabled={inpockBusy || !!inpockStatus?.running || sources.length === 0}
+          style={{
+            background: inpockBusy || inpockStatus?.running || sources.length === 0 ? '#94a3b8' : '#0ea5e9',
+            color: '#fff', border: 'none', borderRadius: 8, padding: '9px 18px',
+            cursor: inpockBusy ? 'wait' : sources.length === 0 ? 'not-allowed' : 'pointer', fontWeight: 700, fontSize: 14, flexShrink: 0,
+          }}>
+          {inpockBusy || inpockStatus?.running ? '수집 중...' : '🔄 전체 수집'}
+        </button>
+        <div style={{ fontSize: 13, color: '#64748b' }}>
+          {inpockStatus?.running ? (
+            <span style={{ color: '#0ea5e9', fontWeight: 600 }}>⏳ 수집 중...</span>
+          ) : inpockStatus?.last_run ? (
+            <>마지막: {new Date(inpockStatus.last_run).toLocaleString('ko-KR')} · 신규 <strong>{inpockStatus.last_count}</strong>개{inpockStatus.error && <span style={{ color: '#ef4444', marginLeft: 8 }}>❌ {inpockStatus.error}</span>}</>
+          ) : '아직 수집한 적 없음'}
+        </div>
+      </div>
+
+      <div style={{ background: '#fff', borderRadius: 12, padding: 20, marginBottom: 20, border: '1px solid #e2e8f0' }}>
+        <h3 style={{ margin: '0 0 14px', fontSize: 15, fontWeight: 700, color: '#1e293b' }}>＋ 인플루언서 추가</h3>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          <input type="url" value={newSourceUrl} onChange={e => onNewUrlChange(e.target.value)}
+            onKeyDown={e => { if (e.key === 'Enter') onAdd() }}
+            placeholder="링크 URL (예: link.inpock.co.kr/handle, linktr.ee/handle)"
+            style={{ ...inputStyle, flex: 2, minWidth: 220 }} />
+          <input type="text" value={newSourceName} onChange={e => onNewNameChange(e.target.value)}
+            onKeyDown={e => { if (e.key === 'Enter') onAdd() }}
+            placeholder="이름 (선택)"
+            style={{ ...inputStyle, flex: 1, minWidth: 120 }} />
+          <button onClick={onAdd}
+            style={{ background: '#6366f1', color: '#fff', border: 'none', borderRadius: 8, padding: '9px 18px', fontWeight: 700, cursor: 'pointer', fontSize: 14, whiteSpace: 'nowrap' }}>
+            추가
+          </button>
+        </div>
+        <p style={{ fontSize: 11, color: '#94a3b8', margin: '8px 0 0' }}>지원: inpock · linktree · littly · 그 외는 수동 검토로 저장</p>
+      </div>
+
+      {sources.length === 0 ? (
+        <div style={{ textAlign: 'center', padding: 60, color: '#94a3b8' }}>
+          <div style={{ fontSize: 40, marginBottom: 12 }}>👤</div>
+          <div>등록된 인플루언서가 없습니다.</div>
+        </div>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+          {sources.map(src => {
+            const stats = influencerStats(src)
+            const isEditing = editingInfluencer === src.id
+            const isBusy = influencerBusy === src.id
+            const collStatusColor: Record<string, string> = { active: '#22c55e', paused: '#94a3b8', failed: '#ef4444', never_collected: '#e2e8f0' }
+            const lcAt = src.last_collected_at ? new Date(src.last_collected_at).toLocaleString('ko-KR') : null
+
+            return (
+              <div key={src.id} style={{ background: '#fff', borderRadius: 12, border: '1px solid #e2e8f0', overflow: 'hidden' }}>
+                <div style={{ padding: '14px 16px', display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+                  <span style={{ background: SOURCE_TYPE_COLORS[src.source_type] || '#94a3b8', color: '#fff', fontSize: 10, fontWeight: 700, borderRadius: 6, padding: '2px 7px', flexShrink: 0 }}>
+                    {src.source_type}
+                  </span>
+                  <span style={{ fontWeight: 700, fontSize: 15, color: '#1e293b' }}>{src.influencer_name}</span>
+                  {src.instagram_handle && (
+                    <span style={{ fontSize: 12, color: '#64748b' }}>@{src.instagram_handle.replace('@', '')}</span>
+                  )}
+                  {src.category && (
+                    <span style={{ fontSize: 11, background: '#f1f5f9', borderRadius: 6, padding: '2px 8px', color: '#475569' }}>
+                      {CAT_OPTIONS.find(c => c.value === src.category)?.label || src.category}
+                    </span>
+                  )}
+                  {src.collection_status && (
+                    <span style={{ width: 8, height: 8, borderRadius: '50%', background: collStatusColor[src.collection_status] || '#e2e8f0', display: 'inline-block', flexShrink: 0 }} title={src.collection_status} />
+                  )}
+                  <a href={src.url} target="_blank" rel="noopener noreferrer"
+                    style={{ fontSize: 11, color: '#94a3b8', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 200 }}>
+                    {src.url}
+                  </a>
+                  {lcAt && <span style={{ fontSize: 11, color: '#94a3b8', marginLeft: 'auto' }}>마지막: {lcAt}</span>}
+                  <div style={{ display: 'flex', gap: 6, marginLeft: lcAt ? 0 : 'auto', flexShrink: 0 }}>
+                    <button onClick={() => onCollectOne(src.id)} disabled={isBusy || !!inpockStatus?.running}
+                      style={{ background: isBusy || inpockStatus?.running ? '#94a3b8' : '#0ea5e9', color: '#fff', border: 'none', borderRadius: 7, padding: '5px 12px', fontSize: 12, fontWeight: 600, cursor: isBusy ? 'wait' : 'pointer' }}>
+                      {isBusy ? '수집 중...' : '수집 실행'}
+                    </button>
+                    <button onClick={() => isEditing ? onEditCancel() : onEditStart(src)}
+                      style={{ background: isEditing ? '#e2e8f0' : '#f1f5f9', color: '#475569', border: 'none', borderRadius: 7, padding: '5px 12px', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>
+                      {isEditing ? '취소' : '수정'}
+                    </button>
+                    <button onClick={() => onRemove(src.id, src.influencer_name)}
+                      style={{ background: '#fee2e2', color: '#dc2626', border: 'none', borderRadius: 7, padding: '5px 10px', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>
+                      삭제
+                    </button>
+                  </div>
+                </div>
+
+                <div style={{ borderTop: '1px solid #f1f5f9', padding: '8px 16px', display: 'flex', gap: 16, flexWrap: 'wrap' }}>
+                  {[
+                    { label: '전체 후보', value: stats.total,        color: '#64748b' },
+                    { label: '검수 필요', value: stats.needs_review,  color: '#f97316' },
+                    { label: '공개 가능', value: stats.ready,         color: '#22c55e' },
+                    { label: '공개됨',    value: stats.published,     color: '#0ea5e9' },
+                    { label: '제외',      value: stats.excluded,      color: '#94a3b8' },
+                  ].map(({ label, value, color }) => (
+                    <div key={label} style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 12 }}>
+                      <span style={{ fontWeight: 700, color }}>{value}</span>
+                      <span style={{ color: '#94a3b8' }}>{label}</span>
+                    </div>
+                  ))}
+                  {src.memo && (
+                    <span style={{ fontSize: 11, color: '#64748b', marginLeft: 'auto', fontStyle: 'italic' }}>{src.memo}</span>
+                  )}
+                </div>
+
+                {isEditing && (
+                  <div style={{ borderTop: '1px solid #e2e8f0', padding: 16, background: '#f8fafc' }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 12 }}>
+                      <div>
+                        <label style={{ fontSize: 12, fontWeight: 600, color: '#475569', display: 'block', marginBottom: 4 }}>이름</label>
+                        <input value={editInfluencerDraft.influencer_name ?? src.influencer_name}
+                          onChange={e => onEditChange({ influencer_name: e.target.value })}
+                          style={inputStyle} />
+                      </div>
+                      <div>
+                        <label style={{ fontSize: 12, fontWeight: 600, color: '#475569', display: 'block', marginBottom: 4 }}>인스타 핸들</label>
+                        <input value={editInfluencerDraft.instagram_handle ?? src.instagram_handle ?? ''}
+                          onChange={e => onEditChange({ instagram_handle: e.target.value })}
+                          placeholder="@username"
+                          style={inputStyle} />
+                      </div>
+                      <div>
+                        <label style={{ fontSize: 12, fontWeight: 600, color: '#475569', display: 'block', marginBottom: 4 }}>카테고리</label>
+                        <select value={editInfluencerDraft.category ?? src.category ?? ''}
+                          onChange={e => onEditChange({ category: e.target.value })}
+                          style={{ ...inputStyle }}>
+                          {CAT_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+                        </select>
+                      </div>
+                      <div>
+                        <label style={{ fontSize: 12, fontWeight: 600, color: '#475569', display: 'block', marginBottom: 4 }}>수집 상태</label>
+                        <select value={editInfluencerDraft.collection_status ?? src.collection_status ?? 'never_collected'}
+                          onChange={e => onEditChange({ collection_status: e.target.value as InfluencerSource['collection_status'] })}
+                          style={{ ...inputStyle }}>
+                          <option value="active">active (활성)</option>
+                          <option value="paused">paused (일시중지)</option>
+                          <option value="failed">failed (오류)</option>
+                          <option value="never_collected">never_collected (미수집)</option>
+                        </select>
+                      </div>
+                    </div>
+                    <div style={{ marginBottom: 12 }}>
+                      <label style={{ fontSize: 12, fontWeight: 600, color: '#475569', display: 'block', marginBottom: 4 }}>메모</label>
+                      <textarea value={editInfluencerDraft.memo ?? src.memo ?? ''}
+                        onChange={e => onEditChange({ memo: e.target.value })}
+                        rows={2}
+                        placeholder="메모 (내부용)"
+                        style={{ ...inputStyle, resize: 'vertical' }} />
+                    </div>
+                    <button onClick={() => onEditSave(src.id)}
+                      style={{ background: '#6366f1', color: '#fff', border: 'none', borderRadius: 8, padding: '8px 20px', fontWeight: 700, cursor: 'pointer', fontSize: 13 }}>
+                      저장
+                    </button>
+                  </div>
+                )}
+              </div>
+            )
+          })}
+        </div>
+      )}
     </div>
   )
 }

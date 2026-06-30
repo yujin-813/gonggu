@@ -3,6 +3,7 @@
 인플루언서 링크 수집기 디스패처
 influencer_sources.json 의 source_type 에 따라 수집 방식을 라우팅한다.
 """
+import argparse
 import json
 import sys
 from datetime import datetime
@@ -89,11 +90,40 @@ def collect_unknown(source):
     return 0, 0
 
 
+def _update_source_status(source_id, status, last_collected_at=None):
+    if not source_id:
+        return
+    src_file = DATA_DIR / "influencer_sources.json"
+    if not src_file.exists():
+        return
+    try:
+        sources = json.loads(src_file.read_text("utf-8"))
+        for s in sources:
+            if s.get("id") == source_id:
+                s["collection_status"] = status
+                if last_collected_at:
+                    s["last_collected_at"] = last_collected_at
+                break
+        tmp = str(src_file) + ".tmp"
+        Path(tmp).write_text(json.dumps(sources, ensure_ascii=False, indent=2), "utf-8")
+        Path(tmp).rename(src_file)
+    except Exception as e:
+        print(f"  ⚠️  상태 업데이트 실패: {e}")
+
+
 def run():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--id", dest="source_id", default="", help="collect only this influencer id")
+    cli = parser.parse_args()
+
     sources = load_sources()
+    if cli.source_id:
+        sources = [s for s in sources if s.get("id") == cli.source_id]
+
     if not sources:
-        print("⚠️  등록된 소스가 없습니다.")
-        write_status(0, 0, "등록된 소스가 없습니다")
+        msg = "등록된 소스가 없습니다" if not cli.source_id else f"ID를 찾을 수 없습니다: {cli.source_id}"
+        print(f"⚠️  {msg}")
+        write_status(0, 0, msg)
         sys.exit(0)
 
     total_new = 0
@@ -111,8 +141,10 @@ def run():
                 new, skipped = collect_linkhub(source)
             else:
                 new, skipped = collect_unknown(source)
+            _update_source_status(source.get("id", ""), "active", datetime.now().isoformat())
         except Exception as e:
             print(f"  ⚠️  수집 실패: {e}")
+            _update_source_status(source.get("id", ""), "failed", datetime.now().isoformat())
             new, skipped = 0, 0
 
         total_new     += new

@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { spawn } from 'child_process'
 import { existsSync } from 'fs'
 import path from 'path'
@@ -10,12 +10,13 @@ export async function GET() {
 }
 
 // 수집 실행 — collector.py가 source_type에 따라 적절한 수집기로 라우팅한다.
-export async function POST() {
+export async function POST(request: NextRequest) {
+  const influencerId = request.nextUrl.searchParams.get('id') || ''
   const status = loadInpockStatus()
   if (status.running) {
     return NextResponse.json({ error: '이미 수집 중입니다', status }, { status: 409 })
   }
-  if (loadInfluencerSources().length === 0) {
+  if (!influencerId && loadInfluencerSources().length === 0) {
     return NextResponse.json({ error: '등록된 인플루언서가 없습니다' }, { status: 400 })
   }
 
@@ -25,7 +26,8 @@ export async function POST() {
 
   saveInpockStatus({ running: true, last_run: null, last_count: 0, skipped_count: 0, error: null })
 
-  const proc = spawn(python, [collectorPath], { cwd: process.cwd(), env: process.env })
+  const args = influencerId ? [collectorPath, '--id', influencerId] : [collectorPath]
+  const proc = spawn(python, args, { cwd: process.cwd(), env: process.env })
 
   proc.on('close', (code) => {
     const s = loadInpockStatus()

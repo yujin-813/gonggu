@@ -8,6 +8,11 @@ export interface InfluencerSource {
   source_type: LinkSourceType
   handle: string
   influencer_name: string
+  instagram_handle?: string
+  category?: string
+  collection_status?: 'active' | 'paused' | 'failed' | 'never_collected'
+  last_collected_at?: string | null
+  memo?: string
   added_at: string
 }
 
@@ -43,6 +48,7 @@ export interface Post {
   extracted_link?: string | null
   collection_status?: string | null
   collection_error?: string | null
+  influencer_id?: string | null
 }
 
 export interface ScraperStatus {

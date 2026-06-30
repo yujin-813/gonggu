@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { loadInfluencerSources, saveInfluencerSources } from '@/lib/store'
+import { loadInfluencerSources, saveInfluencerSources, updateInfluencerSource } from '@/lib/store'
 import type { LinkSourceType, InfluencerSource } from '@/lib/types'
 
 function detectSourceType(url: string): LinkSourceType {
@@ -65,5 +65,16 @@ export async function DELETE(request: NextRequest) {
     return NextResponse.json({ error: '소스를 찾을 수 없습니다' }, { status: 404 })
   }
   saveInfluencerSources(filtered)
+  return NextResponse.json({ success: true })
+}
+
+export async function PATCH(request: NextRequest) {
+  const id = request.nextUrl.searchParams.get('id') || ''
+  if (!id) return NextResponse.json({ error: 'id가 필요합니다' }, { status: 400 })
+  const body = await request.json().catch(() => ({}))
+  const allowed = ['influencer_name', 'instagram_handle', 'category', 'collection_status', 'last_collected_at', 'memo', 'url', 'source_type']
+  const patch = Object.fromEntries(Object.entries(body).filter(([k]) => allowed.includes(k)))
+  const ok = updateInfluencerSource(id, patch as Partial<InfluencerSource>)
+  if (!ok) return NextResponse.json({ error: '소스를 찾을 수 없습니다' }, { status: 404 })
   return NextResponse.json({ success: true })
 }

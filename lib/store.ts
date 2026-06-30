@@ -140,3 +140,12 @@ export function saveInfluencerSources(sources: InfluencerSource[]): void {
   ensureDir()
   atomicWrite(INFLUENCER_SOURCES_FILE, JSON.stringify(sources, null, 2))
 }
+
+export function updateInfluencerSource(id: string, patch: Partial<InfluencerSource>): boolean {
+  const sources = loadInfluencerSources()
+  const idx = sources.findIndex(s => s.id === id)
+  if (idx < 0) return false
+  sources[idx] = { ...sources[idx], ...patch }
+  saveInfluencerSources(sources)
+  return true
+}
