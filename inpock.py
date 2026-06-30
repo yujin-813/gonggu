@@ -131,25 +131,21 @@ def price_from_stickers(stickers):
     return 0
 
 
-def fetch_store_price(url, domain):
-    """구매 페이지에서 가격 파싱. 실패 시 0 반환.
-    전략 1: JSON-LD @type=Product (smartstore, 29cm, musinsa 등 표준)
-    전략 2: Open Graph / meta 태그 (og:price:amount, product:price:amount)
-    두 방법 모두 사이트가 SEO용으로 공개하는 데이터이므로 차단 위험 없음."""
+def fetch_product_info(url, domain):
+    """구매 페이지에서 상품 정보 추출. 전략 1: JSON-LD Product, 2: OG tags, 3: JS JSON keys."""
     if not url or not domain:
-        return 0
-    # 쇼핑몰이 아닌 도메인은 시도하지 않음
+        return {}
     skip = ("instagram.com", "youtube.com", "youtu.be", "kakao.com",
             "naver.com/cafe", "band.us", "t.me", "forms.gle", "docs.google.com")
     if any(s in url for s in skip):
-        return 0
+        return {}
     try:
         r = requests.get(url, headers={"User-Agent": UA}, timeout=10)
         if r.status_code != 200:
-            return 0
+            return {}
         html = r.text
+        result = {}
 
-        # 전략 1: JSON-LD structured data
         for m in re.finditer(
             r'<script[^>]+type=["\']application/ld\+json["\'][^>]*>(.*?)</script>',
             html, re.S,
@@ -158,56 +154,89 @@ def fetch_store_price(url, domain):
                 data = json.loads(m.group(1))
                 items = data if isinstance(data, list) else [data]
                 for item in items:
-                    if item.get("@type") == "Product":
-                        offers = item.get("offers", {})
-                        # offers가 리스트인 경우도 처리
-                        if isinstance(offers, list):
-                            offers = offers[0] if offers else {}
-                        price = offers.get("price") or offers.get("lowPrice")
-                        if price:
+                    if item.get("@type") != "Product":
+                        continue
+                    if not result.get("title") and item.get("name"):
+                        result["title"] = item["name"].strip()
+                    if not result.get("img"):
+                        raw = item.get("image")
+                        if isinstance(raw, list): raw = raw[0]
+                        if isinstance(raw, dict): raw = raw.get("url", "")
+                        if raw: result["img"] = raw
+                    offers = item.get("offers", {})
+                    if isinstance(offers, list): offers = offers[0] if offers else {}
+                    price = offers.get("price") or offers.get("lowPrice")
+                    if price and not result.get("price"):
+                        try:
                             val = int(float(str(price).replace(",", "").replace(" ", "")))
                             if 1000 <= val <= 10_000_000:
-                                return val
+                                result["price"] = val
+                        except Exception:
+                            pass
+                    for key in ("availabilityEnds", "priceValidUntil"):
+                        raw_d = offers.get(key)
+                        if raw_d and not result.get("deadline"):
+                            dm = re.match(r"(\d{4}-\d{2}-\d{2})", str(raw_d))
+                            if dm:
+                                result["deadline"] = dm.group(1)
             except Exception:
                 continue
 
-        # 전략 2: Open Graph / meta 태그
-        for pattern in (
-            r'<meta[^>]+property=["\']og:price:amount["\'][^>]+content=["\']([0-9,. ]+)["\']',
-            r'<meta[^>]+content=["\']([0-9,. ]+)["\'][^>]+property=["\']og:price:amount["\']',
-            r'<meta[^>]+property=["\']product:price:amount["\'][^>]+content=["\']([0-9,. ]+)["\']',
-            r'<meta[^>]+content=["\']([0-9,. ]+)["\'][^>]+property=["\']product:price:amount["\']',
-        ):
-            m = re.search(pattern, html, re.I)
-            if m:
-                try:
-                    val = int(float(m.group(1).replace(",", "").replace(" ", "")))
-                    if 1000 <= val <= 10_000_000:
-                        return val
-                except Exception:
-                    continue
-
-        # 전략 3: 스크립트 내 JSON 가격 키 (무신사 등 SPA 쇼핑몰)
-        for pattern in (
-            r'["\']salePrice["\']\s*:\s*(\d{4,8})',
-            r'["\']sale_price["\']\s*:\s*(\d{4,8})',
-            r'["\']discountedPrice["\']\s*:\s*(\d{4,8})',
-            r'["\']finalPrice["\']\s*:\s*(\d{4,8})',
-            r'["\']goodsPrice["\']\s*:\s*(\d{4,8})',
-            r'["\']sellPrice["\']\s*:\s*(\d{4,8})',
-        ):
-            m = re.search(pattern, html)
-            if m:
-                try:
-                    val = int(m.group(1))
-                    if 1000 <= val <= 10_000_000:
-                        return val
-                except Exception:
-                    continue
-
+        if not result.get("title"):
+            for pat in (
+                r'<meta[^>]+property=["\']og:title["\'][^>]+content=["\']([^"\']+)["\']',
+                r'<meta[^>]+content=["\']([^"\']+)["\'][^>]+property=["\']og:title["\']',
+            ):
+                mt = re.search(pat, html, re.I)
+                if mt:
+                    result["title"] = mt.group(1).strip()
+                    break
+        if not result.get("img"):
+            for pat in (
+                r'<meta[^>]+property=["\']og:image["\'][^>]+content=["\']([^"\']+)["\']',
+                r'<meta[^>]+content=["\']([^"\']+)["\'][^>]+property=["\']og:image["\']',
+            ):
+                mt = re.search(pat, html, re.I)
+                if mt:
+                    result["img"] = mt.group(1).strip()
+                    break
+        if not result.get("price"):
+            for pat in (
+                r'<meta[^>]+property=["\']og:price:amount["\'][^>]+content=["\']([0-9,. ]+)["\']',
+                r'<meta[^>]+content=["\']([0-9,. ]+)["\'][^>]+property=["\']og:price:amount["\']',
+                r'<meta[^>]+property=["\']product:price:amount["\'][^>]+content=["\']([0-9,. ]+)["\']',
+                r'<meta[^>]+content=["\']([0-9,. ]+)["\'][^>]+property=["\']product:price:amount["\']',
+            ):
+                mt = re.search(pat, html, re.I)
+                if mt:
+                    try:
+                        val = int(float(mt.group(1).replace(",", "").replace(" ", "")))
+                        if 1000 <= val <= 10_000_000:
+                            result["price"] = val
+                            break
+                    except Exception:
+                        continue
+        if not result.get("price"):
+            for pat in (
+                r'["\']salePrice["\']\s*:\s*(\d{4,8})',
+                r'["\']sale_price["\']\s*:\s*(\d{4,8})',
+                r'["\']discountedPrice["\']\s*:\s*(\d{4,8})',
+                r'["\']finalPrice["\']\s*:\s*(\d{4,8})',
+                r'["\']goodsPrice["\']\s*:\s*(\d{4,8})',
+                r'["\']sellPrice["\']\s*:\s*(\d{4,8})',
+            ):
+                mt = re.search(pat, html)
+                if mt:
+                    try:
+                        val = int(mt.group(1))
+                        if 1000 <= val <= 10_000_000:
+                            result["price"] = val
+                            break
+                    except Exception:
+                        continue
+        return result
     except Exception:
-        pass
-    return 0
+        return {}
 
 
 def is_product(domain, price, title=""):
@@ -240,30 +269,28 @@ def resolve_img(img, shortcode):
     return src
 
 
-def classify_status(title, store_url, price, img):
-    """수집 결과를 기계적 규칙으로 자동 분류."""
+def classify_status(title, purchase_url, price, deadline):
     reasons = []
-    if not title:
-        reasons.append("상품명 없음")
-    if not store_url:
-        reasons.append("구매 링크 없음")
     if not price:
-        reasons.append("가격 없음")
-    if not img:
-        reasons.append("이미지 없음")
-
-    if not title or not store_url:
-        return "excluded", reasons
-    if price and img:
+        reasons.append("가격 미입력")
+    if not deadline:
+        reasons.append("마감일 미확인")
+    if not purchase_url:
+        reasons.append("구매페이지 미확인")
+    if not title:
+        return "excluded", ["상품명 없음"]
+    if purchase_url and price and deadline:
         return "ready", []
     return "needs_review", reasons
 
 
-def block_to_post(b, ig_handle, price, domain, profile_url, store_url, source_obj=None):
+def block_to_post(b, ig_handle, price, domain, profile_url, purchase_url, deadline, product_info=None, source_obj=None):
     sc = f"inpock_{b['id']}"
-    title = (b.get("title") or "").strip()
-    img   = resolve_img(b.get("image"), sc)
-    status, review_reason = classify_status(title, store_url, price, img)
+    pi = product_info or {}
+    title = (b.get("title") or "").strip() or pi.get("title", "")
+    img_src = b.get("image") or pi.get("img", "")
+    img = resolve_img(img_src, sc)
+    status, review_reason = classify_status(title, purchase_url, price, deadline)
     return {
         "id":              abs(hash(sc)) % (10 ** 9),
         "shortcode":       sc,
@@ -273,17 +300,19 @@ def block_to_post(b, ig_handle, price, domain, profile_url, store_url, source_ob
         "price":           price,
         "origPrice":       None,
         "start_date":      "",
-        "deadline":        b.get("open_until") or "",
+        "deadline":        deadline,
         "brand":           None,
         "img":             img,
         "url":             profile_url,
-        "store_url":       store_url,
+        "store_url":       purchase_url,
+        "purchase_url":    purchase_url,
         "store_domain":    domain or "",
         "participants":    0,
         "avatar":          "🛍️",
         "caption":         "",
         "scraped_at":      datetime.now().isoformat(),
         "source":          "inpock",
+        "is_always_on":    False,
         "status":          status,
         "review_reason":   review_reason,
         "published":       False,
@@ -293,7 +322,7 @@ def block_to_post(b, ig_handle, price, domain, profile_url, store_url, source_ob
         "influencer_name": source_obj.get("influencer_name") if source_obj else ig_handle,
         "influencer_handle": source_obj.get("handle") if source_obj else ig_handle,
         "original_link":   b.get("url"),
-        "extracted_link":  store_url,
+        "extracted_link":  purchase_url,
         "collection_status": "collected",
         "collection_error": None,
         "influencer_id":   source_obj.get("id") if source_obj else None,
@@ -337,15 +366,24 @@ def collect(handles, source_obj=None, write_result=True):
 
             url_abs = b["url"] if b["url"].startswith("http") else INPOCK + b["url"]
             price = price_from_stickers(b.get("stickers"))
+            deadline = b.get("open_until") or ""
             final_url, domain = resolve_link(url_abs)
-            if not price and final_url:
-                price = fetch_store_price(final_url, domain)
+            purchase_url = final_url or url_abs
+
+            product_info = {}
+            if purchase_url and domain:
+                product_info = fetch_product_info(purchase_url, domain)
+            if not price and product_info.get("price"):
+                price = product_info["price"]
+            if not deadline and product_info.get("deadline"):
+                deadline = product_info["deadline"]
+
             if not is_product(domain, price, b.get("title", "")):
                 skipped_count += 1
-                print(f"  - (제외) {b['title'][:34]} [{domain}]")
+                print(f"  - (제외) {b.get('title', '')[:34]} [{domain}]")
                 continue
 
-            posts.insert(0, block_to_post(b, ig_handle, price, domain, profile_url, final_url or url_abs, source_obj))
+            posts.insert(0, block_to_post(b, ig_handle, price, domain, profile_url, purchase_url, deadline, product_info, source_obj))
             by_sc[sc] = posts[0]
             new_count += 1
             print(f"  + {b['title'][:34]} [{domain}]")

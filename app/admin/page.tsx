@@ -95,7 +95,8 @@ function fmt(dateStr?: string) {
 function periodLabel(p: Post) {
   if (p.start_date && p.deadline) return `${fmt(p.start_date)} ~ ${fmt(p.deadline)}`
   if (p.deadline) return `~ ${fmt(p.deadline)}`
-  return '기간 없음'
+  if (p.is_always_on) return '상시딜'
+  return '마감일 미확인'
 }
 
 function daysLeft(deadline?: string) {
@@ -281,6 +282,26 @@ export default function AdminPage() {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ published: nextPublished, status: nextStatus }),
+    })
+  }
+
+  async function toggleAlwaysOn(p: Post) {
+    const next = !p.is_always_on
+    const onlyDeadlineMissing =
+      p.status === 'needs_review' &&
+      (p.review_reason || []).length > 0 &&
+      (p.review_reason || []).every(r => r === '마감일 미확인')
+    const nextStatus = next && onlyDeadlineMissing ? 'ready' : p.status
+    const nextReviewReason = next && onlyDeadlineMissing ? [] : (p.review_reason || [])
+    setPosts(prev =>
+      prev.map(x =>
+        x.id === p.id ? { ...x, is_always_on: next, status: nextStatus, review_reason: nextReviewReason } : x
+      )
+    )
+    await fetch(`/api/posts/${p.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ is_always_on: next, status: nextStatus, review_reason: nextReviewReason }),
     })
   }
 
@@ -515,7 +536,7 @@ export default function AdminPage() {
               </div>
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                {visible.map(p => <AdminPostRow key={p.id} post={p} onToggle={togglePublished} onDelete={deletePost} onEdit={setEditingPost} periodLabel={periodLabel(p)} dLeft={daysLeft(p.deadline)} />)}
+                {visible.map(p => <AdminPostRow key={p.id} post={p} onToggle={togglePublished} onDelete={deletePost} onEdit={setEditingPost} onToggleAlwaysOn={toggleAlwaysOn} periodLabel={periodLabel(p)} dLeft={daysLeft(p.deadline)} />)}
               </div>
             )}
           </>
@@ -660,11 +681,12 @@ function AnalyticsSection({ data }: { data: DayStat[] }) {
   )
 }
 
-function AdminPostRow({ post: p, onToggle, onDelete, onEdit, periodLabel, dLeft }: {
+function AdminPostRow({ post: p, onToggle, onDelete, onEdit, onToggleAlwaysOn, periodLabel, dLeft }: {
   post: Post
   onToggle: (p: Post) => void
   onDelete: (id: number) => void
   onEdit:   (p: Post) => void
+  onToggleAlwaysOn: (p: Post) => void
   periodLabel: string
   dLeft: number
 }) {
@@ -725,6 +747,12 @@ function AdminPostRow({ post: p, onToggle, onDelete, onEdit, periodLabel, dLeft 
             style={{ padding: '6px 12px', borderRadius: 8, border: 'none', cursor: 'pointer', fontSize: 12, fontWeight: 600, whiteSpace: 'nowrap',
               background: published ? '#dcfce7' : '#fff7ed', color: published ? '#16a34a' : '#ea580c' }}>
             {published ? '✅ 공개' : '🙈 숨김'}
+          </button>
+          <button onClick={() => onToggleAlwaysOn(p)}
+            title="상시딜로 설정하면 마감일 없이도 공개 가능"
+            style={{ padding: '6px 10px', borderRadius: 8, border: 'none', cursor: 'pointer', fontSize: 11, fontWeight: 600, whiteSpace: 'nowrap',
+              background: p.is_always_on ? '#fef3c7' : '#f1f5f9', color: p.is_always_on ? '#92400e' : '#94a3b8' }}>
+            {p.is_always_on ? '⏰ 상시딜' : '상시딜'}
           </button>
           <button onClick={() => onDelete(p.id)}
             style={{ padding: '6px 10px', background: '#fee2e2', color: '#dc2626', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 12, fontWeight: 600 }}>

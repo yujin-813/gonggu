@@ -49,6 +49,8 @@ export interface Post {
   collection_status?: string | null
   collection_error?: string | null
   influencer_id?: string | null
+  purchase_url?: string | null
+  is_always_on?: boolean
 }
 
 export interface ScraperStatus {

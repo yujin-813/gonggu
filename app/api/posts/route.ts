@@ -92,6 +92,8 @@ export async function POST(request: NextRequest) {
     origPrice:  data.origPrice ? parseInt(data.origPrice) : null,
     group_key:     data.group_key?.trim() || null,
     market_url:    data.market_url?.trim() || null,
+    purchase_url:  data.purchase_url?.trim() || null,
+    is_always_on:  Boolean(data.is_always_on),
     status:        data.status || 'ready',
     review_reason: data.review_reason || [],
     start_date: data.start_date || '',
