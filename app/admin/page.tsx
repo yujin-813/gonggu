@@ -546,8 +546,15 @@ export default function AdminPage() {
         )}
       </div>
 
-      {showAddModal && <AddPostModal onClose={() => setShowAddModal(false)} onSubmit={addPost} />}
-      {editingPost  && <AddPostModal onClose={() => setEditingPost(null)} onSubmit={updatePost} editPost={editingPost} />}
+      {(() => {
+        const existingGroups = [...new Set(posts.map(p => p.group_key).filter(Boolean) as string[])]
+        return (
+          <>
+            {showAddModal && <AddPostModal onClose={() => setShowAddModal(false)} onSubmit={addPost} existingGroups={existingGroups} />}
+            {editingPost  && <AddPostModal onClose={() => setEditingPost(null)} onSubmit={updatePost} editPost={editingPost} existingGroups={existingGroups} />}
+          </>
+        )
+      })()}
     </div>
   )
 }

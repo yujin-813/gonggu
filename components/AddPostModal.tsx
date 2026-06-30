@@ -30,12 +30,13 @@ function isInstagramUrl(url: string) {
 type PostInput = Omit<Post, 'id' | 'scraped_at' | 'source'>
 
 interface Props {
-  onClose:   () => void
-  onSubmit:  (post: PostInput) => Promise<void>
-  editPost?: Post
+  onClose:        () => void
+  onSubmit:       (post: PostInput) => Promise<void>
+  editPost?:      Post
+  existingGroups?: string[]
 }
 
-export default function AddPostModal({ onClose, onSubmit, editPost }: Props) {
+export default function AddPostModal({ onClose, onSubmit, editPost, existingGroups = [] }: Props) {
   const isEdit = !!editPost
   const fileRef = useRef<HTMLInputElement>(null)
 
@@ -50,9 +51,11 @@ export default function AddPostModal({ onClose, onSubmit, editPost }: Props) {
   const [cat,       setCat]       = useState<Category>('fashion')
   const [startDate, setStartDate] = useState(todayStr())
   const [endDate,   setEndDate]   = useState(defaultDate(7))
-  const [price,     setPrice]     = useState('')
-  const [origPrice, setOrigPrice] = useState('')
-  const [groupKey,  setGroupKey]  = useState('')
+  const [price,       setPrice]       = useState('')
+  const [origPrice,   setOrigPrice]   = useState('')
+  const [groupKey,    setGroupKey]    = useState('')
+  const [newGroupMode, setNewGroupMode] = useState(false)
+  const [newGroupInput, setNewGroupInput] = useState('')
 
   const [imgFile,    setImgFile]    = useState<File | null>(null)
   const [imgPreview, setImgPreview] = useState('')   // blob URL or existing img URL
@@ -71,7 +74,10 @@ export default function AddPostModal({ onClose, onSubmit, editPost }: Props) {
     setEndDate(editPost.deadline || defaultDate(7))
     setPrice(editPost.price ? String(editPost.price) : '')
     setOrigPrice(editPost.origPrice ? String(editPost.origPrice) : '')
-    setGroupKey(editPost.group_key || '')
+    const gk = editPost.group_key || ''
+    setGroupKey(gk)
+    setNewGroupMode(false)
+    setNewGroupInput('')
     setBrand(editPost.brand || '')
     if (editPost.img && !editPost.img.startsWith('data:')) {
       setImgPreview(editPost.img)
@@ -171,7 +177,7 @@ export default function AddPostModal({ onClose, onSubmit, editPost }: Props) {
         participants: editPost?.participants ?? 0,
         avatar:       CAT_EMOJI[cat] || '🛍️',
         caption:      editPost?.caption || '',
-        group_key:    groupKey.trim() || null,
+        group_key:    (newGroupMode ? newGroupInput : groupKey).trim() || null,
         published:    editPost?.published ?? true,
       })
     } catch (err) {
@@ -294,12 +300,45 @@ export default function AddPostModal({ onClose, onSubmit, editPost }: Props) {
           비교 그룹
           <span style={{ fontSize: 12, color: '#94a3b8', fontWeight: 400, marginLeft: 6 }}>(선택 — 같은 상품 가격비교용)</span>
         </label>
-        <input
-          type="text"
-          value={groupKey}
-          onChange={e => setGroupKey(e.target.value)}
-          placeholder="예: 리넨원피스2025 (같은 상품이면 동일하게 입력)"
-        />
+        {!newGroupMode ? (
+          <div style={{ display: 'flex', gap: 6 }}>
+            <select
+              value={groupKey}
+              onChange={e => setGroupKey(e.target.value)}
+              style={{ flex: 1, padding: '10px 12px', borderRadius: 8, border: '1.5px solid #e2e8f0', fontSize: 14, background: '#fff', color: groupKey ? '#0f172a' : '#94a3b8' }}
+            >
+              <option value="">그룹 없음</option>
+              {existingGroups.map(g => (
+                <option key={g} value={g}>{g}</option>
+              ))}
+            </select>
+            <button
+              type="button"
+              onClick={() => { setNewGroupMode(true); setGroupKey('') }}
+              style={{ background: '#f1f5f9', border: '1.5px solid #e2e8f0', borderRadius: 8, padding: '0 12px', fontSize: 12, color: '#475569', cursor: 'pointer', whiteSpace: 'nowrap' }}
+            >
+              ＋ 새 그룹
+            </button>
+          </div>
+        ) : (
+          <div style={{ display: 'flex', gap: 6 }}>
+            <input
+              type="text"
+              value={newGroupInput}
+              onChange={e => setNewGroupInput(e.target.value)}
+              placeholder="새 그룹 이름 입력 (예: 리넨원피스2025)"
+              autoFocus
+              style={{ flex: 1 }}
+            />
+            <button
+              type="button"
+              onClick={() => { setNewGroupMode(false); setNewGroupInput('') }}
+              style={{ background: '#f1f5f9', border: '1.5px solid #e2e8f0', borderRadius: 8, padding: '0 12px', fontSize: 12, color: '#475569', cursor: 'pointer' }}
+            >
+              취소
+            </button>
+          </div>
+        )}
 
         {/* 이미지 업로드 */}
         <label>상품 이미지</label>
