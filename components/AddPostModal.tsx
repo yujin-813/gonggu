@@ -57,8 +57,9 @@ export default function AddPostModal({ onClose, onSubmit, editPost, existingGrou
   const [newGroupMode,  setNewGroupMode]  = useState(false)
   const [newGroupInput, setNewGroupInput] = useState('')
 
+  const [marketUrl,       setMarketUrl]       = useState('')
   const [marketSearching, setMarketSearching] = useState(false)
-  const [marketResults,   setMarketResults]   = useState<{ title: string; lprice: number; mallName: string }[]>([])
+  const [marketResults,   setMarketResults]   = useState<{ title: string; lprice: number; mallName: string; link: string }[]>([])
 
   const [imgFile,    setImgFile]    = useState<File | null>(null)
   const [imgPreview, setImgPreview] = useState('')   // blob URL or existing img URL
@@ -77,6 +78,7 @@ export default function AddPostModal({ onClose, onSubmit, editPost, existingGrou
     setEndDate(editPost.deadline || defaultDate(7))
     setPrice(editPost.price ? String(editPost.price) : '')
     setOrigPrice(editPost.origPrice ? String(editPost.origPrice) : '')
+    setMarketUrl(editPost.market_url || '')
     const gk = editPost.group_key || ''
     setGroupKey(gk)
     setNewGroupMode(false)
@@ -181,6 +183,7 @@ export default function AddPostModal({ onClose, onSubmit, editPost, existingGrou
         avatar:       CAT_EMOJI[cat] || '🛍️',
         caption:      editPost?.caption || '',
         group_key:    (newGroupMode ? newGroupInput : groupKey).trim() || null,
+        market_url:   marketUrl.trim() || null,
         published:    editPost?.published ?? true,
       })
     } catch (err) {
@@ -318,14 +321,21 @@ export default function AddPostModal({ onClose, onSubmit, editPost, existingGrou
                 {marketSearching ? '검색 중...' : '🔍 네이버 시중가 검색'}
               </button>
             </div>
-            <input type="number" value={origPrice} onChange={e => setOrigPrice(e.target.value)} placeholder="60000" />
+            <input type="number" value={origPrice} onChange={e => { setOrigPrice(e.target.value); if (!e.target.value) setMarketUrl('') }} placeholder="60000" />
+            {marketUrl && origPrice && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 4 }}>
+                <span style={{ fontSize: 11, color: '#16a34a' }}>✅ 시중가 링크 연결됨</span>
+                <a href={marketUrl} target="_blank" rel="noopener noreferrer" style={{ fontSize: 11, color: '#6366f1' }}>미리보기 →</a>
+                <button type="button" onClick={() => { setMarketUrl(''); }} style={{ fontSize: 11, color: '#94a3b8', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>링크 제거</button>
+              </div>
+            )}
             {marketResults.length > 0 && (
               <div style={{ marginTop: 6, border: '1.5px solid #e2e8f0', borderRadius: 8, overflow: 'hidden' }}>
                 {marketResults.map((item, i) => (
                   <button
                     key={i}
                     type="button"
-                    onClick={() => { setOrigPrice(String(item.lprice)); setMarketResults([]) }}
+                    onClick={() => { setOrigPrice(String(item.lprice)); setMarketUrl(item.link); setMarketResults([]) }}
                     style={{
                       display: 'flex', justifyContent: 'space-between', alignItems: 'center',
                       width: '100%', padding: '8px 12px', background: i % 2 === 0 ? '#f8fafc' : '#fff',
@@ -345,9 +355,6 @@ export default function AddPostModal({ onClose, onSubmit, editPost, existingGrou
                   닫기
                 </button>
               </div>
-            )}
-            {marketResults.length === 0 && !marketSearching && origPrice === '' && title.trim() && (
-              <p style={{ fontSize: 11, color: '#94a3b8', margin: '4px 0 0' }}>상품명 입력 후 검색하거나 직접 입력하세요</p>
             )}
           </div>
         </div>

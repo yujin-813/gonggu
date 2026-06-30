@@ -114,7 +114,11 @@ export default function PostCard({ post, isBookmarked, onToggleBookmark, onJoin,
           <span className="price-sale">{post.price.toLocaleString()}원</span>
           {discount > 0 && <span className="discount-rate">-{discount}%</span>}
           {post.origPrice && post.origPrice > post.price && (
-            <span className="price-orig">시중가 {post.origPrice.toLocaleString()}원</span>
+            post.market_url
+              ? <a href={post.market_url} target="_blank" rel="noopener noreferrer" className="price-orig" style={{ textDecoration: 'none' }}>
+                  시중가 {post.origPrice.toLocaleString()}원 →
+                </a>
+              : <span className="price-orig">시중가 {post.origPrice.toLocaleString()}원</span>
           )}
         </div>
 

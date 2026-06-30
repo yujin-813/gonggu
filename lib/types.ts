@@ -20,6 +20,7 @@ export interface Post {
   scraped_at?: string
   brand?: string | null
   group_key?: string | null
+  market_url?: string | null
   source?: 'manual' | 'scraper'
   published?: boolean
 }
