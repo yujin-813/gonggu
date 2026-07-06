@@ -27,11 +27,17 @@ export async function GET(request: NextRequest) {
 
   let posts = loadPosts()
 
-  // 고객 페이지: status='published' 또는 status 없는 기존 데이터는 published 필드로 판단
+  // 고객 페이지: published 상태 + 마감일 미경과 (상시딜 제외)
   if (!adminMode) {
-    posts = posts.filter(p =>
-      p.status === 'published' || (!p.status && p.published !== false)
-    )
+    const today = new Date()
+    today.setHours(0, 0, 0, 0)
+    posts = posts.filter(p => {
+      const isPublished = p.status === 'published' || (!p.status && p.published !== false)
+      if (!isPublished) return false
+      if (p.is_evergreen_deal || p.is_always_on) return true
+      if (!p.deadline) return true  // 마감일 없는 기존 데이터는 노출 유지
+      return new Date(p.deadline) >= today
+    })
   }
 
   if (cat && cat !== 'all') posts = posts.filter(p => p.cat === cat)
