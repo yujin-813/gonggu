@@ -216,12 +216,28 @@ def _parse_deadline_candidate(raw):
 
 # ── 도메인별 전용 추출기 ───────────────────────────────────────────────────────
 _DOMAIN_PRICE_PATTERNS = {
+    "smartstore.naver.com": [
+        r'"sellingPrice"\s*:\s*(\d{4,8})',
+        r'"discountedSalePrice"\s*:\s*(\d{4,8})',
+        r'"salePrice"\s*:\s*(\d{4,8})',
+        r'"dcPrice"\s*:\s*(\d{4,8})',
+        r'"benefitPrice"\s*:\s*(\d{4,8})',
+    ],
+    "mkt.shopping.naver.com": [
+        r'"sellingPrice"\s*:\s*(\d{4,8})',
+        r'"salePrice"\s*:\s*(\d{4,8})',
+    ],
     "11st.co.kr":       [r'"finalDscAmt"\s*:\s*(\d{4,8})', r'"saleAmt"\s*:\s*(\d{4,8})'],
     "interpark.com":    [r'"discountPrice"\s*:\s*(\d{4,8})', r'"price"\s*:\s*(\d{4,8})'],
     "ssg.com":          [r'"salePrc"\s*:\s*"?(\d{4,8})"?'],
     "oliveyoung.co.kr": [r'"finalPrice"\s*:\s*"?(\d{4,8})"?'],
     "kurly.com":        [r'"sales_price"\s*:\s*(\d{4,8})'],
     "a-bly.com":        [r'"discountedPrice"\s*:\s*(\d{4,8})'],
+    "ohou.se":          [r'"salePrice"\s*:\s*(\d{4,8})', r'"discountPrice"\s*:\s*(\d{4,8})'],
+    "musinsa.com":      [r'"sale_price"\s*:\s*(\d{4,8})', r'"price"\s*:\s*(\d{4,8})'],
+    "29cm.co.kr":       [r'"sellingPrice"\s*:\s*(\d{4,8})', r'"salePrice"\s*:\s*(\d{4,8})'],
+    "tagby.io":         [r'"price"\s*:\s*(\d{4,8})', r'"salePrice"\s*:\s*(\d{4,8})'],
+    "wadiz.kr":         [r'"rewardPrice"\s*:\s*(\d{4,8})', r'"price"\s*:\s*(\d{4,8})'],
 }
 
 _DOMAIN_DEADLINE_PATTERNS = {
@@ -388,10 +404,16 @@ def fetch_product_info(url, domain):
     for pat in (
         r'["\']salePrice["\']\s*:\s*(\d{4,8})',
         r'["\']sale_price["\']\s*:\s*(\d{4,8})',
+        r'["\']sellingPrice["\']\s*:\s*(\d{4,8})',
+        r'["\']currentPrice["\']\s*:\s*(\d{4,8})',
         r'["\']discountedPrice["\']\s*:\s*(\d{4,8})',
+        r'["\']discountedSalePrice["\']\s*:\s*(\d{4,8})',
         r'["\']finalPrice["\']\s*:\s*(\d{4,8})',
         r'["\']goodsPrice["\']\s*:\s*(\d{4,8})',
         r'["\']sellPrice["\']\s*:\s*(\d{4,8})',
+        r'["\']dcPrice["\']\s*:\s*(\d{4,8})',
+        r'["\']benefitPrice["\']\s*:\s*(\d{4,8})',
+        r'["\']cpnAplcPrice["\']\s*:\s*(\d{4,8})',
     ):
         mt = re.search(pat, html)
         if mt:
@@ -417,7 +439,18 @@ def fetch_product_info(url, domain):
 
     if not result.get("price") and price_cands:
         labeled = [c for c in price_cands if c["source"] == "label_price"]
-        chosen = labeled[0] if labeled else min(price_cands, key=lambda c: c["value"])
+        if labeled:
+            chosen = labeled[0]
+        else:
+            # 배송비(3000원 미만) 제거 후, 빈도 가장 높은 값 선택
+            filtered = [c for c in price_cands if c["value"] >= 3000]
+            if filtered:
+                from collections import Counter
+                freq = Counter(c["value"] for c in filtered)
+                top_val = freq.most_common(1)[0][0]
+                chosen = next(c for c in filtered if c["value"] == top_val)
+            else:
+                chosen = min(price_cands, key=lambda c: c["value"])
         result["price"] = chosen["value"]
         if not debug["extraction_method"]:
             debug["extraction_method"] = "text_regex"
