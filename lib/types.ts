@@ -37,7 +37,7 @@ export interface Post {
   group_key?: string | null
   market_url?: string | null
   source?: 'manual' | 'scraper' | 'inpock'
-  status?: 'candidate' | 'needs_review' | 'ready' | 'published' | 'excluded'
+  status?: 'candidate' | 'needs_review' | 'ready' | 'published' | 'excluded' | 'upcoming'
   review_reason?: string[]
   published?: boolean
   source_type?: LinkSourceType

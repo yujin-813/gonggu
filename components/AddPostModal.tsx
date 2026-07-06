@@ -157,12 +157,15 @@ export default function AddPostModal({ onClose, onSubmit, editPost, existingGrou
     return d.url as string
   }
 
+  const isUpcomingPost = startDate > todayStr()
+
   async function handleSubmit() {
     if (!url.trim() || !isInstagramUrl(url)) {
       setUrlError('올바른 인스타그램 게시글 URL을 입력해주세요')
       return
     }
-    if (!title.trim() || !account.trim() || !price || !endDate) return
+    if (!title.trim() || !account.trim() || !startDate) return
+    if (!isUpcomingPost && (!price || !endDate)) return  // 오픈 예정은 가격/마감일 없어도 됨
 
     setLoading(true)
     try {
@@ -173,7 +176,7 @@ export default function AddPostModal({ onClose, onSubmit, editPost, existingGrou
         brand:        brand.trim() || null,
         account:      account.trim().startsWith('@') ? account.trim() : '@' + account.trim(),
         cat,
-        price:        parseInt(price),
+        price:        price ? parseInt(price) : 0,
         origPrice:    origPrice ? parseInt(origPrice) : null,
         start_date:   startDate || '',
         deadline:     endDate,
@@ -184,7 +187,8 @@ export default function AddPostModal({ onClose, onSubmit, editPost, existingGrou
         caption:      editPost?.caption || '',
         group_key:    (newGroupMode ? newGroupInput : groupKey).trim() || null,
         market_url:   marketUrl.trim() || null,
-        published:    editPost?.published ?? true,
+        published:    editPost?.published ?? !isUpcomingPost,
+        status:       editPost?.status ?? (isUpcomingPost ? 'upcoming' : 'ready'),
       })
     } catch (err) {
       console.error(err)
@@ -441,8 +445,13 @@ export default function AddPostModal({ onClose, onSubmit, editPost, existingGrou
         </div>
         <input ref={fileRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={handleFileChange} />
 
+        {isUpcomingPost && !isEdit && (
+          <div style={{ background: '#ede9fe', borderRadius: 8, padding: '10px 14px', marginBottom: 8, fontSize: 13, color: '#7c3aed' }}>
+            🗓️ 시작일이 미래입니다 — <strong>오픈 예정</strong>으로 등록되어 소비자 화면에 D-day 표시됩니다. 가격/마감일은 선택사항입니다.
+          </div>
+        )}
         <button className="btn-submit" onClick={handleSubmit} disabled={loading}>
-          {loading ? (imgFile ? '이미지 업로드 중...' : '처리 중...') : isEdit ? '수정 완료 ✓' : '공구 올리기 🛍️'}
+          {loading ? (imgFile ? '이미지 업로드 중...' : '처리 중...') : isEdit ? '수정 완료 ✓' : isUpcomingPost ? '오픈 예정 등록 🗓️' : '공구 올리기 🛍️'}
         </button>
       </div>
     </div>

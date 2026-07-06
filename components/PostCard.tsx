@@ -56,11 +56,17 @@ export default function PostCard({ post, isBookmarked, onToggleBookmark, onJoin,
   const [imgFailed, setImgFailed] = useState(false)
   const [showCompare, setShowCompare] = useState(false)
   const compareCount = siblings.length
-  const badge = badgeInfo(post.deadline)
-  const dt = !post.deadline && (post.is_evergreen_deal || post.is_always_on)
+  const isUpcoming = post.status === 'upcoming'
+  const daysToOpen = isUpcoming && post.start_date ? daysLeft(post.start_date) : null
+  const badge = isUpcoming
+    ? { cls: 'soon', icon: '🗓️', txt: daysToOpen !== null && daysToOpen > 0 ? `D-${daysToOpen} 오픈` : '오늘 오픈!' }
+    : badgeInfo(post.deadline)
+  const dt = isUpcoming
+    ? { cls: '', txt: `📅 ${fmt(post.start_date)} 오픈 예정` }
+    : !post.deadline && (post.is_evergreen_deal || post.is_always_on)
     ? { cls: '', txt: '📅 상시딜' }
     : periodText(post.start_date, post.deadline)
-  const closed = daysLeft(post.deadline) < 0
+  const closed = !isUpcoming && daysLeft(post.deadline) < 0
   const discount =
     post.origPrice && post.origPrice > post.price
       ? Math.round((1 - post.price / post.origPrice) * 100)
@@ -149,11 +155,12 @@ export default function PostCard({ post, isBookmarked, onToggleBookmark, onJoin,
             )}
           </div>
           <button
-            className={`btn-join ${closed || !post.url ? 'closed' : ''}`}
-            onClick={() => { if (!closed && post.url) { onJoin?.(post.id); window.open(post.url, '_blank') } }}
-            disabled={closed || !post.url}
+            className={`btn-join ${closed || isUpcoming || !post.url ? 'closed' : ''}`}
+            onClick={() => { if (!closed && !isUpcoming && post.url) { onJoin?.(post.id); window.open(post.url, '_blank') } }}
+            disabled={closed || isUpcoming || !post.url}
+            style={isUpcoming ? { background: '#ede9fe', color: '#7c3aed', borderColor: '#c4b5fd' } : {}}
           >
-            {closed ? '마감됨' : !post.url ? '링크 없음' : '공구 보기 →'}
+            {closed ? '마감됨' : isUpcoming ? '오픈 예정 🗓️' : !post.url ? '링크 없음' : '공구 보기 →'}
           </button>
         </div>
       </div>
