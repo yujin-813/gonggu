@@ -560,6 +560,8 @@ def block_to_post(b, ig_handle, price, domain, profile_url, purchase_url, deadli
     confidence = (debug_info or {}).get("extraction_confidence")
     status, review_reason = classify_status(title, purchase_url, price, deadline, confidence)
     market = fetch_naver_market_price(title) if title else {}
+    if market.get("market_price") and price and price >= market["market_price"]:
+        status, review_reason = "excluded", ["시장 최저가 이상"]
     return {
         "id":              abs(hash(sc)) % (10 ** 9),
         "shortcode":       sc,
