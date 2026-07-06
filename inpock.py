@@ -21,6 +21,10 @@ from datetime import datetime, date
 from pathlib import Path
 
 import requests
+
+# ── 네이버 쇼핑 API ────────────────────────────────────────────────────────────
+_NAVER_CLIENT_ID     = os.environ.get("NAVER_CLIENT_ID", "")
+_NAVER_CLIENT_SECRET = os.environ.get("NAVER_CLIENT_SECRET", "")
 try:
     import dateparser
     _DATEPARSER_OK = True
@@ -486,6 +490,48 @@ def resolve_img(img, shortcode):
     return src
 
 
+def fetch_naver_market_price(title):
+    """네이버 쇼핑 검색 API로 현재 시장 최저가를 조회한다.
+    반환: {market_price: int|None, market_source: str|None}
+    API 미설정이거나 실패하면 빈 dict 반환."""
+    if not _NAVER_CLIENT_ID or not _NAVER_CLIENT_SECRET:
+        return {}
+    # 제목에서 검색에 불필요한 특수문자·이모지 제거
+    query = re.sub(r"[^\w\s가-힣]", " ", title).strip()
+    query = re.sub(r"\s+", " ", query)[:50]
+    if not query:
+        return {}
+    try:
+        r = requests.get(
+            "https://openapi.naver.com/v1/search/shop.json",
+            headers={
+                "X-Naver-Client-Id":     _NAVER_CLIENT_ID,
+                "X-Naver-Client-Secret": _NAVER_CLIENT_SECRET,
+            },
+            params={"query": query, "display": 5, "sort": "asc"},
+            timeout=5,
+        )
+        if r.status_code != 200:
+            return {}
+        items = r.json().get("items", [])
+        prices = []
+        for item in items:
+            lp = item.get("lprice")
+            if lp:
+                try:
+                    prices.append(int(lp))
+                except ValueError:
+                    pass
+        if not prices:
+            return {}
+        return {
+            "market_price":  min(prices),
+            "market_source": "naver_shopping",
+        }
+    except Exception:
+        return {}
+
+
 def classify_status(title, purchase_url, price, deadline, extraction_confidence=None):
     reasons = []
     if not price:
@@ -513,6 +559,7 @@ def block_to_post(b, ig_handle, price, domain, profile_url, purchase_url, deadli
     img = resolve_img(img_src, sc)
     confidence = (debug_info or {}).get("extraction_confidence")
     status, review_reason = classify_status(title, purchase_url, price, deadline, confidence)
+    market = fetch_naver_market_price(title) if title else {}
     return {
         "id":              abs(hash(sc)) % (10 ** 9),
         "shortcode":       sc,
@@ -550,6 +597,8 @@ def block_to_post(b, ig_handle, price, domain, profile_url, purchase_url, deadli
         "collection_status": "collected",
         "collection_error": None,
         "influencer_id":   source_obj.get("id") if source_obj else None,
+        "market_price":    market.get("market_price"),
+        "market_source":   market.get("market_source"),
     }
 
 

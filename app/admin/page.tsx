@@ -728,6 +728,18 @@ function AdminPostRow({ post: p, onToggle, onDelete, onEdit, onToggleAlwaysOn, p
             {p.brand && <span style={{ color: '#6366f1', fontWeight: 600 }}>{p.brand}</span>}
             <span style={{ color: expired ? '#ef4444' : '#6366f1' }}>📅 {periodLabel}</span>
             <span style={{ fontWeight: 600, color: '#0f172a' }}>{p.price?.toLocaleString()}원</span>
+            {p.market_price && p.price && p.market_price > p.price && (
+              <span title={`네이버 쇼핑 최저가: ${p.market_price.toLocaleString()}원`}
+                style={{ fontSize: 11, background: '#fef9c3', color: '#92400e', padding: '2px 6px', borderRadius: 10, fontWeight: 700, cursor: 'help' }}>
+                🏷️ 최저가比 {Math.round((1 - p.price / p.market_price) * 100)}%↓
+              </span>
+            )}
+            {p.market_price && p.price && p.market_price <= p.price && (
+              <span title={`네이버 쇼핑 최저가: ${p.market_price.toLocaleString()}원`}
+                style={{ fontSize: 11, background: '#fee2e2', color: '#991b1b', padding: '2px 6px', borderRadius: 10, cursor: 'help' }}>
+                ⚠️ 최저가보다 비쌈
+              </span>
+            )}
             {p.extraction_debug && (
               <span
                 title={JSON.stringify(p.extraction_debug, null, 2)}

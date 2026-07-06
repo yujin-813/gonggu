@@ -53,6 +53,8 @@ export interface Post {
   is_always_on?: boolean
   is_evergreen_deal?: boolean
   extraction_debug?: Record<string, unknown> | null
+  market_price?: number | null
+  market_source?: string | null
 }
 
 export interface ScraperStatus {
