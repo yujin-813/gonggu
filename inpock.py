@@ -617,14 +617,23 @@ def classify_status(title, purchase_url, price, deadline, extraction_confidence=
 def block_to_post(b, ig_handle, price, domain, profile_url, purchase_url, deadline, product_info=None, debug_info=None, source_obj=None):
     sc = f"inpock_{b['id']}"
     pi = product_info or {}
-    title = (b.get("title") or "").strip() or pi.get("title", "")
+    raw_title = (b.get("title") or "").strip() or pi.get("title", "")
+    # 버튼 텍스트성 suffix 제거 ("구매하기", "바로가기" 등)
+    title = re.sub(r'\s*(구매하기|바로가기|구매링크|신청하기|주문하기|보러가기)\s*$', '', raw_title).strip()
     img_src = b.get("image") or pi.get("img", "")
     img = resolve_img(img_src, sc)
     confidence = (debug_info or {}).get("extraction_confidence")
     status, review_reason = classify_status(title, purchase_url, price, deadline, confidence)
     market = fetch_naver_market_price(title) if title else {}
-    if market.get("market_price") and price and price >= market["market_price"]:
-        status, review_reason = "excluded", ["시장 최저가 이상"]
+    mp = market.get("market_price")
+    if mp and price:
+        if price >= mp:
+            # 네이버 가격이 추출 가격의 30% 미만이면 다른 상품 매칭 가능성 → 검수로
+            if mp < price * 0.3:
+                if status not in ("excluded", "needs_review"):
+                    status, review_reason = "needs_review", ["시장가 비교 불신뢰 (검수 필요)"]
+            else:
+                status, review_reason = "excluded", ["시장 최저가 이상"]
     return {
         "id":              abs(hash(sc)) % (10 ** 9),
         "shortcode":       sc,
