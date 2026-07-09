@@ -112,7 +112,7 @@ export default function AdminPage() {
   const [showAddModal, setShowAddModal] = useState(false)
   const [editingPost, setEditingPost]   = useState<Post | null>(null)
   const [loading, setLoading]         = useState(true)
-  const [filter, setFilter]           = useState<'all' | 'candidate' | 'needs_review' | 'ready' | 'published' | 'excluded'>('all')
+  const [filter, setFilter]           = useState<'all' | 'candidate' | 'needs_review' | 'ready' | 'published' | 'excluded' | 'upcoming'>('all')
   const [searchQ, setSearchQ]         = useState('')
   const [analytics, setAnalytics]     = useState<DayStat[]>([])
   const [includeKws, setIncludeKws]   = useState<string[]>([])
@@ -275,8 +275,9 @@ export default function AdminPage() {
 
   async function togglePublished(p: Post) {
     const isPublished = p.status === 'published' || (!p.status && p.published !== false)
-    const nextStatus: Post['status'] = isPublished ? 'ready' : 'published'
-    const nextPublished = !isPublished
+    // upcoming 공구는 published 필드만 토글 (status는 건드리지 않음)
+    const nextPublished = p.status === 'upcoming' ? p.published === false ? true : false : !isPublished
+    const nextStatus: Post['status'] = p.status === 'upcoming' ? 'upcoming' : isPublished ? 'ready' : 'published'
     setPosts(prev => prev.map(x => x.id === p.id ? { ...x, published: nextPublished, status: nextStatus } : x))
     await fetch(`/api/posts/${p.id}`, {
       method: 'PATCH',
@@ -302,6 +303,19 @@ export default function AdminPage() {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ is_evergreen_deal: next, is_always_on: next, status: nextStatus, review_reason: nextReviewReason }),
+    })
+  }
+
+  async function quickReview(p: Post, action: 'approve' | 'always_on' | 'exclude') {
+    const patch =
+      action === 'approve'   ? { status: 'ready' as const, published: false } :
+      action === 'always_on' ? { status: 'ready' as const, published: false, is_evergreen_deal: true, is_always_on: true } :
+                               { status: 'excluded' as const, published: false }
+    setPosts(prev => prev.map(x => x.id === p.id ? { ...x, ...patch } : x))
+    await fetch(`/api/posts/${p.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(patch),
     })
   }
 
@@ -357,6 +371,7 @@ export default function AdminPage() {
   const readyCount       = countBy('ready')
   const publishedCount   = countBy('published')
   const excludedCount    = countBy('excluded')
+  const upcomingCount    = countBy('upcoming')
 
   // 인증 확인 중 (hydration 전)
   if (authed === null) return null
@@ -510,6 +525,7 @@ export default function AdminPage() {
                   { key: 'ready',        label: `공개 가능 ${readyCount}`,       color: '#22c55e' },
                   { key: 'published',    label: `공개됨 ${publishedCount}`,      color: '#0ea5e9' },
                   { key: 'excluded',     label: `제외 ${excludedCount}`,         color: '#94a3b8' },
+                  { key: 'upcoming',     label: `오픈예정 ${upcomingCount}`,      color: '#7c3aed' },
                 ] as const).map(({ key, label, color }) => (
                   <button key={key} onClick={() => setFilter(key)}
                     style={{
@@ -536,7 +552,7 @@ export default function AdminPage() {
               </div>
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                {visible.map(p => <AdminPostRow key={p.id} post={p} onToggle={togglePublished} onDelete={deletePost} onEdit={setEditingPost} onToggleAlwaysOn={toggleEvergreenDeal} periodLabel={periodLabel(p)} dLeft={daysLeft(p.deadline)} />)}
+                {visible.map(p => <AdminPostRow key={p.id} post={p} onToggle={togglePublished} onDelete={deletePost} onEdit={setEditingPost} onToggleAlwaysOn={toggleEvergreenDeal} onQuickReview={quickReview} periodLabel={periodLabel(p)} dLeft={daysLeft(p.deadline)} />)}
               </div>
             )}
           </>
@@ -681,12 +697,13 @@ function AnalyticsSection({ data }: { data: DayStat[] }) {
   )
 }
 
-function AdminPostRow({ post: p, onToggle, onDelete, onEdit, onToggleAlwaysOn, periodLabel, dLeft }: {
+function AdminPostRow({ post: p, onToggle, onDelete, onEdit, onToggleAlwaysOn, onQuickReview, periodLabel, dLeft }: {
   post: Post
   onToggle: (p: Post) => void
   onDelete: (id: number) => void
   onEdit:   (p: Post) => void
   onToggleAlwaysOn: (p: Post) => void
+  onQuickReview: (p: Post, action: 'approve' | 'always_on' | 'exclude') => void
   periodLabel: string
   dLeft: number
 }) {
@@ -747,6 +764,24 @@ function AdminPostRow({ post: p, onToggle, onDelete, onEdit, onToggleAlwaysOn, p
             )}
           </div>
         </div>
+
+        {/* 빠른 검수 버튼 — needs_review / candidate 전용 */}
+        {(p.status === 'needs_review' || p.status === 'candidate') && (
+          <div style={{ display: 'flex', gap: 6, marginTop: 8, paddingTop: 8, borderTop: '1px solid #e2e8f0' }}>
+            <button onClick={() => onQuickReview(p, 'approve')}
+              style={{ flex: 1, padding: '7px 0', background: '#dcfce7', color: '#15803d', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 12, fontWeight: 700 }}>
+              ✅ 공구 확정
+            </button>
+            <button onClick={() => onQuickReview(p, 'always_on')}
+              style={{ flex: 1, padding: '7px 0', background: '#fef9c3', color: '#92400e', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 12, fontWeight: 700 }}>
+              📦 상시판매
+            </button>
+            <button onClick={() => onQuickReview(p, 'exclude')}
+              style={{ flex: 1, padding: '7px 0', background: '#fee2e2', color: '#dc2626', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 12, fontWeight: 700 }}>
+              🚫 제외
+            </button>
+          </div>
+        )}
 
         {/* 액션 버튼 */}
         <div className="admin-row-actions">

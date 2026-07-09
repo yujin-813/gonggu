@@ -32,7 +32,7 @@ export async function GET(request: NextRequest) {
     const today = new Date()
     today.setHours(0, 0, 0, 0)
     posts = posts.filter(p => {
-      if (p.status === 'upcoming') return true  // 오픈 예정은 항상 노출
+      if (p.status === 'upcoming' && p.published !== false) return true  // 오픈 예정 (명시적 숨김 제외)
       const isPublished = p.status === 'published' || (!p.status && p.published !== false)
       if (!isPublished) return false
       if (p.is_evergreen_deal || p.is_always_on) return true
@@ -81,9 +81,12 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   const data = await request.json()
-  const required = ['title', 'account', 'price', 'cat']
+  const required = ['title', 'account', 'cat']
   for (const field of required) {
     if (!data[field]) return NextResponse.json({ error: `필수 필드 누락: ${field}` }, { status: 400 })
+  }
+  if (data.status !== 'upcoming' && !data.price) {
+    return NextResponse.json({ error: '필수 필드 누락: price' }, { status: 400 })
   }
 
   const posts = loadPosts()

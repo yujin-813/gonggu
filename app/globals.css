@@ -241,6 +241,22 @@ header {
 .price-sale { font-size: 20px; font-weight: 800; color: var(--pink); }
 .price-orig { font-size: 13px; color: var(--gray-3); text-decoration: line-through; }
 .discount-rate { font-size: 13px; font-weight: 700; color: #FF3B30; }
+.deal-judgment {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border-radius: 8px;
+  margin-bottom: 8px;
+  font-size: 12px;
+  line-height: 1.4;
+}
+.judgment-verdict { font-weight: 700; white-space: nowrap; }
+.judgment-detail  { opacity: 0.85; }
+.deal-judgment-good    { background: #dcfce7; color: #15803d; }
+.deal-judgment-neutral { background: #fef9c3; color: #854d0e; }
+.deal-judgment-check   { background: #fff7ed; color: #c2410c; }
+
 .card-footer {
   display: flex;
   align-items: center;

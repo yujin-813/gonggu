@@ -9,6 +9,18 @@ const CAT_LABEL: Record<string, string> = {
   pet: '🐾 반려동물', digital: '📱 디지털',
 }
 
+function dealJudgment(post: Post): { verdict: string; detail: string; cls: string } | null {
+  if (!post.market_price || !post.price || post.status === 'upcoming') return null
+  const mp = post.market_price
+  const p  = post.price
+  const diff = mp - p
+  if (p <= mp * 0.9)
+    return { verdict: '살만해요', detail: `네이버 최저가보다 ${diff.toLocaleString()}원 저렴`, cls: 'good' }
+  if (p < mp)
+    return { verdict: '가격 보통', detail: '온라인 최저가와 큰 차이 없어요', cls: 'neutral' }
+  return { verdict: '비교 필요', detail: '구성품·배송비를 함께 확인해보세요', cls: 'check' }
+}
+
 function daysLeft(deadline?: string): number {
   if (!deadline) return 999
   const today = new Date()
@@ -67,6 +79,7 @@ export default function PostCard({ post, isBookmarked, onToggleBookmark, onJoin,
     ? { cls: '', txt: '📅 상시딜' }
     : periodText(post.start_date, post.deadline)
   const closed = !isUpcoming && daysLeft(post.deadline) < 0
+  const judgment = dealJudgment(post)
   const discount =
     post.origPrice && post.origPrice > post.price
       ? Math.round((1 - post.price / post.origPrice) * 100)
@@ -129,6 +142,13 @@ export default function PostCard({ post, isBookmarked, onToggleBookmark, onJoin,
               : <span className="price-orig">정가 {post.origPrice.toLocaleString()}원</span>
           )}
         </div>
+
+        {judgment && (
+          <div className={`deal-judgment deal-judgment-${judgment.cls}`}>
+            <span className="judgment-verdict">{judgment.verdict}</span>
+            <span className="judgment-detail">{judgment.detail}</span>
+          </div>
+        )}
 
         {compareCount > 1 && (
           <button
