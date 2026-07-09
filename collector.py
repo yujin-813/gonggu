@@ -5,9 +5,19 @@ influencer_sources.json 의 source_type 에 따라 수집 방식을 라우팅한
 """
 import argparse
 import json
+import os
 import sys
 from datetime import datetime
 from pathlib import Path
+
+# cron 실행 시 .env.local 환경변수 주입 (Next.js가 로드해주지 않으므로 직접 파싱)
+_env_file = Path(__file__).parent / ".env.local"
+if _env_file.exists():
+    for _line in _env_file.read_text().splitlines():
+        _line = _line.strip()
+        if _line and not _line.startswith("#") and "=" in _line:
+            _k, _v = _line.split("=", 1)
+            os.environ.setdefault(_k.strip(), _v.strip())
 
 DATA_DIR               = Path(__file__).parent / "data"
 INFLUENCER_SOURCES_FILE = DATA_DIR / "influencer_sources.json"
