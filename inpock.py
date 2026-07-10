@@ -58,6 +58,33 @@ BLOCK_DOMAINS = (
 # 상시판매 신호 — 제목에 있으면 공구가 아님
 ALWAYS_ON_KW = ("상시판매", "상시 판매", "상시할인", "상시 할인", "상시구매", "상시 구매")
 
+# 비공구 신호 — 제목에 있으면 즉시 제외 (CS, 문의, 이벤트폼 등)
+NON_DEAL_KW = (
+    "cs문의", " cs",
+    "고객센터", "고객문의",
+    "배송조회", "주문조회", "주문/배송",
+    "이벤트 폼", "후기이벤트", "리뷰이벤트",
+    "무료체험", "무료 체험",
+    "알림 받", "문자 알림",
+    "문의하기", "네이버톡톡", "톡톡",
+    "레시피북",
+)
+
+# 공구 신호 — 하나라도 있으면 공구 가능성 높음
+DEAL_KW = (
+    "공구", "공동구매",
+    "특가", "단독특가", "단독구매",
+    "오픈", "오픈예정",
+    "마감", "마감임박",
+    "선착순",
+    "최저가", "역대최저",
+    "할인", "할인가",
+    "사은품", "증정",
+    "주문받", "신청받",
+    "기간한정", "한정수량",
+    "공구가", "공구특가",
+)
+
 # 카테고리 자동 분류 — 순서 중요 (구체적인 것부터)
 _CAT_KEYWORDS: list[tuple[str, tuple[str, ...]]] = [
     ("kids",    ("어린이", "유아", "아기", "키즈", "초등", "영아", "육아", "그림책", "동화책",
@@ -596,6 +623,20 @@ def fetch_naver_market_price(title):
 
 
 def classify_status(title, purchase_url, price, deadline, extraction_confidence=None):
+    if not title:
+        return "excluded", ["상품명 없음"]
+
+    t = title.lower()
+
+    # 비공구 신호 즉시 제외
+    if any(kw in t for kw in NON_DEAL_KW):
+        return "excluded", ["비공구"]
+
+    # 가격·마감일·공구 키워드 모두 없으면 상품 추천 링크로 판단
+    has_deal_signal = any(kw in t for kw in DEAL_KW)
+    if not price and not deadline and not has_deal_signal:
+        return "excluded", ["상품 추천 (비공구)"]
+
     reasons = []
     if not price:
         reasons.append("가격 미입력")
@@ -603,8 +644,6 @@ def classify_status(title, purchase_url, price, deadline, extraction_confidence=
         reasons.append("마감일 미확인")
     if not purchase_url:
         reasons.append("구매페이지 미확인")
-    if not title:
-        return "excluded", ["상품명 없음"]
     if purchase_url and price and deadline:
         # JSON-LD/meta(high)만 자동 승인, 그 외는 사람이 확인
         if extraction_confidence == "high":
