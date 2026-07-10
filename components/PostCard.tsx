@@ -175,12 +175,15 @@ export default function PostCard({ post, isBookmarked, onToggleBookmark, onJoin,
             )}
           </div>
           <button
-            className={`btn-join ${closed || isUpcoming || !post.url ? 'closed' : ''}`}
-            onClick={() => { if (!closed && !isUpcoming && post.url) { onJoin?.(post.id); window.open(post.url, '_blank') } }}
-            disabled={closed || isUpcoming || !post.url}
+            className={`btn-join ${closed || isUpcoming || !(post.purchase_url || post.url) ? 'closed' : ''}`}
+            onClick={() => {
+              const link = post.purchase_url || post.url
+              if (!closed && !isUpcoming && link) { onJoin?.(post.id); window.open(link, '_blank') }
+            }}
+            disabled={closed || isUpcoming || !(post.purchase_url || post.url)}
             style={isUpcoming ? { background: '#ede9fe', color: '#7c3aed', borderColor: '#c4b5fd' } : {}}
           >
-            {closed ? '마감됨' : isUpcoming ? '오픈 예정 🗓️' : !post.url ? '링크 없음' : '공구 보기 →'}
+            {closed ? '마감됨' : isUpcoming ? '오픈 예정 🗓️' : !(post.purchase_url || post.url) ? '링크 없음' : '공구 보기 →'}
           </button>
         </div>
       </div>
