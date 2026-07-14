@@ -10,11 +10,15 @@ const CAT_LABEL: Record<string, string> = {
 }
 
 function dealJudgment(post: Post): { verdict: string; detail: string; cls: string } | null {
-  if (!post.market_price || !post.price || post.status === 'upcoming') return null
-  const mp = post.market_price
+  if (!post.price || post.status === 'upcoming') return null
+  // 네이버 자동 매칭가가 있으면 우선 사용하고, 없으면 직접 입력된 정가라도 기준으로 삼는다
+  // (자동 매칭은 니치 상품이면 실패하는 경우가 많아, 절반 가까운 공구가 아예 판단을 못 받고 있었음)
+  const mp = post.market_price || post.origPrice
+  if (!mp) return null
   const p  = post.price
+  const label = post.market_price ? '네이버 최저가' : '정가'
 
-  // 가격이 시장 최저가 이상이면 할인 근거가 없는 것 — 괜히 좋다고 했다가 나중에 신뢰만 잃는다
+  // 가격이 기준가 이상이면 할인 근거가 없는 것 — 괜히 좋다고 했다가 나중에 신뢰만 잃는다
   if (p >= mp) {
     return { verdict: '가격은 직접 비교해보세요', detail: '온라인 최저가와 비슷하거나 더 비쌀 수 있어요 — 구성품·배송비도 함께 확인해보세요', cls: 'check' }
   }
@@ -27,9 +31,9 @@ function dealJudgment(post: Post): { verdict: string; detail: string; cls: strin
   const urgentSuffix = urgent ? ' · ⏰ 마감임박' : ''
 
   if (p <= mp * 0.7)
-    return { verdict: '완전 득템이에요', detail: `네이버 최저가보다 ${diff.toLocaleString()}원(${rate}%) 저렴${urgentSuffix}`, cls: 'great' }
+    return { verdict: '완전 득템이에요', detail: `${label}보다 ${diff.toLocaleString()}원(${rate}%) 저렴${urgentSuffix}`, cls: 'great' }
   if (p <= mp * 0.9)
-    return { verdict: '살만해요', detail: `네이버 최저가보다 ${diff.toLocaleString()}원 저렴${urgentSuffix}`, cls: 'good' }
+    return { verdict: '살만해요', detail: `${label}보다 ${diff.toLocaleString()}원 저렴${urgentSuffix}`, cls: 'good' }
   return { verdict: '가격 보통', detail: `온라인 최저가와 큰 차이 없어요${urgentSuffix}`, cls: 'neutral' }
 }
 
