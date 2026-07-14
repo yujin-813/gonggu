@@ -583,15 +583,35 @@ def resolve_img(img, shortcode):
     return src, False
 
 
+_QUERY_PROMO_WORDS = [
+    "구매하기", "바로가기", "구매링크", "신청하기", "주문하기", "보러가기", "주문링크",
+    "회원가입", "카카오채널", "카톡채널", "중복할인", "특별기획전", "단독특가", "신제품출시",
+    "공동구매", "한정수량", "선착순",
+]
+
+
+def clean_market_query(title):
+    """네이버쇼핑 검색어 정제 — 인포크 링크 제목엔 상품명 뒤에 프로모션 조건(괄호 안 회원가입/
+    할인조건/기간)이나 "구매하기" 같은 CTA 문구가 섞여 있어 그대로 검색하면 매칭률이 낮다."""
+    t = title or ""
+    # 괄호류(및 그 안의 내용) 통째로 제거 — 보통 프로모션 조건/기간이지 상품명이 아님
+    t = re.sub(r"[\(\[\{【（][^)\]}】）]*[\)\]\}】）]", " ", t)
+    for w in _QUERY_PROMO_WORDS:
+        t = t.replace(w, " ")
+    # "최대할인 40%", "할인53%" 류 제거
+    t = re.sub(r"(최대)?할인\s*\d+\s*%", " ", t)
+    # 특수문자·이모지 제거
+    t = re.sub(r"[^\w\s가-힣]", " ", t)
+    return re.sub(r"\s+", " ", t).strip()
+
+
 def fetch_naver_market_price(title):
     """네이버 쇼핑 검색 API로 현재 시장 최저가를 조회한다.
     반환: {market_price: int|None, market_source: str|None}
     API 미설정이거나 실패하면 빈 dict 반환."""
     if not _NAVER_CLIENT_ID or not _NAVER_CLIENT_SECRET:
         return {}
-    # 제목에서 검색에 불필요한 특수문자·이모지 제거
-    query = re.sub(r"[^\w\s가-힣]", " ", title).strip()
-    query = re.sub(r"\s+", " ", query)[:50]
+    query = clean_market_query(title)[:50]
     if not query:
         return {}
     try:
