@@ -611,9 +611,12 @@ def clean_market_query(title):
 
 
 def _query_variants(title):
-    """검색 후보를 여러 개 만든다 — 원제목 그대로 정제한 버전이 실패하면
-    "브랜드 - 감성적인 설명" 같은 인포크 특유의 제목 패턴에서 앞부분(브랜드/상품명)만,
-    그래도 안 되면 단어 수를 줄여가며 재시도한다."""
+    """검색 후보를 여러 개 만든다.
+    인포크 제목은 "인플루언서 캠페인명 × 실제 브랜드/상품명 - 쇼핑몰명" 패턴이 흔한데
+    (예: "트니맘 11차 공구 × 베베루트 링크형 카시트발판 - 이고다"), "×" 뒤가 진짜
+    상품이고 앞은 캠페인 라벨, 맨 끝 " - 쇼핑몰명"은 상품명이 아닌 경우가 많다.
+    그래서 원제목 정제본보다 이 "× 뒤 ~ 마지막 구분자 전" 구간을 먼저 시도하고,
+    실패하면 "브랜드 - 설명" 패턴의 앞부분, 그래도 안 되면 단어 수를 줄여가며 재시도한다."""
     variants = []
 
     def add(q):
@@ -622,6 +625,13 @@ def _query_variants(title):
             variants.append(q)
 
     base = clean_market_query(title)
+
+    # "캠페인명 × 실제상품 - 쇼핑몰명" — × 뒤, 마지막 " - "/" : " 앞까지가 가장 신뢰도 높은 후보
+    m = re.search(r"[×xX]\s*(.+)", title)
+    if m:
+        after = re.split(r"\s+[-:]\s+", m.group(1))[0]
+        add(clean_market_query(after))
+
     add(base)
 
     for sep in _QUERY_SEPARATORS:
@@ -667,17 +677,23 @@ def _naver_shop_search(query):
         return None
 
 
-def fetch_naver_market_price(title):
+def fetch_naver_market_price(title, price=None):
     """네이버 쇼핑 검색 API로 현재 시장 최저가를 조회한다. 검색어 후보를 여러 개
-    (원제목 정제본 → 구분자 앞부분 → 단어 수 축약본) 순서로 시도해 매칭률을 높인다.
+    (× 뒤 상품명 → 원제목 정제본 → 구분자 앞부분 → 단어 수 축약본) 순서로 시도한다.
+    price(공구 판매가)가 주어지면, 검색된 최저가가 판매가의 30% 미만인 매칭은
+    다른 상품일 가능성이 높다고 보고 건너뛰고 다음 후보를 계속 시도한다 — 그래야
+    앞쪽의 애매한 후보가 뒤쪽의 더 정확한 후보를 가로막지 않는다.
     반환: {market_price: int|None, market_source: str|None}
     API 미설정이거나 실패하면 빈 dict 반환."""
     if not _NAVER_CLIENT_ID or not _NAVER_CLIENT_SECRET:
         return {}
     for query in _query_variants(title):
-        price = _naver_shop_search(query[:50])
-        if price:
-            return {"market_price": price, "market_source": "naver_shopping"}
+        mp = _naver_shop_search(query[:50])
+        if not mp:
+            continue
+        if price and mp < price * 0.3:
+            continue
+        return {"market_price": mp, "market_source": "naver_shopping"}
     return {}
 
 
@@ -722,16 +738,11 @@ def block_to_post(b, ig_handle, price, domain, profile_url, purchase_url, deadli
     img, img_ok = resolve_img(img_src, sc)
     confidence = (debug_info or {}).get("extraction_confidence")
     status, review_reason = classify_status(title, purchase_url, price, deadline, confidence)
-    market = fetch_naver_market_price(title) if title else {}
+    # 신뢰도 낮은 매칭(판매가의 30% 미만)은 fetch_naver_market_price 내부에서 이미 걸러진다
+    market = fetch_naver_market_price(title, price) if title else {}
     mp = market.get("market_price")
-    if mp and price:
-        if price >= mp:
-            # 네이버 가격이 추출 가격의 30% 미만이면 다른 상품 매칭 가능성 → 검수로
-            if mp < price * 0.3:
-                if status not in ("excluded", "needs_review"):
-                    status, review_reason = "needs_review", ["시장가 비교 불신뢰 (검수 필요)"]
-            else:
-                status, review_reason = "excluded", ["시장 최저가 이상"]
+    if mp and price and price >= mp:
+        status, review_reason = "excluded", ["시장 최저가 이상"]
     if not img_ok and status != "excluded":
         # 이미지 다운로드 실패 — 원격 URL이 나중에 만료/차단되어 깨진 이미지로 보일 수 있으므로 검수 대상으로 표시
         status = "needs_review"

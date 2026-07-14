@@ -37,17 +37,12 @@ def main():
 
     updated = 0
     for p in targets:
-        market = fetch_naver_market_price(p["title"])
+        # 신뢰도 낮은 매칭(판매가의 30% 미만)은 fetch_naver_market_price가 알아서
+        # 건너뛰고 다음 검색어 후보를 시도하므로, 여기선 결과만 받으면 된다
+        market = fetch_naver_market_price(p["title"], p.get("price") or None)
         mp = market.get("market_price")
         if not mp:
             print(f"  · {p['title'][:40]} → 매칭 없음")
-            time.sleep(0.2)
-            continue
-
-        price = p.get("price") or 0
-        if price and mp < price * 0.3:
-            # 시세가 판매가의 30% 미만이면 다른 상품과 잘못 매칭됐을 가능성이 높음 — 스킵
-            print(f"  · {p['title'][:40]} → 매칭 신뢰도 낮음(스킵): 시세 {mp}원 vs 판매가 {price}원")
             time.sleep(0.2)
             continue
 
