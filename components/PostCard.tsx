@@ -13,12 +13,24 @@ function dealJudgment(post: Post): { verdict: string; detail: string; cls: strin
   if (!post.market_price || !post.price || post.status === 'upcoming') return null
   const mp = post.market_price
   const p  = post.price
+
+  // 가격이 시장 최저가 이상이면 할인 근거가 없는 것 — 괜히 좋다고 했다가 나중에 신뢰만 잃는다
+  if (p >= mp) {
+    return { verdict: '가격은 직접 비교해보세요', detail: '온라인 최저가와 비슷하거나 더 비쌀 수 있어요 — 구성품·배송비도 함께 확인해보세요', cls: 'check' }
+  }
+
   const diff = mp - p
+  const rate = Math.round((diff / mp) * 100)
+  // 가격이 좋고 마감도 임박했을 때만 "지금 사야 할 이유"를 덧붙인다 (둘 다 사실일 때만 — 과장 없이)
+  const dLeft = daysLeft(post.deadline)
+  const urgent = !(post.is_evergreen_deal || post.is_always_on) && dLeft >= 0 && dLeft <= 2
+  const urgentSuffix = urgent ? ' · ⏰ 마감임박' : ''
+
+  if (p <= mp * 0.7)
+    return { verdict: '완전 득템이에요', detail: `네이버 최저가보다 ${diff.toLocaleString()}원(${rate}%) 저렴${urgentSuffix}`, cls: 'great' }
   if (p <= mp * 0.9)
-    return { verdict: '살만해요', detail: `네이버 최저가보다 ${diff.toLocaleString()}원 저렴`, cls: 'good' }
-  if (p < mp)
-    return { verdict: '가격 보통', detail: '온라인 최저가와 큰 차이 없어요', cls: 'neutral' }
-  return { verdict: '비교 필요', detail: '구성품·배송비를 함께 확인해보세요', cls: 'check' }
+    return { verdict: '살만해요', detail: `네이버 최저가보다 ${diff.toLocaleString()}원 저렴${urgentSuffix}`, cls: 'good' }
+  return { verdict: '가격 보통', detail: `온라인 최저가와 큰 차이 없어요${urgentSuffix}`, cls: 'neutral' }
 }
 
 function daysLeft(deadline?: string): number {
@@ -30,7 +42,11 @@ function daysLeft(deadline?: string): number {
   return Math.ceil((d.getTime() - today.getTime()) / (1000 * 60 * 60 * 24))
 }
 
-function badgeInfo(deadline?: string) {
+function badgeInfo(deadline?: string, evergreen?: boolean): { cls: string; icon: string; txt: string } | null {
+  if (!deadline) {
+    // 마감일 미확인 — 상시딜이면 그렇게 표시하고, 아니면 D-999처럼 거짓 정보를 주느니 배지를 아예 숨긴다
+    return evergreen ? { cls: 'ok', icon: '📦', txt: '상시딜' } : null
+  }
   const d = daysLeft(deadline)
   if (d < 0) return { cls: 'closed', icon: '🔒', txt: '마감' }
   if (d === 0) return { cls: 'urgent', icon: '⏰', txt: '오늘 마감!' }
@@ -72,7 +88,7 @@ export default function PostCard({ post, isBookmarked, onToggleBookmark, onJoin,
   const daysToOpen = isUpcoming && post.start_date ? daysLeft(post.start_date) : null
   const badge = isUpcoming
     ? { cls: 'soon', icon: '🗓️', txt: daysToOpen !== null && daysToOpen > 0 ? `D-${daysToOpen} 오픈` : '오늘 오픈!' }
-    : badgeInfo(post.deadline)
+    : badgeInfo(post.deadline, post.is_evergreen_deal || post.is_always_on)
   const dt = isUpcoming
     ? { cls: '', txt: `📅 ${fmt(post.start_date)} 오픈 예정` }
     : !post.deadline && (post.is_evergreen_deal || post.is_always_on)
@@ -102,9 +118,11 @@ export default function PostCard({ post, isBookmarked, onToggleBookmark, onJoin,
         ) : (
           <div className="img-placeholder">{post.avatar || '🛍️'}</div>
         )}
-        <div className={`badge-deadline ${badge.cls}`}>
-          {badge.icon} {badge.txt}
-        </div>
+        {badge && (
+          <div className={`badge-deadline ${badge.cls}`}>
+            {badge.icon} {badge.txt}
+          </div>
+        )}
         <button
           className={`btn-bookmark ${isBookmarked ? 'active' : ''}`}
           onClick={() => onToggleBookmark(post.id)}

@@ -253,6 +253,7 @@ header {
 }
 .judgment-verdict { font-weight: 700; white-space: nowrap; }
 .judgment-detail  { opacity: 0.85; }
+.deal-judgment-great    { background: var(--pink-light); color: var(--pink); }
 .deal-judgment-good    { background: #dcfce7; color: #15803d; }
 .deal-judgment-neutral { background: #fef9c3; color: #854d0e; }
 .deal-judgment-check   { background: #fff7ed; color: #c2410c; }
