@@ -586,8 +586,12 @@ def resolve_img(img, shortcode):
 _QUERY_PROMO_WORDS = [
     "구매하기", "바로가기", "구매링크", "신청하기", "주문하기", "보러가기", "주문링크",
     "회원가입", "카카오채널", "카톡채널", "중복할인", "특별기획전", "단독특가", "신제품출시",
-    "공동구매", "한정수량", "선착순",
+    "공동구매", "한정수량", "선착순", "공구", "오픈", "특가", "모음전", "기획전",
 ]
+
+# 브랜드/상품명과 감성적 설명 문구를 가르는 흔한 구분자 — "브랜드 - 설명" 패턴에서
+# 구분자 앞부분만 따로 검색해보면 매칭률이 오른다 (예: "시간고양이 - 줄글책 힘들어..." → "시간고양이")
+_QUERY_SEPARATORS = [" - ", " × ", " X ", " x ", " : ", " ~ ", " | "]
 
 
 def clean_market_query(title):
@@ -598,22 +602,45 @@ def clean_market_query(title):
     t = re.sub(r"[\(\[\{【（][^)\]}】）]*[\)\]\}】）]", " ", t)
     for w in _QUERY_PROMO_WORDS:
         t = t.replace(w, " ")
-    # "최대할인 40%", "할인53%" 류 제거
+    # "최대할인 40%", "할인53%" 류, "11차" 같은 회차 표기 제거
     t = re.sub(r"(최대)?할인\s*\d+\s*%", " ", t)
+    t = re.sub(r"\d+\s*차\b", " ", t)
     # 특수문자·이모지 제거
     t = re.sub(r"[^\w\s가-힣]", " ", t)
     return re.sub(r"\s+", " ", t).strip()
 
 
-def fetch_naver_market_price(title):
-    """네이버 쇼핑 검색 API로 현재 시장 최저가를 조회한다.
-    반환: {market_price: int|None, market_source: str|None}
-    API 미설정이거나 실패하면 빈 dict 반환."""
-    if not _NAVER_CLIENT_ID or not _NAVER_CLIENT_SECRET:
-        return {}
-    query = clean_market_query(title)[:50]
-    if not query:
-        return {}
+def _query_variants(title):
+    """검색 후보를 여러 개 만든다 — 원제목 그대로 정제한 버전이 실패하면
+    "브랜드 - 감성적인 설명" 같은 인포크 특유의 제목 패턴에서 앞부분(브랜드/상품명)만,
+    그래도 안 되면 단어 수를 줄여가며 재시도한다."""
+    variants = []
+
+    def add(q):
+        q = (q or "").strip()
+        if q and q not in variants:
+            variants.append(q)
+
+    base = clean_market_query(title)
+    add(base)
+
+    for sep in _QUERY_SEPARATORS:
+        if sep in title:
+            add(clean_market_query(title.split(sep)[0]))
+
+    words = base.split()
+    if len(words) > 4:
+        add(" ".join(words[:4]))
+    if len(words) > 3:
+        add(" ".join(words[:3]))
+    if len(words) > 2:
+        add(" ".join(words[:2]))
+
+    return variants
+
+
+def _naver_shop_search(query):
+    """단일 검색어로 네이버쇼핑 API를 호출해 최저가를 반환. 결과 없으면 None."""
     try:
         r = requests.get(
             "https://openapi.naver.com/v1/search/shop.json",
@@ -625,7 +652,7 @@ def fetch_naver_market_price(title):
             timeout=5,
         )
         if r.status_code != 200:
-            return {}
+            return None
         items = r.json().get("items", [])
         prices = []
         for item in items:
@@ -635,14 +662,23 @@ def fetch_naver_market_price(title):
                     prices.append(int(lp))
                 except ValueError:
                     pass
-        if not prices:
-            return {}
-        return {
-            "market_price":  min(prices),
-            "market_source": "naver_shopping",
-        }
+        return min(prices) if prices else None
     except Exception:
+        return None
+
+
+def fetch_naver_market_price(title):
+    """네이버 쇼핑 검색 API로 현재 시장 최저가를 조회한다. 검색어 후보를 여러 개
+    (원제목 정제본 → 구분자 앞부분 → 단어 수 축약본) 순서로 시도해 매칭률을 높인다.
+    반환: {market_price: int|None, market_source: str|None}
+    API 미설정이거나 실패하면 빈 dict 반환."""
+    if not _NAVER_CLIENT_ID or not _NAVER_CLIENT_SECRET:
         return {}
+    for query in _query_variants(title):
+        price = _naver_shop_search(query[:50])
+        if price:
+            return {"market_price": price, "market_source": "naver_shopping"}
+    return {}
 
 
 def classify_status(title, purchase_url, price, deadline, extraction_confidence=None):
