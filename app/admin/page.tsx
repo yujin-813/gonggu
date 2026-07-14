@@ -709,6 +709,8 @@ function AdminPostRow({ post: p, onToggle, onDelete, onEdit, onToggleAlwaysOn, o
 }) {
   const published = p.status === 'published' || (!p.status && p.published !== false)
   const expired   = dLeft < 0
+  // 관리자엔 "공개됨"으로 보여도 마감일이 지나면 고객 화면(/api/posts) 필터에서 자동 제외됨 — 상시딜은 예외
+  const hiddenFromCustomers = published && expired && !(p.is_evergreen_deal || p.is_always_on)
 
   return (
     <div style={{
@@ -745,6 +747,12 @@ function AdminPostRow({ post: p, onToggle, onDelete, onEdit, onToggleAlwaysOn, o
             ))}
             {p.brand && <span style={{ color: '#6366f1', fontWeight: 600 }}>{p.brand}</span>}
             <span style={{ color: expired ? '#ef4444' : '#6366f1' }}>📅 {periodLabel}</span>
+            {hiddenFromCustomers && (
+              <span title="마감일이 지나서 상시딜이 아니면 고객 화면(/) 에는 자동으로 안 보여요"
+                style={{ fontSize: 11, background: '#fee2e2', color: '#dc2626', padding: '2px 6px', borderRadius: 10, fontWeight: 700, cursor: 'help' }}>
+                ⚠️ 마감 지남 · 고객화면엔 숨김
+              </span>
+            )}
             <span style={{ fontWeight: 600, color: '#0f172a' }}>{p.price?.toLocaleString()}원</span>
             {p.market_price && p.price && p.market_price > p.price && (
               <span title={`네이버 쇼핑 최저가: ${p.market_price.toLocaleString()}원`}
