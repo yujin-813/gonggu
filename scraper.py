@@ -323,11 +323,12 @@ def is_gonggu_post(caption, config=None):
 # ── 이미지 다운로드 ───────────────────────────────────────────────────────────
 
 def download_image(cdn_url, shortcode):
+    """이미지를 로컬로 다운로드한다. 반환: (경로 또는 None, 다운로드 성공 여부)."""
     if not _HAS_REQUESTS:
-        return None
+        return None, False
     local = IMG_DIR / f"{shortcode}.jpg"
     if local.exists():
-        return f"/scraped/{shortcode}.jpg"
+        return f"/scraped/{shortcode}.jpg", True
     try:
         r = _requests.get(cdn_url, headers={
             "User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X)",
@@ -335,9 +336,10 @@ def download_image(cdn_url, shortcode):
         }, timeout=10)
         r.raise_for_status()
         local.write_bytes(r.content)
-        return f"/scraped/{shortcode}.jpg"
-    except:
-        return None
+        return f"/scraped/{shortcode}.jpg", True
+    except Exception:
+        # 다운로드 실패 — 원본 CDN URL은 만료/차단될 수 있으므로 호출부에서 검수 대상으로 표시한다
+        return None, False
 
 
 # ── Instaloader 초기화 ────────────────────────────────────────────────────────
@@ -424,10 +426,10 @@ def login(L, username=None, password=None, interactive=False):
 def post_to_dict(post, shortcode):
     caption = post.caption or ""
     cat = categorize(caption)
-    local_img = download_image(post.url, shortcode)
+    local_img, img_ok = download_image(post.url, shortcode)
     start_date, end_date = extract_date_range(caption)
 
-    return {
+    data = {
         "id":         abs(hash(shortcode)) % (10**9),
         "shortcode":  shortcode,
         "title":      make_title(caption),
@@ -448,6 +450,11 @@ def post_to_dict(post, shortcode):
         "source":     "scraper",
         "published":  False,                         # 검수 대기 (관리자 보완 후 공개)
     }
+    if not img_ok:
+        # 이미지 다운로드 실패 — 원격 CDN URL이 나중에 만료/차단될 수 있으므로 검수 대상으로 표시
+        data["status"] = "needs_review"
+        data["review_reason"] = ["이미지 다운로드 실패"]
+    return data
 
 
 # ── 데이터 저장 ───────────────────────────────────────────────────────────────
@@ -559,7 +566,7 @@ def _fetch_profile_posts_api(username, cookies, limit, seen, loader=None, config
             continue
 
         img_url = node.get("display_url", "") or node.get("thumbnail_src", "")
-        local_img = download_image(img_url, shortcode) if img_url else None
+        local_img, img_ok = download_image(img_url, shortcode) if img_url else (None, True)
         start_date, end_date = extract_date_range(caption_text)
         cat = categorize(caption_text)
 
@@ -584,6 +591,10 @@ def _fetch_profile_posts_api(username, cookies, limit, seen, loader=None, config
             "source":      "scraper",
             "published":   False,
         }
+        if not img_ok:
+            # 이미지 다운로드 실패 — 원격 CDN URL이 나중에 만료/차단될 수 있으므로 검수 대상으로 표시
+            post_data["status"] = "needs_review"
+            post_data["review_reason"] = ["이미지 다운로드 실패"]
         new_posts.append(post_data)
         seen.add(shortcode)
         price_str = f"{post_data['price']:,}원" if post_data['price'] else "가격미상"

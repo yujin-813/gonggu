@@ -564,8 +564,10 @@ def is_product(domain, price, title=""):
 
 
 def resolve_img(img, shortcode):
+    """이미지를 로컬로 다운로드한다. 반환: (경로 또는 원격 URL, 다운로드 성공 여부).
+    소스 이미지가 아예 없는 경우는 실패로 취급하지 않는다 (원본에 이미지가 없을 뿐)."""
     if not img:
-        return ""
+        return "", True
     src = img if img.startswith("http") else IMG_CDN + re.sub(r"^images/", "", img)
     ext = re.search(r"\.(jpg|jpeg|png|webp|gif|avif)", src, re.I)
     ext = ext.group(1).lower() if ext else "jpg"
@@ -574,10 +576,11 @@ def resolve_img(img, shortcode):
         if r.status_code == 200 and r.content:
             dest = IMG_DIR / f"{shortcode}.{ext}"
             dest.write_bytes(r.content)
-            return f"/scraped/{shortcode}.{ext}"
+            return f"/scraped/{shortcode}.{ext}", True
     except Exception:
         pass
-    return src
+    # 다운로드 실패 — 원격 CDN URL은 만료/차단될 수 있으므로 그대로 쓰되 검수 대상으로 표시
+    return src, False
 
 
 def fetch_naver_market_price(title):
@@ -660,7 +663,7 @@ def block_to_post(b, ig_handle, price, domain, profile_url, purchase_url, deadli
     # 버튼 텍스트성 suffix 제거 ("구매하기", "바로가기" 등)
     title = re.sub(r'\s*(구매하기|바로가기|구매링크|신청하기|주문하기|보러가기)\s*$', '', raw_title).strip()
     img_src = b.get("image") or pi.get("img", "")
-    img = resolve_img(img_src, sc)
+    img, img_ok = resolve_img(img_src, sc)
     confidence = (debug_info or {}).get("extraction_confidence")
     status, review_reason = classify_status(title, purchase_url, price, deadline, confidence)
     market = fetch_naver_market_price(title) if title else {}
@@ -673,6 +676,11 @@ def block_to_post(b, ig_handle, price, domain, profile_url, purchase_url, deadli
                     status, review_reason = "needs_review", ["시장가 비교 불신뢰 (검수 필요)"]
             else:
                 status, review_reason = "excluded", ["시장 최저가 이상"]
+    if not img_ok and status != "excluded":
+        # 이미지 다운로드 실패 — 원격 URL이 나중에 만료/차단되어 깨진 이미지로 보일 수 있으므로 검수 대상으로 표시
+        status = "needs_review"
+        if "이미지 다운로드 실패" not in review_reason:
+            review_reason = list(review_reason) + ["이미지 다운로드 실패"]
     return {
         "id":              abs(hash(sc)) % (10 ** 9),
         "shortcode":       sc,

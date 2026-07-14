@@ -24,7 +24,9 @@ function defaultDate(days = 7) {
 }
 
 function isInstagramUrl(url: string) {
-  return /instagram\.com\/(p|reel)\/[^/?#]+/.test(url)
+  // 게시글/릴스 URL 또는 프로필 URL(인포크 수집 공구는 게시글 링크가 없어 프로필 URL만 저장됨) 모두 허용
+  if (/instagram\.com\/(p|reel)\/[^/?#]+/.test(url)) return true
+  return /^https?:\/\/(www\.)?instagram\.com\/[A-Za-z0-9._]+\/?(\?.*)?$/i.test(url.trim())
 }
 
 type PostInput = Omit<Post, 'id' | 'scraped_at' | 'source'>
@@ -66,6 +68,7 @@ export default function AddPostModal({ onClose, onSubmit, editPost, existingGrou
   const [imgSaved,   setImgSaved]   = useState('')   // uploaded path from server
 
   const [loading, setLoading] = useState(false)
+  const [formError, setFormError] = useState('')
 
   // 수정 모드 초기화
   useEffect(() => {
@@ -74,10 +77,12 @@ export default function AddPostModal({ onClose, onSubmit, editPost, existingGrou
     setTitle(editPost.title || '')
     setAccount(editPost.account || '')
     setCat(editPost.cat || 'fashion')
-    setStartDate(editPost.start_date || todayStr())
-    setEndDate(editPost.deadline || defaultDate(7))
+    // 원본에서 확인 안 된 날짜는 오늘/+7일로 임의 대체하지 않고 비워둔다 — 확인된 것처럼 보이는 걸 방지
+    setStartDate(editPost.start_date || '')
+    setEndDate(editPost.deadline || '')
     setPrice(editPost.price ? String(editPost.price) : '')
-    setOrigPrice(editPost.origPrice ? String(editPost.origPrice) : '')
+    // origPrice(수동 입력 정가)가 없으면 자동 수집된 market_price(네이버쇼핑 최저가)를 대신 보여준다
+    setOrigPrice(editPost.origPrice ? String(editPost.origPrice) : editPost.market_price ? String(editPost.market_price) : '')
     setMarketUrl(editPost.market_url || '')
     const gk = editPost.group_key || ''
     setGroupKey(gk)
@@ -160,12 +165,27 @@ export default function AddPostModal({ onClose, onSubmit, editPost, existingGrou
   const isUpcomingPost = startDate > todayStr()
 
   async function handleSubmit() {
+    setFormError('')
     if (!url.trim() || !isInstagramUrl(url)) {
       setUrlError('올바른 인스타그램 게시글 URL을 입력해주세요')
       return
     }
-    if (!title.trim() || !account.trim() || !startDate) return
-    if (!isUpcomingPost && (!price || !endDate)) return  // 오픈 예정은 가격/마감일 없어도 됨
+    if (!title.trim() || !account.trim()) {
+      setFormError('상품명과 계정명을 입력해주세요')
+      return
+    }
+    if (!startDate) {
+      setFormError('공구 시작일을 입력해주세요 (원본에서 확인되지 않았습니다)')
+      return
+    }
+    if (!isUpcomingPost && !price) {
+      setFormError('판매가를 입력해주세요')
+      return
+    }
+    if (!isUpcomingPost && !endDate) {  // 오픈 예정은 마감일 없어도 됨
+      setFormError('공구 마감일을 입력해주세요 (원본에서 확인되지 않았습니다). 상시 판매라면 취소 후 "상시딜" 버튼을 사용하세요')
+      return
+    }
 
     setLoading(true)
     try {
@@ -192,6 +212,7 @@ export default function AddPostModal({ onClose, onSubmit, editPost, existingGrou
       })
     } catch (err) {
       console.error(err)
+      setFormError('저장에 실패했습니다. 잠시 후 다시 시도해주세요')
     } finally {
       setLoading(false)
     }
@@ -292,6 +313,11 @@ export default function AddPostModal({ onClose, onSubmit, editPost, existingGrou
             <input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} />
           </div>
         </div>
+        {isEdit && !(editPost?.is_evergreen_deal || editPost?.is_always_on) && (!editPost?.start_date || !editPost?.deadline) && (
+          <p style={{ color: '#f97316', fontSize: 12, margin: '4px 0 0' }}>
+            ⚠️ 원본에서 {!editPost?.start_date && !editPost?.deadline ? '시작일과 마감일을' : !editPost?.start_date ? '시작일을' : '마감일을'} 확인하지 못했습니다 — 직접 입력해주세요 (상시 판매라면 취소 후 &quot;상시딜&quot; 버튼을 사용하세요)
+          </p>
+        )}
 
         {/* 가격 */}
         <div className="modal-row">
@@ -450,6 +476,7 @@ export default function AddPostModal({ onClose, onSubmit, editPost, existingGrou
             🗓️ 시작일이 미래입니다 — <strong>오픈 예정</strong>으로 등록되어 소비자 화면에 D-day 표시됩니다. 가격/마감일은 선택사항입니다.
           </div>
         )}
+        {formError && <p style={{ color: '#ef4444', fontSize: 13, margin: '0 0 8px', fontWeight: 600 }}>❌ {formError}</p>}
         <button className="btn-submit" onClick={handleSubmit} disabled={loading}>
           {loading ? (imgFile ? '이미지 업로드 중...' : '처리 중...') : isEdit ? '수정 완료 ✓' : isUpcomingPost ? '오픈 예정 등록 🗓️' : '공구 올리기 🛍️'}
         </button>
