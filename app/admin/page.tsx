@@ -141,7 +141,9 @@ export default function AdminPage() {
   }, [])
 
   const fetchPosts = useCallback(async () => {
-    const r = await fetch('/api/posts?admin=1&per_page=200')
+    // admin=1 은 필터 없이 전체 게시물을 대상으로 하므로 per_page를 넉넉하게 잡아야
+    // 오래된(스크랩 시각이 이른) 게시물이 목록에서 조용히 잘려나가지 않는다
+    const r = await fetch('/api/posts?admin=1&per_page=10000')
     const d = await r.json()
     setPosts(d.posts || [])
     setLoading(false)
