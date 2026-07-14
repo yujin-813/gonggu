@@ -1,6 +1,6 @@
 #!/bin/bash
 # ============================================================
-# 공구모아 배포 스크립트 — gonggu.askdatanugget.com
+# 공구모아 배포 스크립트 — gonggu.asknuggetdata.com
 # ============================================================
 #
 # [최초 배포 절차 — EC2에서 한 번만 실행]
@@ -39,7 +39,7 @@
 #
 # 7. SSL 인증서 (Let's Encrypt)
 #    sudo apt install -y certbot python3-certbot-nginx
-#    sudo certbot --nginx -d gonggu.askdatanugget.com
+#    sudo certbot --nginx -d gonggu.asknuggetdata.com
 #
 # [이후 배포는 이 스크립트 실행]
 #    bash deploy.sh
@@ -71,4 +71,4 @@ mkdir -p public/uploads public/scraped data
 echo "▶ PM2 재시작..."
 pm2 reload gonggu || pm2 start ecosystem.config.js
 
-echo "✅ 배포 완료 → https://gonggu.askdatanugget.com"
+echo "✅ 배포 완료 → https://gonggu.asknuggetdata.com"

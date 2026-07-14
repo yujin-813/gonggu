@@ -174,16 +174,10 @@ export default function AddPostModal({ onClose, onSubmit, editPost, existingGrou
       setFormError('상품명과 계정명을 입력해주세요')
       return
     }
-    if (!startDate) {
-      setFormError('공구 시작일을 입력해주세요 (원본에서 확인되지 않았습니다)')
-      return
-    }
+    // 공구 기간(시작일/마감일)은 원본에서 확인이 안 되는 경우가 많아 필수로 두지 않는다 —
+    // 확인되면 채우고, 안 되면 비운 채로 저장해 "마감일 미확인" 상태로 남긴다
     if (!isUpcomingPost && !price) {
       setFormError('판매가를 입력해주세요')
-      return
-    }
-    if (!isUpcomingPost && !endDate) {  // 오픈 예정은 마감일 없어도 됨
-      setFormError('공구 마감일을 입력해주세요 (원본에서 확인되지 않았습니다). 상시 판매라면 취소 후 "상시딜" 버튼을 사용하세요')
       return
     }
 
@@ -302,8 +296,8 @@ export default function AddPostModal({ onClose, onSubmit, editPost, existingGrou
           {CATEGORIES.map(c => <option key={c.value} value={c.value}>{c.label}</option>)}
         </select>
 
-        {/* 공구 기간 */}
-        <label>공구 기간 *</label>
+        {/* 공구 기간 — 원본에서 확인 안 되는 경우가 많아 필수 아님. 확인되는 만큼만 입력 */}
+        <label>공구 기간 <span style={{ fontSize: 12, color: '#94a3b8', fontWeight: 400 }}>(선택 — 확인되는 대로 입력)</span></label>
         <div className="modal-row">
           <div>
             <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} />
@@ -315,7 +309,7 @@ export default function AddPostModal({ onClose, onSubmit, editPost, existingGrou
         </div>
         {isEdit && !(editPost?.is_evergreen_deal || editPost?.is_always_on) && (!editPost?.start_date || !editPost?.deadline) && (
           <p style={{ color: '#f97316', fontSize: 12, margin: '4px 0 0' }}>
-            ⚠️ 원본에서 {!editPost?.start_date && !editPost?.deadline ? '시작일과 마감일을' : !editPost?.start_date ? '시작일을' : '마감일을'} 확인하지 못했습니다 — 직접 입력해주세요 (상시 판매라면 취소 후 &quot;상시딜&quot; 버튼을 사용하세요)
+            ⚠️ 원본에서 {!editPost?.start_date && !editPost?.deadline ? '시작일과 마감일을' : !editPost?.start_date ? '시작일을' : '마감일을'} 확인하지 못했습니다 — 확인되면 입력하고, 모르면 비워둔 채 저장해도 됩니다 (목록에 &quot;미확인&quot;으로 표시됩니다)
           </p>
         )}
 

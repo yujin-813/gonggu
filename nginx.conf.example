@@ -4,7 +4,7 @@
 
 server {
     listen 80;
-    server_name gonggu.askdatanugget.com;
+    server_name gonggu.asknuggetdata.com;
 
     client_max_body_size 20m;
 
@@ -24,4 +24,4 @@ server {
 }
 
 # SSL은 certbot이 자동으로 아래 블록을 추가합니다:
-# sudo certbot --nginx -d gonggu.askdatanugget.com
+# sudo certbot --nginx -d gonggu.asknuggetdata.com
