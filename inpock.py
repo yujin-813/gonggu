@@ -673,14 +673,43 @@ _BRAND_GUESS_STOPWORDS = {
 }
 
 
+# 조사/어미가 붙은 단어는 "브랜드명"이 아니라 문장의 일부일 가능성이 높다
+# (예: "의학계가 인정한" → 브랜드가 아니라 그냥 문장. 브랜드는 보통 조사 없이 맨 명사로 등장)
+# 한 글자짜리 조사(가/은/는/만 등)는 "베르만"처럼 실제 브랜드명 끝음절과 우연히 겹치는 경우가
+# 많아서 오탐이 잦다 — 두 글자 이상으로 비교적 뚜렷한 것만 사용한다
+_KOREAN_PARTICLE_SUFFIXES = sorted((
+    "이가", "이는", "이의", "이도", "이만", "에서", "에게", "으로",
+    "적인", "하는", "되는",
+), key=len, reverse=True)
+
+# 한 글자짜리 조사는 그 자체만으로는 신호가 약하다("베르만"의 "만"과 우연히 겹침) — 바로 다음
+# 단어까지 동사/형용사형 어미로 끝날 때만("의학계가 인정한"처럼) 문장으로 판단한다
+_SINGLE_CHAR_PARTICLES = ("가", "은", "는", "을", "를", "의", "에", "로", "와", "과", "도", "만")
+_VERB_ENDING_SUFFIXES = ("하는", "되는", "한", "된", "인", "는", "은")
+
+
+def _looks_like_sentence_fragment(word, next_word=None):
+    if any(word.endswith(suf) and len(word) > len(suf) for suf in _KOREAN_PARTICLE_SUFFIXES):
+        return True
+    if word.endswith(_SINGLE_CHAR_PARTICLES) and next_word and next_word.endswith(_VERB_ENDING_SUFFIXES):
+        return True
+    return False
+
+
 def _guess_brand_from_title(title):
     """브랜드를 어디서도 못 찾았을 때 최후 수단 — 정제된 제목에서 "NEW", "국내유일" 같은
     홍보성 수식어를 건너뛰고 첫 실제 단어를 브랜드로 추정한다. 한국 공구 제목은 보통
     "브랜드/상품라인명 + 설명" 순서라 꽤 맞는 편이지만 확정 정보는 아니므로, 관리자가
-    수정 화면에서 확인·정정할 수 있게 남겨둔다."""
-    for w in clean_market_query(title).split():
+    수정 화면에서 확인·정정할 수 있게 남겨둔다.
+    조사/어미가 붙은 단어를 만나면 거기서부터는 브랜드명이 아니라 그냥 문장이라는 뜻이므로,
+    억지로 아무 단어나 골라 잘못된 값을 만들어내느니 포기하고 None을 반환한다."""
+    words = clean_market_query(title).split()
+    for i, w in enumerate(words):
         if len(w) < 2 or w.lower() in _BRAND_GUESS_STOPWORDS:
             continue
+        next_word = words[i + 1] if i + 1 < len(words) else None
+        if _looks_like_sentence_fragment(w, next_word):
+            return None
         return w
     return None
 
