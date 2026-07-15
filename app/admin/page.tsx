@@ -1,6 +1,7 @@
 'use client'
 import { useState, useEffect, useCallback } from 'react'
 import type { Post, ScraperStatus, InfluencerSource } from '@/lib/types'
+import { daysLeft, periodLabel, isExpired } from '@/lib/period'
 import AddPostModal from '@/components/AddPostModal'
 
 interface DayStat { date: string; visitors: number; events: Record<string, number> }
@@ -84,26 +85,6 @@ const CAT_LABEL: Record<string, string> = {
   fashion: '👗 패션', beauty: '💄 뷰티', food: '🍱 식품',
   life: '🏠 생활용품', kids: '🧸 유아동', health: '💊 건강',
   pet: '🐾 반려동물', digital: '📱 디지털',
-}
-
-function fmt(dateStr?: string) {
-  if (!dateStr) return ''
-  const [, m, d] = dateStr.split('-')
-  return `${parseInt(m)}.${parseInt(d)}`
-}
-
-function periodLabel(p: Post) {
-  if (p.start_date && p.deadline) return `${fmt(p.start_date)} ~ ${fmt(p.deadline)}`
-  if (p.deadline) return `~ ${fmt(p.deadline)}`
-  if (p.is_evergreen_deal || p.is_always_on) return '상시딜'
-  return '마감일 미확인'
-}
-
-function daysLeft(deadline?: string) {
-  if (!deadline) return 999
-  const today = new Date(); today.setHours(0,0,0,0)
-  const d = new Date(deadline); d.setHours(0,0,0,0)
-  return Math.ceil((d.getTime() - today.getTime()) / 86400000)
 }
 
 export default function AdminPage() {
@@ -305,6 +286,26 @@ export default function AdminPage() {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ is_evergreen_deal: next, is_always_on: next, status: nextStatus, review_reason: nextReviewReason }),
+    })
+  }
+
+  async function toggleSoldOutOnly(p: Post) {
+    const next = !p.sale_until_sold_out
+    const onlyDeadlineMissing =
+      p.status === 'needs_review' &&
+      (p.review_reason || []).length > 0 &&
+      (p.review_reason || []).every(r => r === '마감일 미확인')
+    const nextStatus = next && onlyDeadlineMissing ? 'ready' : p.status
+    const nextReviewReason = next && onlyDeadlineMissing ? [] : (p.review_reason || [])
+    setPosts(prev =>
+      prev.map(x =>
+        x.id === p.id ? { ...x, sale_until_sold_out: next, status: nextStatus, review_reason: nextReviewReason } : x
+      )
+    )
+    await fetch(`/api/posts/${p.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ sale_until_sold_out: next, status: nextStatus, review_reason: nextReviewReason }),
     })
   }
 
@@ -554,7 +555,7 @@ export default function AdminPage() {
               </div>
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                {visible.map(p => <AdminPostRow key={p.id} post={p} onToggle={togglePublished} onDelete={deletePost} onEdit={setEditingPost} onToggleAlwaysOn={toggleEvergreenDeal} onQuickReview={quickReview} periodLabel={periodLabel(p)} dLeft={daysLeft(p.deadline)} />)}
+                {visible.map(p => <AdminPostRow key={p.id} post={p} onToggle={togglePublished} onDelete={deletePost} onEdit={setEditingPost} onToggleAlwaysOn={toggleEvergreenDeal} onToggleSoldOutOnly={toggleSoldOutOnly} onQuickReview={quickReview} periodLabel={periodLabel(p)} />)}
               </div>
             )}
           </>
@@ -699,20 +700,20 @@ function AnalyticsSection({ data }: { data: DayStat[] }) {
   )
 }
 
-function AdminPostRow({ post: p, onToggle, onDelete, onEdit, onToggleAlwaysOn, onQuickReview, periodLabel, dLeft }: {
+function AdminPostRow({ post: p, onToggle, onDelete, onEdit, onToggleAlwaysOn, onToggleSoldOutOnly, onQuickReview, periodLabel }: {
   post: Post
   onToggle: (p: Post) => void
   onDelete: (id: number) => void
   onEdit:   (p: Post) => void
   onToggleAlwaysOn: (p: Post) => void
+  onToggleSoldOutOnly: (p: Post) => void
   onQuickReview: (p: Post, action: 'approve' | 'always_on' | 'exclude') => void
   periodLabel: string
-  dLeft: number
 }) {
   const published = p.status === 'published' || (!p.status && p.published !== false)
-  const expired   = dLeft < 0
-  // 관리자엔 "공개됨"으로 보여도 마감일이 지나면 고객 화면(/api/posts) 필터에서 자동 제외됨 — 상시딜은 예외
-  const hiddenFromCustomers = published && expired && !(p.is_evergreen_deal || p.is_always_on)
+  const expired   = isExpired(p)
+  // 관리자엔 "공개됨"으로 보여도 마감일이 지나면 고객 화면(/api/posts) 필터에서 자동 제외됨 — 상시딜/소진시는 예외
+  const hiddenFromCustomers = published && expired
 
   return (
     <div style={{
@@ -750,7 +751,7 @@ function AdminPostRow({ post: p, onToggle, onDelete, onEdit, onToggleAlwaysOn, o
             {p.brand && <span style={{ color: '#6366f1', fontWeight: 600 }}>{p.brand}</span>}
             <span style={{ color: expired ? '#ef4444' : '#6366f1' }}>📅 {periodLabel}</span>
             {hiddenFromCustomers && (
-              <span title="마감일이 지나서 상시딜이 아니면 고객 화면(/) 에는 자동으로 안 보여요"
+              <span title="마감일이 지나서 상시딜/소진시 마감이 아니면 고객 화면(/) 에는 자동으로 안 보여요"
                 style={{ fontSize: 11, background: '#fee2e2', color: '#dc2626', padding: '2px 6px', borderRadius: 10, fontWeight: 700, cursor: 'help' }}>
                 ⚠️ 마감 지남 · 고객화면엔 숨김
               </span>
@@ -827,6 +828,12 @@ function AdminPostRow({ post: p, onToggle, onDelete, onEdit, onToggleAlwaysOn, o
             style={{ padding: '6px 10px', borderRadius: 8, border: 'none', cursor: 'pointer', fontSize: 11, fontWeight: 600, whiteSpace: 'nowrap',
               background: (p.is_evergreen_deal || p.is_always_on) ? '#fef3c7' : '#f1f5f9', color: (p.is_evergreen_deal || p.is_always_on) ? '#92400e' : '#94a3b8' }}>
             {(p.is_evergreen_deal || p.is_always_on) ? '⏰ 상시딜' : '상시딜'}
+          </button>
+          <button onClick={() => onToggleSoldOutOnly(p)}
+            title="한정수량으로 재고 소진시 마감되고, 고정된 마감일은 없는 공구"
+            style={{ padding: '6px 10px', borderRadius: 8, border: 'none', cursor: 'pointer', fontSize: 11, fontWeight: 600, whiteSpace: 'nowrap',
+              background: p.sale_until_sold_out ? '#fee2e2' : '#f1f5f9', color: p.sale_until_sold_out ? '#b91c1c' : '#94a3b8' }}>
+            {p.sale_until_sold_out ? '🔥 소진시' : '소진시'}
           </button>
           <button onClick={() => onDelete(p.id)}
             style={{ padding: '6px 10px', background: '#fee2e2', color: '#dc2626', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 12, fontWeight: 600 }}>

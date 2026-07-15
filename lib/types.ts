@@ -52,6 +52,7 @@ export interface Post {
   purchase_url?: string | null
   is_always_on?: boolean
   is_evergreen_deal?: boolean
+  sale_until_sold_out?: boolean
   extraction_debug?: Record<string, unknown> | null
   market_price?: number | null
   market_source?: string | null

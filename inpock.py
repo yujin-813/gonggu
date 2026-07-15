@@ -351,6 +351,10 @@ def _clean_brand(name):
     return n
 
 
+# 고정 마감일 없이 "재고 떨어지면 종료"하는 판매 방식 — 추출 실패와는 구분해야 한다
+_SOLD_OUT_PATTERN = re.compile(r"소진\s*시|품절\s*시|재고\s*소진|매진\s*시")
+
+
 def fetch_product_info(url, domain):
     debug = {
         "purchase_url_found": bool(url),
@@ -573,6 +577,11 @@ def fetch_product_info(url, domain):
                 debug["deadline_candidates"].append({"raw": parsed, "source": "dateparser_reparse", "context": cand["context"]})
                 break
 
+    # 고정 마감일을 못 찾았는데 "소진시/품절시" 문구가 있으면 추출 실패가 아니라
+    # 원래 마감일이 없는 판매 방식으로 본다
+    if not result.get("deadline") and _SOLD_OUT_PATTERN.search(clean):
+        result["sold_out_only"] = True
+
     debug["selected_price"] = result.get("price")
     debug["selected_deadline"] = result.get("deadline")
     if result.get("price") and not debug["extraction_method"]:
@@ -735,7 +744,7 @@ def fetch_naver_market_price(title, price=None):
     return {}
 
 
-def classify_status(title, purchase_url, price, deadline, extraction_confidence=None):
+def classify_status(title, purchase_url, price, deadline, extraction_confidence=None, sold_out_only=False):
     if not title:
         return "excluded", ["상품명 없음"]
 
@@ -750,14 +759,18 @@ def classify_status(title, purchase_url, price, deadline, extraction_confidence=
     if not price and not deadline and not has_deal_signal:
         return "excluded", ["상품 추천 (비공구)"]
 
+    # "소진시 마감"은 마감일이 없는 게 추출 실패가 아니라 원래 그런 판매 방식이므로
+    # "마감일 미확인"으로 취급하지 않는다
+    has_period_info = bool(deadline) or sold_out_only
+
     reasons = []
     if not price:
         reasons.append("가격 미입력")
-    if not deadline:
+    if not has_period_info:
         reasons.append("마감일 미확인")
     if not purchase_url:
         reasons.append("구매페이지 미확인")
-    if purchase_url and price and deadline:
+    if purchase_url and price and has_period_info:
         # JSON-LD/meta(high)만 자동 승인, 그 외는 사람이 확인
         if extraction_confidence == "high":
             return "ready", []
@@ -780,7 +793,10 @@ def block_to_post(b, ig_handle, price, domain, profile_url, purchase_url, deadli
     img_src = b.get("image") or pi.get("img", "")
     img, img_ok = resolve_img(img_src, sc)
     confidence = (debug_info or {}).get("extraction_confidence")
-    status, review_reason = classify_status(title, purchase_url, price, deadline, confidence)
+    # 고정 마감일이 없을 때, 구매 페이지 또는 인포크 제목에 "소진시/품절시" 문구가 있으면
+    # 추출 실패가 아니라 원래 마감일이 없는 판매 방식으로 본다
+    sold_out_only = bool(pi.get("sold_out_only")) or (not deadline and bool(_SOLD_OUT_PATTERN.search(block_title)))
+    status, review_reason = classify_status(title, purchase_url, price, deadline, confidence, sold_out_only)
     # 신뢰도 낮은 매칭(판매가의 30% 미만)은 fetch_naver_market_price 내부에서 이미 걸러진다
     market = fetch_naver_market_price(title, price) if title else {}
     mp = market.get("market_price")
@@ -816,6 +832,7 @@ def block_to_post(b, ig_handle, price, domain, profile_url, purchase_url, deadli
         "source":          "inpock",
         "is_always_on":    False,
         "is_evergreen_deal": False,
+        "sale_until_sold_out": sold_out_only,
         "extraction_debug": debug_info,
         "status":          status,
         "review_reason":   review_reason,

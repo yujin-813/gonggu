@@ -1,19 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { loadPosts, savePosts } from '@/lib/store'
 import type { Post } from '@/lib/types'
+import { daysLeft } from '@/lib/period'
 
 const CAT_EMOJI: Record<string, string> = {
   fashion: '👗', beauty: '💄', food: '🍱', life: '🏠',
   kids: '🧸', health: '💊', pet: '🐾', digital: '📱',
-}
-
-function daysLeft(p: Post): number {
-  if (!p.deadline) return 999
-  const today = new Date()
-  today.setHours(0, 0, 0, 0)
-  const d = new Date(p.deadline)
-  d.setHours(0, 0, 0, 0)
-  return Math.ceil((d.getTime() - today.getTime()) / (1000 * 60 * 60 * 24))
 }
 
 export async function GET(request: NextRequest) {
@@ -36,7 +28,7 @@ export async function GET(request: NextRequest) {
       const isPublished = p.status === 'published' || (!p.status && p.published !== false)
       if (!isPublished) return false
       if (p.is_evergreen_deal || p.is_always_on) return true
-      if (!p.deadline) return true
+      if (!p.deadline) return true  // 마감일 미확인 + 소진시 마감(sale_until_sold_out) 둘 다 포함 — 지난 게 아니므로 계속 노출
       return new Date(p.deadline) >= today
     })
   }
@@ -57,7 +49,7 @@ export async function GET(request: NextRequest) {
     )
   } else if (sort === 'deadline') {
     posts = [...posts].sort((a, b) => {
-      const da = daysLeft(a), db = daysLeft(b)
+      const da = daysLeft(a.deadline), db = daysLeft(b.deadline)
       if (da < 0 && db >= 0) return 1
       if (db < 0 && da >= 0) return -1
       return da - db

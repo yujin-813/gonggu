@@ -24,7 +24,7 @@ export async function PATCH(request: NextRequest, { params }: Ctx) {
   if (idx === -1) {
     return NextResponse.json({ error: '게시글을 찾을 수 없습니다' }, { status: 404 })
   }
-  const allowed: (keyof Post)[] = ['published','status','review_reason','title','brand','group_key','market_url','purchase_url','is_always_on','is_evergreen_deal','extraction_debug','price','origPrice','start_date','deadline','cat','img','url','account']
+  const allowed: (keyof Post)[] = ['published','status','review_reason','title','brand','group_key','market_url','purchase_url','is_always_on','is_evergreen_deal','sale_until_sold_out','extraction_debug','price','origPrice','start_date','deadline','cat','img','url','account']
   for (const key of allowed) {
     if (key in body) {
       (posts[idx] as unknown as Record<string, unknown>)[key] = body[key]
@@ -43,7 +43,7 @@ export async function PUT(request: NextRequest, { params }: Ctx) {
   if (idx === -1) {
     return NextResponse.json({ error: '게시글을 찾을 수 없습니다' }, { status: 404 })
   }
-  const allowed: (keyof Post)[] = ['title','brand','group_key','market_url','purchase_url','is_always_on','is_evergreen_deal','extraction_debug','account','cat','price','origPrice','start_date','deadline','img','url','caption','published','status','review_reason']
+  const allowed: (keyof Post)[] = ['title','brand','group_key','market_url','purchase_url','is_always_on','is_evergreen_deal','sale_until_sold_out','extraction_debug','account','cat','price','origPrice','start_date','deadline','img','url','caption','published','status','review_reason']
   const patch: Partial<Post> = {}
   for (const key of allowed) {
     if (key in body) {

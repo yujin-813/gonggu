@@ -1,6 +1,7 @@
 'use client'
 import { useState } from 'react'
 import type { Post } from '@/lib/types'
+import { daysLeft, getPeriodState, badgeFromState, periodTextFromState, isExpired } from '@/lib/period'
 import PriceCompareModal from './PriceCompareModal'
 
 const CAT_LABEL: Record<string, string> = {
@@ -37,45 +38,6 @@ function dealJudgment(post: Post): { verdict: string; detail: string; cls: strin
   return { verdict: '가격 보통', detail: `온라인 최저가와 큰 차이 없어요${urgentSuffix}`, cls: 'neutral' }
 }
 
-function daysLeft(deadline?: string): number {
-  if (!deadline) return 999
-  const today = new Date()
-  today.setHours(0, 0, 0, 0)
-  const d = new Date(deadline)
-  d.setHours(0, 0, 0, 0)
-  return Math.ceil((d.getTime() - today.getTime()) / (1000 * 60 * 60 * 24))
-}
-
-function badgeInfo(deadline?: string, evergreen?: boolean): { cls: string; icon: string; txt: string } | null {
-  if (!deadline) {
-    // 마감일 미확인 — 상시딜이면 그렇게 표시하고, 아니면 D-999처럼 거짓 정보를 주느니 배지를 아예 숨긴다
-    return evergreen ? { cls: 'ok', icon: '📦', txt: '상시딜' } : null
-  }
-  const d = daysLeft(deadline)
-  if (d < 0) return { cls: 'closed', icon: '🔒', txt: '마감' }
-  if (d === 0) return { cls: 'urgent', icon: '⏰', txt: '오늘 마감!' }
-  if (d === 1) return { cls: 'urgent', icon: '⏰', txt: 'D-1' }
-  if (d <= 3) return { cls: 'soon', icon: '⏰', txt: `D-${d}` }
-  return { cls: 'ok', icon: '⏰', txt: `D-${d}` }
-}
-
-function fmt(dateStr?: string) {
-  if (!dateStr) return ''
-  // YYYY-MM-DD → M.D
-  const [, m, d] = dateStr.split('-')
-  return `${parseInt(m)}.${parseInt(d)}`
-}
-
-function periodText(startDate?: string, deadline?: string) {
-  const d = daysLeft(deadline)
-  if (d < 0) return { cls: 'urgent', txt: '마감됨' }
-  if (d === 0) return { cls: 'urgent', txt: '⚡ 오늘 마감!' }
-  if (d === 1) return { cls: 'urgent', txt: '⚡ 내일 마감!' }
-  if (startDate && deadline) return { cls: '', txt: `📅 ${fmt(startDate)} ~ ${fmt(deadline)}` }
-  if (deadline) return { cls: '', txt: `📅 ~ ${fmt(deadline)} 마감` }
-  return { cls: '', txt: '' }
-}
-
 interface PostCardProps {
   post: Post
   isBookmarked: boolean
@@ -89,16 +51,10 @@ export default function PostCard({ post, isBookmarked, onToggleBookmark, onJoin,
   const [showCompare, setShowCompare] = useState(false)
   const compareCount = siblings.length
   const isUpcoming = post.status === 'upcoming'
-  const daysToOpen = isUpcoming && post.start_date ? daysLeft(post.start_date) : null
-  const badge = isUpcoming
-    ? { cls: 'soon', icon: '🗓️', txt: daysToOpen !== null && daysToOpen > 0 ? `D-${daysToOpen} 오픈` : '오늘 오픈!' }
-    : badgeInfo(post.deadline, post.is_evergreen_deal || post.is_always_on)
-  const dt = isUpcoming
-    ? { cls: '', txt: `📅 ${fmt(post.start_date)} 오픈 예정` }
-    : !post.deadline && (post.is_evergreen_deal || post.is_always_on)
-    ? { cls: '', txt: '📅 상시딜' }
-    : periodText(post.start_date, post.deadline)
-  const closed = !isUpcoming && daysLeft(post.deadline) < 0
+  const periodState = getPeriodState(post)
+  const badge = badgeFromState(periodState)
+  const dt = periodTextFromState(periodState)
+  const closed = isExpired(post)
   const judgment = dealJudgment(post)
   const discount =
     post.origPrice && post.origPrice > post.price
