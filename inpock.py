@@ -666,15 +666,23 @@ def clean_market_query(title):
     return re.sub(r"\s+", " ", t).strip()
 
 
+_BRAND_GUESS_STOPWORDS = {
+    "new", "hot", "best", "sale", "핫딜", "특가", "초특가", "역대급", "국내유일", "국내최초",
+    "단독", "단독판매", "한정", "한정수량", "인기", "베스트", "오늘의", "긴급", "완전", "진짜",
+    "레알", "리얼", "대박", "강추", "강력추천", "신상", "신제품", "필수템", "꿀템", "완판임박",
+}
+
+
 def _guess_brand_from_title(title):
-    """브랜드를 어디서도 못 찾았을 때 최후 수단 — 정제된 제목의 첫 단어를 브랜드로 추정한다.
-    한국 공구 제목은 보통 "브랜드/상품라인명 + 설명" 순서라 꽤 맞는 편이지만 확정 정보는
-    아니므로, 관리자가 수정 화면에서 확인·정정할 수 있게 남겨둔다."""
-    words = clean_market_query(title).split()
-    if not words:
-        return None
-    first = words[0]
-    return first if len(first) >= 2 else None
+    """브랜드를 어디서도 못 찾았을 때 최후 수단 — 정제된 제목에서 "NEW", "국내유일" 같은
+    홍보성 수식어를 건너뛰고 첫 실제 단어를 브랜드로 추정한다. 한국 공구 제목은 보통
+    "브랜드/상품라인명 + 설명" 순서라 꽤 맞는 편이지만 확정 정보는 아니므로, 관리자가
+    수정 화면에서 확인·정정할 수 있게 남겨둔다."""
+    for w in clean_market_query(title).split():
+        if len(w) < 2 or w.lower() in _BRAND_GUESS_STOPWORDS:
+            continue
+        return w
+    return None
 
 
 def _query_variants(title):
