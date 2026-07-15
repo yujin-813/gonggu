@@ -81,8 +81,10 @@ export default function AddPostModal({ onClose, onSubmit, editPost, existingGrou
     setStartDate(editPost.start_date || '')
     setEndDate(editPost.deadline || '')
     setPrice(editPost.price ? String(editPost.price) : '')
-    // origPrice(수동 입력 정가)가 없으면 자동 수집된 market_price(네이버쇼핑 최저가)를 대신 보여준다
-    setOrigPrice(editPost.origPrice ? String(editPost.origPrice) : editPost.market_price ? String(editPost.market_price) : '')
+    // origPrice는 관리자가 직접 입력한 값만 — market_price를 채워넣으면 그냥 저장 버튼만
+    // 눌러도 그 시점의 market_price가 origPrice로 영구 고정돼버려서(재검증돼도 origPrice는 안 바뀜),
+    // 자동 수집된 값은 아래 "자동 매칭" 안내로만 보여주고 이 입력칸엔 절대 자동으로 채우지 않는다
+    setOrigPrice(editPost.origPrice ? String(editPost.origPrice) : '')
     setMarketUrl(editPost.market_url || '')
     const gk = editPost.group_key || ''
     setGroupKey(gk)
@@ -346,6 +348,11 @@ export default function AddPostModal({ onClose, onSubmit, editPost, existingGrou
               </button>
             </div>
             <input type="number" value={origPrice} onChange={e => { setOrigPrice(e.target.value); if (!e.target.value) setMarketUrl('') }} placeholder="60000" />
+            {isEdit && editPost?.market_price && !origPrice && (
+              <p style={{ fontSize: 11, color: '#6366f1', margin: '4px 0 0' }}>
+                🔍 자동 매칭된 네이버 최저가: {editPost.market_price.toLocaleString()}원 (이 값은 자동 재검증되며, 직접 입력하면 그 값이 우선 사용돼요)
+              </p>
+            )}
             {marketUrl && origPrice && (
               <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 4 }}>
                 <span style={{ fontSize: 11, color: '#16a34a' }}>✅ 네이버쇼핑 링크 연결됨</span>
