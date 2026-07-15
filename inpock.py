@@ -337,6 +337,20 @@ def _extract_from_domain(html, domain):
     return result
 
 
+# 쇼핑몰 템플릿(카페24 등)이 브랜드 미입력 시 채워두는 placeholder — 실제 브랜드명이 아니므로 걸러낸다
+_BRAND_PLACEHOLDERS = {
+    "상세페이지 참조", "상세 페이지 참조", "상세페이지참조", "상세 설명 참조", "상세설명 참조",
+    "상품 상세 참조", "상세참조", "브랜드없음", "브랜드 없음", "노브랜드", "no brand", "기타",
+}
+
+
+def _clean_brand(name):
+    n = (name or "").strip()
+    if not n or n.lower() in {p.lower() for p in _BRAND_PLACEHOLDERS}:
+        return None
+    return n
+
+
 def fetch_product_info(url, domain):
     debug = {
         "purchase_url_found": bool(url),
@@ -397,8 +411,9 @@ def fetch_product_info(url, domain):
                     raw_brand = item.get("brand") or item.get("manufacturer")
                     if isinstance(raw_brand, dict):
                         raw_brand = raw_brand.get("name")
-                    if isinstance(raw_brand, str) and raw_brand.strip():
-                        result["brand"] = raw_brand.strip()
+                    cleaned = _clean_brand(raw_brand) if isinstance(raw_brand, str) else None
+                    if cleaned:
+                        result["brand"] = cleaned
                 if not result.get("img"):
                     raw = item.get("image")
                     if isinstance(raw, list): raw = raw[0]
@@ -450,7 +465,11 @@ def fetch_product_info(url, domain):
             r'<meta[^>]+content=["\']([^"\']+)["\'][^>]+property=["\']product:brand["\']',
         ):
             mt = re.search(pat, html, re.I)
-            if mt: result["brand"] = mt.group(1).strip(); break
+            if mt:
+                cleaned = _clean_brand(mt.group(1))
+                if cleaned:
+                    result["brand"] = cleaned
+                break
     for pat in (
         r'<meta[^>]+property=["\']og:price:amount["\'][^>]+content=["\']([0-9,. ]+)["\']',
         r'<meta[^>]+content=["\']([0-9,. ]+)["\'][^>]+property=["\']og:price:amount["\']',
@@ -688,7 +707,7 @@ def _naver_shop_search(query):
             except ValueError:
                 continue
             if cheapest is None or val < cheapest["price"]:
-                brand = (item.get("brand") or item.get("maker") or "").strip() or None
+                brand = _clean_brand(item.get("brand") or item.get("maker"))
                 cheapest = {"price": val, "brand": brand}
         return cheapest
     except Exception:
