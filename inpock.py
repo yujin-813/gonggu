@@ -393,6 +393,12 @@ def fetch_product_info(url, domain):
                 debug["jsonld_found"] = True
                 if not result.get("title") and item.get("name"):
                     result["title"] = item["name"].strip()
+                if not result.get("brand"):
+                    raw_brand = item.get("brand") or item.get("manufacturer")
+                    if isinstance(raw_brand, dict):
+                        raw_brand = raw_brand.get("name")
+                    if isinstance(raw_brand, str) and raw_brand.strip():
+                        result["brand"] = raw_brand.strip()
                 if not result.get("img"):
                     raw = item.get("image")
                     if isinstance(raw, list): raw = raw[0]
@@ -438,6 +444,13 @@ def fetch_product_info(url, domain):
         ):
             mt = re.search(pat, html, re.I)
             if mt: result["img"] = mt.group(1).strip(); break
+    if not result.get("brand"):
+        for pat in (
+            r'<meta[^>]+property=["\']product:brand["\'][^>]+content=["\']([^"\']+)["\']',
+            r'<meta[^>]+content=["\']([^"\']+)["\'][^>]+property=["\']product:brand["\']',
+        ):
+            mt = re.search(pat, html, re.I)
+            if mt: result["brand"] = mt.group(1).strip(); break
     for pat in (
         r'<meta[^>]+property=["\']og:price:amount["\'][^>]+content=["\']([0-9,. ]+)["\']',
         r'<meta[^>]+content=["\']([0-9,. ]+)["\'][^>]+property=["\']og:price:amount["\']',
@@ -650,7 +663,8 @@ def _query_variants(title):
 
 
 def _naver_shop_search(query):
-    """단일 검색어로 네이버쇼핑 API를 호출해 최저가를 반환. 결과 없으면 None."""
+    """단일 검색어로 네이버쇼핑 API를 호출해 최저가 상품 정보를 반환.
+    반환: {"price": int, "brand": str|None} 또는 결과 없으면 None."""
     try:
         r = requests.get(
             "https://openapi.naver.com/v1/search/shop.json",
@@ -664,15 +678,19 @@ def _naver_shop_search(query):
         if r.status_code != 200:
             return None
         items = r.json().get("items", [])
-        prices = []
+        cheapest = None
         for item in items:
             lp = item.get("lprice")
-            if lp:
-                try:
-                    prices.append(int(lp))
-                except ValueError:
-                    pass
-        return min(prices) if prices else None
+            if not lp:
+                continue
+            try:
+                val = int(lp)
+            except ValueError:
+                continue
+            if cheapest is None or val < cheapest["price"]:
+                brand = (item.get("brand") or item.get("maker") or "").strip() or None
+                cheapest = {"price": val, "brand": brand}
+        return cheapest
     except Exception:
         return None
 
@@ -683,17 +701,18 @@ def fetch_naver_market_price(title, price=None):
     price(공구 판매가)가 주어지면, 검색된 최저가가 판매가의 30% 미만인 매칭은
     다른 상품일 가능성이 높다고 보고 건너뛰고 다음 후보를 계속 시도한다 — 그래야
     앞쪽의 애매한 후보가 뒤쪽의 더 정확한 후보를 가로막지 않는다.
-    반환: {market_price: int|None, market_source: str|None}
+    반환: {market_price: int|None, market_source: str|None, brand: str|None}
     API 미설정이거나 실패하면 빈 dict 반환."""
     if not _NAVER_CLIENT_ID or not _NAVER_CLIENT_SECRET:
         return {}
     for query in _query_variants(title):
-        mp = _naver_shop_search(query[:50])
-        if not mp:
+        found = _naver_shop_search(query[:50])
+        if not found:
             continue
+        mp = found["price"]
         if price and mp < price * 0.3:
             continue
-        return {"market_price": mp, "market_source": "naver_shopping"}
+        return {"market_price": mp, "market_source": "naver_shopping", "brand": found.get("brand")}
     return {}
 
 
@@ -731,7 +750,12 @@ def classify_status(title, purchase_url, price, deadline, extraction_confidence=
 def block_to_post(b, ig_handle, price, domain, profile_url, purchase_url, deadline, product_info=None, debug_info=None, source_obj=None):
     sc = f"inpock_{b['id']}"
     pi = product_info or {}
-    raw_title = (b.get("title") or "").strip() or pi.get("title", "")
+    block_title = (b.get("title") or "").strip()
+    page_title  = (pi.get("title") or "").strip()
+    # 구매 페이지에서 JSON-LD로 신뢰도 높게 뽑은 상품명이 있으면 그걸 우선 사용한다 —
+    # 인포크 블록 제목은 인플루언서가 감성적으로 쓴 문구라 실제 상품명과 다른 경우가 많음
+    extraction_method = (debug_info or {}).get("extraction_method")
+    raw_title = page_title if (extraction_method == "jsonld" and page_title) else (block_title or page_title)
     # 버튼 텍스트성 suffix 제거 ("구매하기", "바로가기" 등)
     title = re.sub(r'\s*(구매하기|바로가기|구매링크|신청하기|주문하기|보러가기)\s*$', '', raw_title).strip()
     img_src = b.get("image") or pi.get("img", "")
@@ -743,6 +767,8 @@ def block_to_post(b, ig_handle, price, domain, profile_url, purchase_url, deadli
     mp = market.get("market_price")
     if mp and price and price >= mp:
         status, review_reason = "excluded", ["시장 최저가 이상"]
+    # 구매 페이지 JSON-LD brand 우선, 없으면 네이버쇼핑 매칭 결과의 brand/maker 사용
+    brand = pi.get("brand") or market.get("brand")
     if not img_ok and status != "excluded":
         # 이미지 다운로드 실패 — 원격 URL이 나중에 만료/차단되어 깨진 이미지로 보일 수 있으므로 검수 대상으로 표시
         status = "needs_review"
@@ -758,7 +784,7 @@ def block_to_post(b, ig_handle, price, domain, profile_url, purchase_url, deadli
         "origPrice":       None,
         "start_date":      "",
         "deadline":        deadline,
-        "brand":           None,
+        "brand":           brand,
         "img":             img,
         "url":             profile_url,
         "store_url":       purchase_url,
