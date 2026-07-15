@@ -63,6 +63,10 @@ export default function AddPostModal({ onClose, onSubmit, editPost, existingGrou
   const [marketSearching, setMarketSearching] = useState(false)
   const [marketResults,   setMarketResults]   = useState<{ title: string; lprice: number; mallName: string; link: string }[]>([])
 
+  const [customVerdict,       setCustomVerdict]       = useState('')
+  const [customVerdictDetail, setCustomVerdictDetail] = useState('')
+  const [customVerdictCls,    setCustomVerdictCls]    = useState<'great' | 'good' | 'neutral' | 'check'>('good')
+
   const [imgFile,    setImgFile]    = useState<File | null>(null)
   const [imgPreview, setImgPreview] = useState('')   // blob URL or existing img URL
   const [imgSaved,   setImgSaved]   = useState('')   // uploaded path from server
@@ -86,6 +90,9 @@ export default function AddPostModal({ onClose, onSubmit, editPost, existingGrou
     // 자동 수집된 값은 아래 "자동 매칭" 안내로만 보여주고 이 입력칸엔 절대 자동으로 채우지 않는다
     setOrigPrice(editPost.origPrice ? String(editPost.origPrice) : '')
     setMarketUrl(editPost.market_url || '')
+    setCustomVerdict(editPost.custom_verdict || '')
+    setCustomVerdictDetail(editPost.custom_verdict_detail || '')
+    setCustomVerdictCls(editPost.custom_verdict_cls || 'good')
     const gk = editPost.group_key || ''
     setGroupKey(gk)
     setNewGroupMode(false)
@@ -205,6 +212,9 @@ export default function AddPostModal({ onClose, onSubmit, editPost, existingGrou
         market_url:   marketUrl.trim() || null,
         published:    editPost?.published ?? !isUpcomingPost,
         status:       editPost?.status ?? (isUpcomingPost ? 'upcoming' : 'ready'),
+        custom_verdict:        customVerdict.trim() || null,
+        custom_verdict_detail: customVerdict.trim() ? (customVerdictDetail.trim() || null) : null,
+        custom_verdict_cls:    customVerdict.trim() ? customVerdictCls : null,
       })
     } catch (err) {
       console.error(err)
@@ -389,6 +399,36 @@ export default function AddPostModal({ onClose, onSubmit, editPost, existingGrou
             )}
           </div>
         </div>
+
+        {/* 구매 판단 문구 직접 입력 */}
+        <label>
+          구매 판단 문구 직접 입력
+          <span style={{ fontSize: 12, color: '#94a3b8', fontWeight: 400, marginLeft: 6 }}>
+            (선택 — 비워두면 자동 판단 사용, 채우면 이 문구가 카드에 그대로 노출돼요)
+          </span>
+        </label>
+        <div className="modal-row">
+          <div>
+            <input type="text" value={customVerdict} onChange={e => setCustomVerdict(e.target.value)} placeholder="예: 살만해요" />
+          </div>
+          <div>
+            <select value={customVerdictCls} onChange={e => setCustomVerdictCls(e.target.value as typeof customVerdictCls)}>
+              <option value="great">완전 득템 (핑크)</option>
+              <option value="good">살만해요 (초록)</option>
+              <option value="neutral">가격 보통 (노랑)</option>
+              <option value="check">직접 비교 필요 (주황)</option>
+            </select>
+          </div>
+        </div>
+        {customVerdict.trim() && (
+          <input type="text" value={customVerdictDetail} onChange={e => setCustomVerdictDetail(e.target.value)}
+            placeholder="설명 문구 (예: 실제 매장가보다 1만원 저렴해요)" style={{ marginTop: 6 }} />
+        )}
+        {customVerdict.trim() && (
+          <p style={{ fontSize: 11, color: '#f97316', margin: '4px 0 0' }}>
+            ⚠️ 이 문구는 자동 계산을 완전히 덮어써요 — 실제 가격 근거 없이 좋게만 쓰면 나중에 신뢰를 잃을 수 있으니, 자동 판단이 놓친 진짜 정보를 보완할 때만 사용해주세요.
+          </p>
+        )}
 
         {/* 가격 비교 그룹 */}
         <label>

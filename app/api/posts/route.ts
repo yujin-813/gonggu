@@ -111,6 +111,9 @@ export async function POST(request: NextRequest) {
     scraped_at: new Date().toISOString(),
     source:     'manual',
     published:  true,  // 관리자가 직접 등록한 것은 바로 공개
+    custom_verdict:        data.custom_verdict?.trim() || null,
+    custom_verdict_detail: data.custom_verdict_detail?.trim() || null,
+    custom_verdict_cls:    data.custom_verdict_cls || null,
   }
 
   posts.unshift(newPost)

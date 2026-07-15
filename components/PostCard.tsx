@@ -12,6 +12,12 @@ const CAT_LABEL: Record<string, string> = {
 
 function dealJudgment(post: Post): { verdict: string; detail: string; cls: string } | null {
   if (!post.price || post.status === 'upcoming') return null
+  // 관리자가 직접 입력한 판단 문구가 있으면 자동 계산보다 우선한다 — 자동 계산이 데이터
+  // 부족으로 놓친 부분을 관리자가 아는 정보로 보완하는 용도 (자동 계산을 덮어써서 과장하는
+  // 용도로 쓰이면 지금까지 지켜온 "틀린 정보는 안 보여준다" 원칙이 깨지니 주의해서 써야 함)
+  if (post.custom_verdict) {
+    return { verdict: post.custom_verdict, detail: post.custom_verdict_detail || '', cls: post.custom_verdict_cls || 'neutral' }
+  }
   // 네이버 자동 매칭가가 있으면 우선 사용하고, 없으면 직접 입력된 정가라도 기준으로 삼는다
   // (자동 매칭은 니치 상품이면 실패하는 경우가 많아, 절반 가까운 공구가 아예 판단을 못 받고 있었음)
   const mp = post.market_price || post.origPrice

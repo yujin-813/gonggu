@@ -56,6 +56,10 @@ export interface Post {
   extraction_debug?: Record<string, unknown> | null
   market_price?: number | null
   market_source?: string | null
+  // 관리자가 자동 판단(dealJudgment) 대신 직접 입력한 구매 판단 문구 — 값이 있으면 이걸 우선 사용
+  custom_verdict?: string | null
+  custom_verdict_detail?: string | null
+  custom_verdict_cls?: 'great' | 'good' | 'neutral' | 'check' | null
 }
 
 export interface ScraperStatus {
