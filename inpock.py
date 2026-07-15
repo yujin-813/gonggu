@@ -397,6 +397,21 @@ def fetch_product_info(url, domain):
 
     result = {}
 
+    # 쇼핑몰(카페24 등)이 브랜드 필드에 상품 브랜드 대신 "우리 쇼핑몰 이름"을 넣어두는 경우가
+    # 흔해서(og:site_name/author와 동일한 값), 그런 값은 브랜드로 쓰지 않는다
+    site_identity = set()
+    for pat in (
+        r'<meta[^>]+property=["\']og:site_name["\'][^>]+content=["\']([^"\']+)["\']',
+        r'<meta[^>]+name=["\']author["\'][^>]+content=["\']([^"\']+)["\']',
+    ):
+        mt = re.search(pat, html, re.I)
+        if mt:
+            site_identity.add(mt.group(1).strip())
+
+    def _brand_or_none(raw_brand):
+        cleaned = _clean_brand(raw_brand)
+        return None if (cleaned and cleaned in site_identity) else cleaned
+
     # Strategy 1: JSON-LD
     for m in re.finditer(
         r'<script[^>]+type=["\']application/ld\+json["\'][^>]*>(.*?)</script>',
@@ -415,7 +430,7 @@ def fetch_product_info(url, domain):
                     raw_brand = item.get("brand") or item.get("manufacturer")
                     if isinstance(raw_brand, dict):
                         raw_brand = raw_brand.get("name")
-                    cleaned = _clean_brand(raw_brand) if isinstance(raw_brand, str) else None
+                    cleaned = _brand_or_none(raw_brand) if isinstance(raw_brand, str) else None
                     if cleaned:
                         result["brand"] = cleaned
                 if not result.get("img"):
@@ -470,7 +485,7 @@ def fetch_product_info(url, domain):
         ):
             mt = re.search(pat, html, re.I)
             if mt:
-                cleaned = _clean_brand(mt.group(1))
+                cleaned = _brand_or_none(mt.group(1))
                 if cleaned:
                     result["brand"] = cleaned
                 break
@@ -651,6 +666,17 @@ def clean_market_query(title):
     return re.sub(r"\s+", " ", t).strip()
 
 
+def _guess_brand_from_title(title):
+    """브랜드를 어디서도 못 찾았을 때 최후 수단 — 정제된 제목의 첫 단어를 브랜드로 추정한다.
+    한국 공구 제목은 보통 "브랜드/상품라인명 + 설명" 순서라 꽤 맞는 편이지만 확정 정보는
+    아니므로, 관리자가 수정 화면에서 확인·정정할 수 있게 남겨둔다."""
+    words = clean_market_query(title).split()
+    if not words:
+        return None
+    first = words[0]
+    return first if len(first) >= 2 else None
+
+
 def _query_variants(title):
     """검색 후보를 여러 개 만든다.
     인포크 제목은 "인플루언서 캠페인명 × 실제 브랜드/상품명 - 쇼핑몰명" 패턴이 흔한데
@@ -802,8 +828,9 @@ def block_to_post(b, ig_handle, price, domain, profile_url, purchase_url, deadli
     mp = market.get("market_price")
     if mp and price and price >= mp:
         status, review_reason = "excluded", ["시장 최저가 이상"]
-    # 구매 페이지 JSON-LD brand 우선, 없으면 네이버쇼핑 매칭 결과의 brand/maker 사용
-    brand = pi.get("brand") or market.get("brand")
+    # 구매 페이지 JSON-LD brand 우선, 없으면 네이버쇼핑 매칭 결과의 brand/maker,
+    # 그래도 없으면 제목 첫 단어를 최후 수단으로 추정
+    brand = pi.get("brand") or market.get("brand") or _guess_brand_from_title(title)
     if not img_ok and status != "excluded":
         # 이미지 다운로드 실패 — 원격 URL이 나중에 만료/차단되어 깨진 이미지로 보일 수 있으므로 검수 대상으로 표시
         status = "needs_review"
