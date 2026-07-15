@@ -230,7 +230,10 @@ def _find_price_candidates(text):
 # 주변 문맥으로 걸러내고(negative), 점수를 매겨(positive) 진짜 마감일일 가능성이 높은
 # 후보를 앞에 두어야 한다 — 예전엔 정규식 목록 순서(iso_date가 항상 1순위)가 우선순위
 # 역할을 해버려서, "유통기한 2027.09.15"가 "~7/18까지"보다 먼저 골라지는 버그가 있었음
-_DEADLINE_NEGATIVE_CONTEXT = re.compile(r"유통기한|소비기한|제조일자|등록일|작성일|조회\s*\d|추천\s*\d|평점")
+_DEADLINE_NEGATIVE_CONTEXT = re.compile(
+    r"유통기한|소비기한|제조일자|등록일|작성일|조회\s*\d|추천\s*\d|평점|"
+    r"계좌|예금주|은행|BANK|무통장|사업자\s*등록|Business|입금자"
+)
 _DEADLINE_POSITIVE_CONTEXT = re.compile(r"까지|마감|종료|한정")
 
 
