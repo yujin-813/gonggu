@@ -226,6 +226,14 @@ def _find_price_candidates(text):
     return candidates
 
 
+# 날짜 형태만 보고 "마감일 후보"로 넣으면 유통기한·리뷰 작성일 등과 뒤섞인다.
+# 주변 문맥으로 걸러내고(negative), 점수를 매겨(positive) 진짜 마감일일 가능성이 높은
+# 후보를 앞에 두어야 한다 — 예전엔 정규식 목록 순서(iso_date가 항상 1순위)가 우선순위
+# 역할을 해버려서, "유통기한 2027.09.15"가 "~7/18까지"보다 먼저 골라지는 버그가 있었음
+_DEADLINE_NEGATIVE_CONTEXT = re.compile(r"유통기한|소비기한|제조일자|등록일|작성일|조회\s*\d|추천\s*\d|평점")
+_DEADLINE_POSITIVE_CONTEXT = re.compile(r"까지|마감|종료|한정")
+
+
 def _find_deadline_candidates(text):
     candidates = []
     for pat, label in [
@@ -236,38 +244,50 @@ def _find_deadline_candidates(text):
     ]:
         for m in re.finditer(pat, text):
             snippet = text[max(0, m.start()-20):m.end()+20].strip()
-            candidates.append({"raw": m.group(0), "source": label, "context": snippet})
+            if _DEADLINE_NEGATIVE_CONTEXT.search(snippet):
+                continue  # 유통기한/리뷰 작성일 등은 공구 마감일이 아니므로 후보에서 제외
+            if _DEADLINE_POSITIVE_CONTEXT.search(snippet):
+                score = 2  # "까지/마감" 같은 명시적 문맥 — 가장 신뢰도 높음
+            elif label in ("tilde_date", "until_date"):
+                score = 1  # 패턴 자체가 마감일 표기용(~, 까지)
+            else:
+                score = 0  # 그냥 날짜 형태만 맞음 — 가장 신뢰도 낮음
+            candidates.append({"raw": m.group(0), "source": label, "context": snippet, "score": score})
+    candidates.sort(key=lambda c: -c["score"])
     return candidates
 
 
 def _parse_deadline_candidate(raw):
-    """문자열을 YYYY-MM-DD로 변환. dateparser → regex 순서로 시도."""
+    """문자열을 YYYY-MM-DD로 변환. 직접 정규식 → dateparser 순서로 시도.
+    "M/D", "~M/D", "M월D일"처럼 연도가 없는 단순 표기는 직접 정규식으로 먼저 처리한다 —
+    dateparser가 이런 짧은 슬래시 표기를 가끔 엉뚱한 연도(예: 2118년)로 잘못 해석하는
+    문제가 있어서, 자체 정규식이 확실히 처리 가능한 형식까지 dateparser에 맡기면 안 된다."""
     raw = raw.strip()
     # ISO 형식은 직접 처리 (빠르고 오인식 없음)
     m = re.match(r'(\d{4})[.\-/](\d{1,2})[.\-/](\d{1,2})', raw)
     if m:
         return f"{m.group(1)}-{m.group(2).zfill(2)}-{m.group(3).zfill(2)}"
-    # dateparser로 한국어 날짜 파싱
-    if _DATEPARSER_OK:
-        parsed = dateparser.parse(
-            raw,
-            languages=["ko"],
-            settings={"PREFER_DATES_FROM": "future", "RETURN_AS_TIMEZONE_AWARE": False},
-        )
-        if parsed:
-            result = parsed.strftime("%Y-%m-%d")
-            # 오늘보다 과거이면 내년으로 조정
-            if result < date.today().strftime("%Y-%m-%d"):
-                parsed = parsed.replace(year=parsed.year + 1)
-                result = parsed.strftime("%Y-%m-%d")
-            return result
-    # regex fallback
     m = re.match(r'(\d{1,2})[월]\s*(\d{1,2})[일]', raw)
     if m:
         return f"{date.today().year}-{m.group(1).zfill(2)}-{m.group(2).zfill(2)}"
     m = re.match(r'~?\s*(\d{1,2})[./](\d{1,2})', raw)
     if m:
         return f"{date.today().year}-{m.group(1).zfill(2)}-{m.group(2).zfill(2)}"
+    # 그 외(자연어 한국어 날짜 표현)는 dateparser로 파싱
+    if _DATEPARSER_OK:
+        parsed = dateparser.parse(
+            raw,
+            languages=["ko"],
+            settings={"PREFER_DATES_FROM": "future", "RETURN_AS_TIMEZONE_AWARE": False},
+        )
+        # 터무니없는 연도(파싱 오류)는 버린다
+        if parsed and abs(parsed.year - date.today().year) <= 2:
+            result = parsed.strftime("%Y-%m-%d")
+            # 오늘보다 과거이면 내년으로 조정
+            if result < date.today().strftime("%Y-%m-%d"):
+                parsed = parsed.replace(year=parsed.year + 1)
+                result = parsed.strftime("%Y-%m-%d")
+            return result
     return None
 
 
