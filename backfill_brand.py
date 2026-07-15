@@ -19,7 +19,7 @@ if _env_file.exists():
             _k, _v = _line.split("=", 1)
             os.environ.setdefault(_k.strip(), _v.strip())
 
-from inpock import load_posts, save_posts, fetch_naver_market_price, fetch_product_info  # noqa: E402
+from inpock import load_posts, save_posts, fetch_naver_market_price, fetch_product_info, _guess_brand_from_title  # noqa: E402
 
 
 def main():
@@ -45,6 +45,9 @@ def main():
         if not brand:
             market = fetch_naver_market_price(p["title"], p.get("price") or None)
             brand = market.get("brand")
+
+        if not brand:
+            brand = _guess_brand_from_title(p["title"])
 
         if brand:
             p["brand"] = brand
