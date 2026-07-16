@@ -2,6 +2,7 @@ import type { Category } from '@/lib/types'
 
 const CATEGORIES = [
   { id: 'all' as const, label: '전체' },
+  { id: 'evergreen' as const, label: '📦 상시딜' },
   { id: 'fashion' as const, label: '👗 패션' },
   { id: 'beauty' as const, label: '💄 뷰티' },
   { id: 'food' as const, label: '🍱 식품' },
@@ -13,8 +14,8 @@ const CATEGORIES = [
 ]
 
 interface CategoryFilterProps {
-  current: Category | 'all'
-  onSelect: (cat: Category | 'all') => void
+  current: Category | 'all' | 'evergreen'
+  onSelect: (cat: Category | 'all' | 'evergreen') => void
 }
 
 export default function CategoryFilter({ current, onSelect }: CategoryFilterProps) {

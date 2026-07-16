@@ -60,8 +60,22 @@ export default function AddPostModal({ onClose, onSubmit, editPost, existingGrou
   const [newGroupInput, setNewGroupInput] = useState('')
 
   const [marketUrl,       setMarketUrl]       = useState('')
+  const [marketQuery,     setMarketQuery]     = useState('')
   const [marketSearching, setMarketSearching] = useState(false)
   const [marketResults,   setMarketResults]   = useState<{ title: string; lprice: number; mallName: string; link: string }[]>([])
+
+  async function searchMarketPrice(q: string) {
+    const query = q.trim()
+    if (!query) return
+    setMarketSearching(true)
+    setMarketResults([])
+    try {
+      const r = await fetch(`/api/market-price?q=${encodeURIComponent(query)}`)
+      const d = await r.json()
+      setMarketResults(d.items ?? [])
+    } catch {}
+    finally { setMarketSearching(false) }
+  }
 
   const [customVerdict,       setCustomVerdict]       = useState('')
   const [customVerdictDetail, setCustomVerdictDetail] = useState('')
@@ -332,31 +346,32 @@ export default function AddPostModal({ onClose, onSubmit, editPost, existingGrou
             <input type="number" value={price} onChange={e => setPrice(e.target.value)} placeholder="45000" />
           </div>
           <div>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
-              <label style={{ margin: 0 }}>네이버쇼핑 가격 (원, 선택)</label>
+            <label style={{ margin: '0 0 6px', display: 'block' }}>네이버쇼핑 가격 (원, 선택)</label>
+            <div style={{ display: 'flex', gap: 6, marginBottom: 6 }}>
+              <input
+                type="text"
+                value={marketQuery}
+                onChange={e => setMarketQuery(e.target.value)}
+                onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); searchMarketPrice(marketQuery || title) } }}
+                placeholder={title.trim() || '검색어 입력 (예: 모로오렌지)'}
+                style={{ flex: 1, padding: '7px 10px', borderRadius: 7, border: '1.5px solid #e2e8f0', fontSize: 12, outline: 'none' }}
+              />
               <button
                 type="button"
-                onClick={async () => {
-                  if (!title.trim()) return
-                  setMarketSearching(true)
-                  setMarketResults([])
-                  try {
-                    const r = await fetch(`/api/market-price?q=${encodeURIComponent(title.trim())}`)
-                    const d = await r.json()
-                    setMarketResults(d.items ?? [])
-                  } catch {}
-                  finally { setMarketSearching(false) }
-                }}
-                disabled={marketSearching || !title.trim()}
+                onClick={() => searchMarketPrice(marketQuery || title)}
+                disabled={marketSearching || !(marketQuery.trim() || title.trim())}
                 style={{
-                  background: 'none', border: 'none', fontSize: 12,
-                  color: title.trim() ? '#6366f1' : '#94a3b8',
-                  cursor: title.trim() ? 'pointer' : 'default', padding: 0,
+                  background: (marketQuery.trim() || title.trim()) ? '#6366f1' : '#94a3b8', color: '#fff', border: 'none',
+                  borderRadius: 7, padding: '0 12px', fontSize: 12, fontWeight: 600,
+                  cursor: (marketQuery.trim() || title.trim()) ? 'pointer' : 'default', whiteSpace: 'nowrap',
                 }}
               >
-                {marketSearching ? '검색 중...' : '🔍 네이버쇼핑 검색'}
+                {marketSearching ? '검색 중...' : '🔍 검색'}
               </button>
             </div>
+            <p style={{ fontSize: 11, color: '#94a3b8', margin: '0 0 6px' }}>
+              기본값은 상품명 전체예요 — 검색이 안 되면 위 칸에 핵심 단어만 직접 입력해서 다시 검색해보세요 (예: 상품명 전체 대신 브랜드명만)
+            </p>
             <input type="number" value={origPrice} onChange={e => { setOrigPrice(e.target.value); if (!e.target.value) setMarketUrl('') }} placeholder="60000" />
             {isEdit && editPost?.market_price && !origPrice && (
               <p style={{ fontSize: 11, color: '#6366f1', margin: '4px 0 0' }}>

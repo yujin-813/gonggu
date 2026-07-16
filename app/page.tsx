@@ -33,7 +33,7 @@ function track(type: string) {
 export default function Home() {
   const [posts, setPosts] = useState<Post[]>([])
   const [bookmarks, setBookmarks] = useState<Set<number>>(new Set())
-  const [currentCat, setCurrentCat] = useState<Category | 'all'>('all')
+  const [currentCat, setCurrentCat] = useState<Category | 'all' | 'evergreen'>('all')
   const [searchQuery, setSearchQuery] = useState('')
   const [sortOrder, setSortOrder] = useState<SortOrder>('latest')
   const [viewingBookmarks, setViewingBookmarks] = useState(false)
@@ -90,7 +90,9 @@ export default function Home() {
     ? posts.filter(p => bookmarks.has(p.id))
     : posts
 
-  if (!viewingBookmarks && currentCat !== 'all') {
+  if (!viewingBookmarks && currentCat === 'evergreen') {
+    filtered = filtered.filter(p => p.is_evergreen_deal || p.is_always_on)
+  } else if (!viewingBookmarks && currentCat !== 'all') {
     filtered = filtered.filter(p => p.cat === currentCat)
   }
   if (searchQuery) {

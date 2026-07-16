@@ -893,6 +893,14 @@ function InfluencerManager({
   const inputStyle: React.CSSProperties = {
     padding: '7px 10px', borderRadius: 8, border: '1.5px solid #e2e8f0', fontSize: 13, outline: 'none', width: '100%', boxSizing: 'border-box',
   }
+  const [search, setSearch] = useState('')
+  const q = search.trim().toLowerCase()
+  const filteredSources = !q ? sources : sources.filter(s =>
+    (s.influencer_name || '').toLowerCase().includes(q) ||
+    (s.instagram_handle || '').toLowerCase().includes(q) ||
+    (s.handle || '').toLowerCase().includes(q) ||
+    (s.url || '').toLowerCase().includes(q)
+  )
 
   return (
     <div>
@@ -934,14 +942,28 @@ function InfluencerManager({
         <p style={{ fontSize: 11, color: '#94a3b8', margin: '8px 0 0' }}>지원: inpock · linktree · littly · 그 외는 수동 검토로 저장</p>
       </div>
 
+      {sources.length > 0 && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14 }}>
+          <input type="text" value={search} onChange={e => setSearch(e.target.value)}
+            placeholder="이름 / 인스타 핸들 / URL 검색..."
+            style={{ ...inputStyle, maxWidth: 320 }} />
+          <span style={{ fontSize: 12, color: '#94a3b8' }}>{filteredSources.length}개</span>
+        </div>
+      )}
+
       {sources.length === 0 ? (
         <div style={{ textAlign: 'center', padding: 60, color: '#94a3b8' }}>
           <div style={{ fontSize: 40, marginBottom: 12 }}>👤</div>
           <div>등록된 인플루언서가 없습니다.</div>
         </div>
+      ) : filteredSources.length === 0 ? (
+        <div style={{ textAlign: 'center', padding: 60, color: '#94a3b8' }}>
+          <div style={{ fontSize: 40, marginBottom: 12 }}>🔍</div>
+          <div>검색 결과가 없습니다.</div>
+        </div>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-          {sources.map(src => {
+          {filteredSources.map(src => {
             const stats = influencerStats(src)
             const isEditing = editingInfluencer === src.id
             const isBusy = influencerBusy === src.id
