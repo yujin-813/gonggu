@@ -22,11 +22,18 @@ function getSession(): string {
   return id
 }
 
-function track(type: string) {
+// 세션(탭)과 무관하게 이 브라우저를 계속 식별하는 영구 ID — "재방문자" 판별용
+function getVisitorId(): string {
+  let id = localStorage.getItem('_dj_vid')
+  if (!id) { id = Math.random().toString(36).slice(2, 10) + Date.now().toString(36); localStorage.setItem('_dj_vid', id) }
+  return id
+}
+
+function track(type: string, extra?: { postId?: number }) {
   fetch('/api/analytics', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ type, sessionId: getSession() }),
+    body: JSON.stringify({ type, sessionId: getSession(), visitorId: getVisitorId(), postId: extra?.postId }),
   }).catch(() => {})
 }
 
@@ -200,7 +207,7 @@ export default function Home() {
               post={post}
               isBookmarked={bookmarks.has(post.id)}
               onToggleBookmark={toggleBookmark}
-              onJoin={() => track('join')}
+              onJoin={id => track('join', { postId: id })}
               siblings={post.group_key ? groupMap.get(post.group_key) : undefined}
             />
           ))

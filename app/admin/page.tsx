@@ -4,7 +4,8 @@ import type { Post, ScraperStatus, InfluencerSource } from '@/lib/types'
 import { daysLeft, periodLabel, isExpired } from '@/lib/period'
 import AddPostModal from '@/components/AddPostModal'
 
-interface DayStat { date: string; visitors: number; events: Record<string, number> }
+interface DayStat { date: string; visitors: number; events: Record<string, number>; newVisitors: number; returningVisitors: number }
+interface TopPost { id: number; title: string; img: string | null; price: number; count: number }
 
 function LoginScreen({ onLogin }: { onLogin: () => void }) {
   const [pw, setPw]       = useState('')
@@ -96,6 +97,7 @@ export default function AdminPage() {
   const [filter, setFilter]           = useState<'all' | 'candidate' | 'needs_review' | 'ready' | 'published' | 'excluded' | 'upcoming'>('all')
   const [searchQ, setSearchQ]         = useState('')
   const [analytics, setAnalytics]     = useState<DayStat[]>([])
+  const [topPosts, setTopPosts]       = useState<TopPost[]>([])
   const [includeKws, setIncludeKws]   = useState<string[]>([])
   const [excludeKws, setExcludeKws]   = useState<string[]>([])
   const [newInclude, setNewInclude]   = useState('')
@@ -132,7 +134,11 @@ export default function AdminPage() {
 
   const fetchAnalytics = useCallback(async () => {
     const r = await fetch('/api/analytics')
-    if (r.ok) setAnalytics(await r.json())
+    if (r.ok) {
+      const d = await r.json()
+      setAnalytics(d.summary || [])
+      setTopPosts(d.topPosts || [])
+    }
   }, [])
 
   const fetchInfluencerSources = useCallback(async () => {
@@ -415,7 +421,7 @@ export default function AdminPage() {
         </div>
 
         {/* 방문자 분석 */}
-        <AnalyticsSection data={analytics} />
+        <AnalyticsSection data={analytics} topPosts={topPosts} />
 
         {/* 탭 메뉴 */}
         <div style={{ display: 'flex', gap: 4, marginBottom: 20, borderBottom: '2px solid #e2e8f0', paddingBottom: 0 }}>
@@ -626,12 +632,13 @@ function StatCard({ label, value, icon, color }: { label: string; value: number;
   )
 }
 
-function AnalyticsSection({ data }: { data: DayStat[] }) {
+function AnalyticsSection({ data, topPosts }: { data: DayStat[]; topPosts: TopPost[] }) {
   const last7 = data.slice(-7)
   const today = last7[last7.length - 1]
   const total7 = last7.reduce((s, d) => s + d.visitors, 0)
   const total7join = last7.reduce((s, d) => s + (d.events.join || 0), 0)
   const total7bm = last7.reduce((s, d) => s + (d.events.bookmark || 0), 0)
+  const total7returning = last7.reduce((s, d) => s + (d.returningVisitors || 0), 0)
   const maxVisitors = Math.max(...last7.map(d => d.visitors), 1)
 
   function fmtDate(dateStr: string) {
@@ -648,6 +655,7 @@ function AnalyticsSection({ data }: { data: DayStat[] }) {
         {[
           { label: '오늘 방문자', value: today?.visitors ?? 0, color: '#6366f1' },
           { label: '7일 방문자', value: total7, color: '#0ea5e9' },
+          { label: '7일 재방문자', value: total7returning, color: '#8b5cf6' },
           { label: '7일 공구보기', value: total7join, color: '#22c55e' },
           { label: '7일 찜', value: total7bm, color: '#f43f5e' },
         ].map(({ label, value, color }) => (
@@ -694,6 +702,23 @@ function AnalyticsSection({ data }: { data: DayStat[] }) {
               {e.icon} {e.label} <strong>{today.events[e.key]}</strong>회
             </div>
           ))}
+        </div>
+      )}
+
+      {/* 가장 많이 본 상품 — "공구 보기" 클릭 누적 기준 (전체 기간) */}
+      {topPosts.length > 0 && (
+        <div style={{ marginTop: 20, paddingTop: 16, borderTop: '1px solid #f1f5f9' }}>
+          <h4 style={{ margin: '0 0 10px', fontSize: 13, fontWeight: 700, color: '#1e293b' }}>🔥 가장 많이 본 상품 TOP 5</h4>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            {topPosts.slice(0, 5).map((p, i) => (
+              <div key={p.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '6px 8px', background: i === 0 ? '#fff7ed' : '#f8fafc', borderRadius: 8 }}>
+                <span style={{ fontSize: 12, fontWeight: 700, color: '#94a3b8', width: 16, flexShrink: 0 }}>{i + 1}</span>
+                {p.img && <img src={p.img} alt="" style={{ width: 32, height: 32, borderRadius: 6, objectFit: 'cover', flexShrink: 0 }} />}
+                <span style={{ fontSize: 12, color: '#0f172a', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.title}</span>
+                <span style={{ fontSize: 12, fontWeight: 700, color: '#f97316', flexShrink: 0 }}>{p.count}회 클릭</span>
+              </div>
+            ))}
+          </div>
         </div>
       )}
     </div>
