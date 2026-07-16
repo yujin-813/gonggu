@@ -73,6 +73,47 @@ header {
 .btn-icon:hover { background: var(--pink-mid); }
 .btn-icon:disabled { opacity: 0.5; cursor: not-allowed; }
 
+/* ── Recently viewed ── */
+.recent-wrap {
+  max-width: 680px;
+  margin: 0 auto;
+  padding: 14px 20px 0;
+}
+.recent-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--gray-4);
+  margin: 0 0 8px;
+}
+.recent-scroll {
+  display: flex;
+  gap: 10px;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.recent-scroll::-webkit-scrollbar { display: none; }
+.recent-item {
+  flex-shrink: 0;
+  width: 76px;
+  text-decoration: none;
+  cursor: pointer;
+}
+.recent-item img, .recent-item .recent-placeholder {
+  width: 76px; height: 76px;
+  border-radius: 12px;
+  object-fit: cover;
+  background: var(--gray-2);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 28px;
+}
+.recent-item-price {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--gray-4);
+  margin-top: 4px;
+  text-align: center;
+}
+
 /* ── Category ── */
 .category-wrap {
   max-width: 680px;
@@ -178,6 +219,18 @@ header {
 .badge-deadline.soon   { background: #FF9500; color: white; }
 .badge-deadline.ok     { background: #34C759; color: white; }
 .badge-deadline.closed { background: #8E8E93; color: white; }
+
+.badge-new {
+  position: absolute;
+  bottom: 12px; left: 12px;
+  border-radius: 8px;
+  padding: 4px 10px;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.03em;
+  background: var(--pink);
+  color: white;
+}
 
 .btn-bookmark {
   position: absolute;

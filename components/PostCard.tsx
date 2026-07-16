@@ -1,7 +1,7 @@
 'use client'
 import { useState } from 'react'
 import type { Post } from '@/lib/types'
-import { daysLeft, getPeriodState, badgeFromState, periodTextFromState, isExpired } from '@/lib/period'
+import { daysLeft, getPeriodState, badgeFromState, periodTextFromState, isExpired, isNewPost } from '@/lib/period'
 import PriceCompareModal from './PriceCompareModal'
 
 const CAT_LABEL: Record<string, string> = {
@@ -50,9 +50,16 @@ interface PostCardProps {
   onToggleBookmark: (id: number) => void
   onJoin?: (id: number) => void
   siblings?: Post[]
+  isFollowingAccount?: boolean
+  isFollowingCategory?: boolean
+  onToggleFollowAccount?: (account: string) => void
+  onToggleFollowCategory?: (cat: string) => void
 }
 
-export default function PostCard({ post, isBookmarked, onToggleBookmark, onJoin, siblings = [] }: PostCardProps) {
+export default function PostCard({
+  post, isBookmarked, onToggleBookmark, onJoin, siblings = [],
+  isFollowingAccount, isFollowingCategory, onToggleFollowAccount, onToggleFollowCategory,
+}: PostCardProps) {
   const [imgFailed, setImgFailed] = useState(false)
   const [showCompare, setShowCompare] = useState(false)
   const compareCount = siblings.length
@@ -61,6 +68,11 @@ export default function PostCard({ post, isBookmarked, onToggleBookmark, onJoin,
   const badge = badgeFromState(periodState)
   const dt = periodTextFromState(periodState)
   const closed = isExpired(post)
+  const isNew = !isUpcoming && isNewPost(post.scraped_at)
+  // 관리자가 직접 입력했거나(source=manual), 자동 추출 신뢰도가 높을 때만 "확인됨"으로 표시한다 —
+  // 애매한 걸 확인됐다고 하면 나중에 신뢰만 잃으므로, 확실할 때만 긍정 신호를 준다
+  const extractionConfidence = (post.extraction_debug as Record<string, unknown> | null)?.extraction_confidence as string | undefined
+  const isVerified = post.source === 'manual' || extractionConfidence === 'high'
   const judgment = dealJudgment(post)
   const discount =
     post.origPrice && post.origPrice > post.price
@@ -89,6 +101,7 @@ export default function PostCard({ post, isBookmarked, onToggleBookmark, onJoin,
             {badge.icon} {badge.txt}
           </div>
         )}
+        {isNew && <div className="badge-new">NEW</div>}
         <button
           className={`btn-bookmark ${isBookmarked ? 'active' : ''}`}
           onClick={() => onToggleBookmark(post.id)}
@@ -105,7 +118,27 @@ export default function PostCard({ post, isBookmarked, onToggleBookmark, onJoin,
               {post.account}
             </a>
           </span>
-          <span className="cat-tag">{CAT_LABEL[post.cat] || post.cat}</span>
+          {onToggleFollowAccount && (
+            <button
+              onClick={() => onToggleFollowAccount(post.account)}
+              title={isFollowingAccount ? '인플루언서 팔로우 취소' : '이 인플루언서 팔로우'}
+              style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 13, padding: '0 2px', color: isFollowingAccount ? '#f59e0b' : '#cbd5e1', lineHeight: 1 }}
+            >
+              {isFollowingAccount ? '⭐' : '☆'}
+            </button>
+          )}
+          <span className="cat-tag" style={{ display: 'inline-flex', alignItems: 'center', gap: 2 }}>
+            {CAT_LABEL[post.cat] || post.cat}
+            {onToggleFollowCategory && (
+              <button
+                onClick={() => onToggleFollowCategory(post.cat)}
+                title={isFollowingCategory ? '카테고리 팔로우 취소' : '이 카테고리 팔로우'}
+                style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 12, padding: '0 0 0 2px', color: isFollowingCategory ? '#f59e0b' : '#94a3b8', lineHeight: 1 }}
+              >
+                {isFollowingCategory ? '⭐' : '☆'}
+              </button>
+            )}
+          </span>
         </div>
 
         {post.brand && (
@@ -131,6 +164,12 @@ export default function PostCard({ post, isBookmarked, onToggleBookmark, onJoin,
           <div className={`deal-judgment deal-judgment-${judgment.cls}`}>
             <span className="judgment-verdict">{judgment.verdict}</span>
             <span className="judgment-detail">{judgment.detail}</span>
+          </div>
+        )}
+
+        {isVerified && (
+          <div style={{ fontSize: 11, color: '#16a34a', marginBottom: 6, display: 'flex', alignItems: 'center', gap: 3 }}>
+            ✓ 가격·마감일 확인된 정보예요
           </div>
         )}
 

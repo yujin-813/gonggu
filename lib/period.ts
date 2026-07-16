@@ -65,6 +65,16 @@ export function isExpired(post: PeriodInput): boolean {
   return (s.kind === 'range' || s.kind === 'deadline_only') && s.daysLeft < 0
 }
 
+const NEW_WINDOW_HOURS = 48
+
+/** 최근(기본 48시간 이내) 수집된 공구인지 — "NEW" 배지용 */
+export function isNewPost(scrapedAt?: string): boolean {
+  if (!scrapedAt) return false
+  const t = new Date(scrapedAt).getTime()
+  if (Number.isNaN(t)) return false
+  return Date.now() - t <= NEW_WINDOW_HOURS * 60 * 60 * 1000
+}
+
 /** 카드 왼쪽 위 D-day 배지. 정보가 없으면(start_only/unknown) 거짓 정보를 주느니 배지를 숨긴다 */
 export function badgeFromState(state: PeriodState): { cls: string; icon: string; txt: string } | null {
   switch (state.kind) {

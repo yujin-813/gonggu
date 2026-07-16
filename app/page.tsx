@@ -37,6 +37,20 @@ function track(type: string, extra?: { postId?: number }) {
   }).catch(() => {})
 }
 
+// VAPID 공개키(base64url) → 브라우저 PushManager가 요구하는 Uint8Array 형식으로 변환
+function urlBase64ToUint8Array(base64String: string): Uint8Array {
+  const padding = '='.repeat((4 - (base64String.length % 4)) % 4)
+  const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/')
+  const rawData = atob(base64)
+  const outputArray = new Uint8Array(rawData.length)
+  for (let i = 0; i < rawData.length; i++) outputArray[i] = rawData.charCodeAt(i)
+  return outputArray
+}
+
+function pushSupported(): boolean {
+  return typeof window !== 'undefined' && 'serviceWorker' in navigator && 'PushManager' in window
+}
+
 export default function Home() {
   const [posts, setPosts] = useState<Post[]>([])
   const [bookmarks, setBookmarks] = useState<Set<number>>(new Set())
@@ -46,13 +60,119 @@ export default function Home() {
   const [viewingBookmarks, setViewingBookmarks] = useState(false)
   const [toast, setToast] = useState({ message: '', visible: false })
   const [loading, setLoading] = useState(true)
+  const [recentlyViewed, setRecentlyViewed] = useState<number[]>([])
+  const [followedCategories, setFollowedCategories] = useState<Set<string>>(new Set())
+  const [followedInfluencers, setFollowedInfluencers] = useState<Set<string>>(new Set())
+  const [viewingFollowed, setViewingFollowed] = useState(false)
+  const [pushSubscribed, setPushSubscribed] = useState(false)
 
   useEffect(() => {
     const saved = JSON.parse(localStorage.getItem('gonggu_bookmarks') || '[]')
     setBookmarks(new Set(saved))
+    setRecentlyViewed(JSON.parse(localStorage.getItem('gonggu_recent') || '[]'))
+    setFollowedCategories(new Set(JSON.parse(localStorage.getItem('gonggu_followed_cats') || '[]')))
+    setFollowedInfluencers(new Set(JSON.parse(localStorage.getItem('gonggu_followed_accounts') || '[]')))
     fetchPosts()
     track('view')
+    if (pushSupported()) {
+      navigator.serviceWorker.getRegistration('/sw.js')
+        .then(reg => reg?.pushManager.getSubscription())
+        .then(sub => setPushSubscribed(!!sub))
+        .catch(() => {})
+    }
   }, [])
+
+  // 찜 목록이 바뀌면(알림 구독 중일 때만) 서버에 최신 찜 목록을 다시 동기화 —
+  // 마감 임박 알림은 서버가 이 목록을 기준으로 보내기 때문에 항상 최신 상태여야 한다
+  useEffect(() => {
+    if (!pushSubscribed || !pushSupported()) return
+    navigator.serviceWorker.getRegistration('/sw.js').then(async reg => {
+      const sub = await reg?.pushManager.getSubscription()
+      if (!sub) return
+      fetch('/api/push/subscribe', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ visitorId: getVisitorId(), subscription: sub.toJSON(), bookmarkedPostIds: [...bookmarks] }),
+      }).catch(() => {})
+    }).catch(() => {})
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [bookmarks, pushSubscribed])
+
+  async function subscribeToPush() {
+    if (!pushSupported()) { showToast('이 브라우저는 알림을 지원하지 않아요'); return }
+    const vapidKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY
+    if (!vapidKey) { showToast('알림 기능이 아직 설정되지 않았어요'); return }
+    try {
+      const perm = await Notification.requestPermission()
+      if (perm !== 'granted') { showToast('알림 권한을 허용해주셔야 받을 수 있어요'); return }
+      const reg = await navigator.serviceWorker.register('/sw.js')
+      await navigator.serviceWorker.ready
+      const sub = await reg.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: urlBase64ToUint8Array(vapidKey) as BufferSource,
+      })
+      await fetch('/api/push/subscribe', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ visitorId: getVisitorId(), subscription: sub.toJSON(), bookmarkedPostIds: [...bookmarks] }),
+      })
+      setPushSubscribed(true)
+      showToast('🔔 찜한 공구 마감 알림을 켰어요!')
+    } catch {
+      showToast('알림 설정에 실패했어요')
+    }
+  }
+
+  async function unsubscribeFromPush() {
+    try {
+      if (pushSupported()) {
+        const reg = await navigator.serviceWorker.getRegistration('/sw.js')
+        const sub = await reg?.pushManager.getSubscription()
+        await sub?.unsubscribe()
+      }
+      await fetch('/api/push/subscribe', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ visitorId: getVisitorId() }),
+      })
+    } catch {}
+    setPushSubscribed(false)
+    showToast('마감 알림을 껐어요')
+  }
+
+  function togglePush() {
+    if (pushSubscribed) unsubscribeFromPush()
+    else subscribeToPush()
+  }
+
+  function toggleFollowCategory(cat: string) {
+    setFollowedCategories(prev => {
+      const next = new Set(prev)
+      if (next.has(cat)) { next.delete(cat); showToast('카테고리 팔로우를 취소했어요') }
+      else { next.add(cat); showToast('⭐ 카테고리를 팔로우했어요!') }
+      localStorage.setItem('gonggu_followed_cats', JSON.stringify([...next]))
+      return next
+    })
+  }
+
+  function toggleFollowInfluencer(account: string) {
+    setFollowedInfluencers(prev => {
+      const next = new Set(prev)
+      if (next.has(account)) { next.delete(account); showToast('팔로우를 취소했어요') }
+      else { next.add(account); showToast('⭐ 인플루언서를 팔로우했어요!') }
+      localStorage.setItem('gonggu_followed_accounts', JSON.stringify([...next]))
+      return next
+    })
+  }
+
+  // "공구 보기"를 눌러 실제로 관심을 보인 상품을 최근 본 목록에 기록 (최대 20개, 중복 제거)
+  function recordRecentlyViewed(id: number) {
+    setRecentlyViewed(prev => {
+      const next = [id, ...prev.filter(x => x !== id)].slice(0, 20)
+      localStorage.setItem('gonggu_recent', JSON.stringify(next))
+      return next
+    })
+  }
 
   async function fetchPosts() {
     setLoading(true)
@@ -95,11 +215,14 @@ export default function Home() {
   // Filter + sort
   let filtered = viewingBookmarks
     ? posts.filter(p => bookmarks.has(p.id))
+    : viewingFollowed
+    ? posts.filter(p => followedInfluencers.has(p.account) || followedCategories.has(p.cat))
     : posts
 
-  if (!viewingBookmarks && currentCat === 'evergreen') {
+  const showingMainFeed = !viewingBookmarks && !viewingFollowed
+  if (showingMainFeed && currentCat === 'evergreen') {
     filtered = filtered.filter(p => p.is_evergreen_deal || p.is_always_on)
-  } else if (!viewingBookmarks && currentCat !== 'all') {
+  } else if (showingMainFeed && currentCat !== 'all') {
     filtered = filtered.filter(p => p.cat === currentCat)
   }
   if (searchQuery) {
@@ -143,11 +266,15 @@ export default function Home() {
       <Header
         searchQuery={searchQuery}
         onSearch={setSearchQuery}
-        onBookmarkView={() => setViewingBookmarks(v => !v)}
+        onBookmarkView={() => { setViewingBookmarks(v => !v); setViewingFollowed(false) }}
         viewingBookmarks={viewingBookmarks}
+        onFollowView={() => { setViewingFollowed(v => !v); setViewingBookmarks(false) }}
+        viewingFollowed={viewingFollowed}
+        onPushToggle={togglePush}
+        pushSubscribed={pushSubscribed}
       />
 
-      {!viewingBookmarks && urgentCount > 0 && (
+      {showingMainFeed && urgentCount > 0 && (
         <div className="notify-banner">
           <div className="notify-inner">
             <div className="notify-icon">🔔</div>
@@ -170,9 +297,33 @@ export default function Home() {
           <button className="back-btn" onClick={() => setViewingBookmarks(false)}>←</button>
           ❤️ 찜한 공구
         </div>
+      ) : viewingFollowed ? (
+        <div className="section-header">
+          <button className="back-btn" onClick={() => setViewingFollowed(false)}>←</button>
+          ⭐ 팔로우한 카테고리·인플루언서
+        </div>
       ) : (
         <>
-          <CategoryFilter current={currentCat} onSelect={cat => { setCurrentCat(cat); setViewingBookmarks(false); if (cat !== 'all') track('category') }} />
+          {recentlyViewed.length > 0 && (
+            <div className="recent-wrap">
+              <p className="recent-title">🕒 최근 본 상품</p>
+              <div className="recent-scroll">
+                {recentlyViewed.map(id => {
+                  const p = posts.find(x => x.id === id)
+                  if (!p) return null
+                  const link = p.purchase_url || p.url
+                  return (
+                    <a key={id} className="recent-item" href={link || '#'} target="_blank" rel="noopener noreferrer"
+                      onClick={() => track('join', { postId: id })}>
+                      {p.img ? <img src={p.img} alt={p.title} /> : <div className="recent-placeholder">{p.avatar || '🛍️'}</div>}
+                      <div className="recent-item-price">{p.price.toLocaleString()}원</div>
+                    </a>
+                  )
+                })}
+              </div>
+            </div>
+          )}
+          <CategoryFilter current={currentCat} onSelect={cat => { setCurrentCat(cat); setViewingBookmarks(false); setViewingFollowed(false); if (cat !== 'all') track('category') }} />
           <div className="topbar">
             <span className="count-text">총 <strong>{sorted.length}</strong>개의 공구</span>
             <select
@@ -197,8 +348,8 @@ export default function Home() {
           </div>
         ) : sorted.length === 0 ? (
           <div className="empty">
-            <div className="empty-icon">{viewingBookmarks ? '🤍' : '🔍'}</div>
-            <p>{viewingBookmarks ? '아직 찜한 공구가 없어요' : '검색 결과가 없어요'}</p>
+            <div className="empty-icon">{viewingBookmarks ? '🤍' : viewingFollowed ? '⭐' : '🔍'}</div>
+            <p>{viewingBookmarks ? '아직 찜한 공구가 없어요' : viewingFollowed ? '아직 팔로우한 카테고리·인플루언서가 없어요' : '검색 결과가 없어요'}</p>
           </div>
         ) : (
           sorted.map(post => (
@@ -207,8 +358,12 @@ export default function Home() {
               post={post}
               isBookmarked={bookmarks.has(post.id)}
               onToggleBookmark={toggleBookmark}
-              onJoin={id => track('join', { postId: id })}
+              onJoin={id => { track('join', { postId: id }); recordRecentlyViewed(id) }}
               siblings={post.group_key ? groupMap.get(post.group_key) : undefined}
+              isFollowingAccount={followedInfluencers.has(post.account)}
+              isFollowingCategory={followedCategories.has(post.cat)}
+              onToggleFollowAccount={toggleFollowInfluencer}
+              onToggleFollowCategory={toggleFollowCategory}
             />
           ))
         )}
