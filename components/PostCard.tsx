@@ -1,14 +1,18 @@
 'use client'
 import { useState } from 'react'
 import type { Post } from '@/lib/types'
-import { daysLeft, getPeriodState, badgeFromState, periodTextFromState, isExpired, isNewPost } from '@/lib/period'
+import { daysLeft, getPeriodState, badgeFromState, periodTextFromState, isExpired, isNewPost, type BadgeIcon, type PeriodIcon } from '@/lib/period'
+import { CATEGORY_LABEL, categoryIcon } from '@/lib/categoryIcons'
+import {
+  Heart, Star, Wallet, CheckCircle2, Calendar, CalendarClock,
+  Package, Flame, Lock, Timer, Zap,
+} from 'lucide-react'
 import PriceCompareModal from './PriceCompareModal'
 
-const CAT_LABEL: Record<string, string> = {
-  fashion: '👗 패션', beauty: '💄 뷰티', food: '🍱 식품',
-  life: '🏠 생활용품', kids: '🧸 유아동', health: '💊 건강',
-  pet: '🐾 반려동물', digital: '📱 디지털',
+const BADGE_ICON: Record<BadgeIcon, typeof Calendar> = {
+  'calendar-clock': CalendarClock, package: Package, flame: Flame, lock: Lock, timer: Timer,
 }
+const PERIOD_ICON: Record<PeriodIcon, typeof Calendar> = { calendar: Calendar, zap: Zap }
 
 function dealJudgment(post: Post): { verdict: string; detail: string; cls: string } | null {
   if (!post.price || post.status === 'upcoming') return null
@@ -35,7 +39,7 @@ function dealJudgment(post: Post): { verdict: string; detail: string; cls: strin
   // 가격이 좋고 마감도 임박했을 때만 "지금 사야 할 이유"를 덧붙인다 (둘 다 사실일 때만 — 과장 없이)
   const dLeft = daysLeft(post.deadline)
   const urgent = !(post.is_evergreen_deal || post.is_always_on) && dLeft >= 0 && dLeft <= 2
-  const urgentSuffix = urgent ? ' · ⏰ 마감임박' : ''
+  const urgentSuffix = urgent ? ' · 마감임박' : ''
 
   if (p <= mp * 0.7)
     return { verdict: '완전 득템이에요', detail: `${label}보다 ${diff.toLocaleString()}원(${rate}%) 저렴${urgentSuffix}`, cls: 'great' }
@@ -83,6 +87,10 @@ export default function PostCard({
     ? `https://instagram.com/${post.account.replace('@', '')}`
     : '#'
 
+  const CatIcon = categoryIcon(post.cat)
+  const BadgeIconEl = badge ? BADGE_ICON[badge.icon] : null
+  const PeriodIconEl = PERIOD_ICON[dt.icon]
+
   return (
     <div className="card">
       <div className="card-img-wrap">
@@ -99,11 +107,11 @@ export default function PostCard({
             />
           </>
         ) : (
-          <div className="img-placeholder">{post.avatar || '🛍️'}</div>
+          <div className="img-placeholder"><CatIcon size={40} strokeWidth={1.5} /></div>
         )}
-        {badge && (
+        {badge && BadgeIconEl && (
           <div className={`badge-deadline ${badge.cls}`}>
-            {badge.icon} {badge.txt}
+            <BadgeIconEl size={13} strokeWidth={2.25} /> {badge.txt}
           </div>
         )}
         {isNew && <div className="badge-new">NEW</div>}
@@ -111,13 +119,13 @@ export default function PostCard({
           className={`btn-bookmark ${isBookmarked ? 'active' : ''}`}
           onClick={() => onToggleBookmark(post.id)}
         >
-          {isBookmarked ? '❤️' : '🤍'}
+          <Heart size={16} fill={isBookmarked ? 'currentColor' : 'none'} />
         </button>
       </div>
 
       <div className="card-body">
         <div className="card-top">
-          <div className="avatar">{post.avatar || '🛍️'}</div>
+          <div className="avatar"><CatIcon size={15} strokeWidth={2} /></div>
           <span className="account-name">
             <a href={profileUrl} target="_blank" rel="noreferrer">
               {post.account}
@@ -127,20 +135,22 @@ export default function PostCard({
             <button
               onClick={() => onToggleFollowAccount(post.account)}
               title={isFollowingAccount ? '인플루언서 팔로우 취소' : '이 인플루언서 팔로우'}
-              style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 13, padding: '0 2px', color: isFollowingAccount ? '#f59e0b' : '#cbd5e1', lineHeight: 1 }}
+              className="btn-follow-star"
+              style={{ color: isFollowingAccount ? '#f59e0b' : '#cbd5e1' }}
             >
-              {isFollowingAccount ? '⭐' : '☆'}
+              <Star size={14} fill={isFollowingAccount ? 'currentColor' : 'none'} />
             </button>
           )}
-          <span className="cat-tag" style={{ display: 'inline-flex', alignItems: 'center', gap: 2 }}>
-            {CAT_LABEL[post.cat] || post.cat}
+          <span className="cat-tag">
+            {CATEGORY_LABEL[post.cat] || post.cat}
             {onToggleFollowCategory && (
               <button
                 onClick={() => onToggleFollowCategory(post.cat)}
                 title={isFollowingCategory ? '카테고리 팔로우 취소' : '이 카테고리 팔로우'}
-                style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 12, padding: '0 0 0 2px', color: isFollowingCategory ? '#f59e0b' : '#94a3b8', lineHeight: 1 }}
+                className="btn-follow-star"
+                style={{ color: isFollowingCategory ? '#f59e0b' : '#94a3b8' }}
               >
-                {isFollowingCategory ? '⭐' : '☆'}
+                <Star size={12} fill={isFollowingCategory ? 'currentColor' : 'none'} />
               </button>
             )}
           </span>
@@ -169,7 +179,7 @@ export default function PostCard({
         {/* 두 번째로 중요한 정보: 기간이 언제까지인지 — 독립된 줄로 항상 노출 */}
         {dt.txt && (
           <div className={`period-row ${dt.cls}`}>
-            <span>📅</span>
+            <PeriodIconEl size={13} strokeWidth={2.25} />
             <span>{dt.txt}</span>
           </div>
         )}
@@ -182,8 +192,8 @@ export default function PostCard({
         )}
 
         {isVerified && (
-          <div style={{ fontSize: 11, color: '#16a34a', marginBottom: 6, display: 'flex', alignItems: 'center', gap: 3 }}>
-            ✓ 가격·마감일 확인된 정보예요
+          <div style={{ fontSize: 11, color: '#16a34a', marginBottom: 6, display: 'flex', alignItems: 'center', gap: 4 }}>
+            <CheckCircle2 size={13} /> 가격·마감일 확인된 정보예요
           </div>
         )}
 
@@ -196,14 +206,17 @@ export default function PostCard({
               borderRadius: 8, padding: '6px 0',
               fontSize: 12, fontWeight: 700, color: '#92400e',
               cursor: 'pointer',
+              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5,
             }}
           >
-            💰 {compareCount}개 가격 비교
+            <Wallet size={13} /> {compareCount}개 가격 비교
           </button>
         )}
 
         {(post.participants || 0) > 0 && (
-          <div className="participants">❤️ {(post.participants || 0).toLocaleString()} 좋아요</div>
+          <div className="participants">
+            <Heart size={12} fill="currentColor" /> {(post.participants || 0).toLocaleString()} 좋아요
+          </div>
         )}
       </div>
 
@@ -217,7 +230,13 @@ export default function PostCard({
         disabled={closed || isUpcoming || !(post.purchase_url || post.url)}
         style={isUpcoming ? { background: '#ede9fe', color: '#7c3aed' } : {}}
       >
-        {closed ? '마감됨' : isUpcoming ? '오픈 예정 🗓️' : !(post.purchase_url || post.url) ? '링크 없음' : '공구 보기 →'}
+        {closed
+          ? '마감됨'
+          : isUpcoming
+          ? <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}><CalendarClock size={16} /> 오픈 예정</span>
+          : !(post.purchase_url || post.url)
+          ? '링크 없음'
+          : '공구 보기 →'}
       </button>
 
       {showCompare && (

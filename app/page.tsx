@@ -6,6 +6,8 @@ import CategoryFilter from '@/components/CategoryFilter'
 import PostCard from '@/components/PostCard'
 import Toast from '@/components/Toast'
 import type { Post, Category, SortOrder } from '@/lib/types'
+import { categoryIcon } from '@/lib/categoryIcons'
+import { Bell, ArrowLeft, Heart, Star, Clock, Loader2, Search } from 'lucide-react'
 
 function daysLeft(deadline?: string): number {
   if (!deadline) return 999
@@ -117,7 +119,7 @@ export default function Home() {
         body: JSON.stringify({ visitorId: getVisitorId(), subscription: sub.toJSON(), bookmarkedPostIds: [...bookmarks] }),
       })
       setPushSubscribed(true)
-      showToast('🔔 찜한 공구 마감 알림을 켰어요!')
+      showToast('찜한 공구 마감 알림을 켰어요!')
     } catch {
       showToast('알림 설정에 실패했어요')
     }
@@ -149,7 +151,7 @@ export default function Home() {
     setFollowedCategories(prev => {
       const next = new Set(prev)
       if (next.has(cat)) { next.delete(cat); showToast('카테고리 팔로우를 취소했어요') }
-      else { next.add(cat); showToast('⭐ 카테고리를 팔로우했어요!') }
+      else { next.add(cat); showToast('카테고리를 팔로우했어요!') }
       localStorage.setItem('gonggu_followed_cats', JSON.stringify([...next]))
       return next
     })
@@ -159,7 +161,7 @@ export default function Home() {
     setFollowedInfluencers(prev => {
       const next = new Set(prev)
       if (next.has(account)) { next.delete(account); showToast('팔로우를 취소했어요') }
-      else { next.add(account); showToast('⭐ 인플루언서를 팔로우했어요!') }
+      else { next.add(account); showToast('인플루언서를 팔로우했어요!') }
       localStorage.setItem('gonggu_followed_accounts', JSON.stringify([...next]))
       return next
     })
@@ -200,7 +202,7 @@ export default function Home() {
         showToast('찜을 해제했어요')
       } else {
         next.add(id)
-        showToast('❤️ 찜 목록에 추가했어요!')
+        showToast('찜 목록에 추가했어요!')
         track('bookmark')
       }
       saveBookmarks(next)
@@ -277,7 +279,7 @@ export default function Home() {
       {showingMainFeed && urgentCount > 0 && (
         <div className="notify-banner">
           <div className="notify-inner">
-            <div className="notify-icon">🔔</div>
+            <div className="notify-icon"><Bell size={18} /></div>
             <div className="notify-text">
               <p>마감 임박 공구가 {urgentCount}개 있어요!</p>
               <p>오늘 자정까지 마감되는 공구를 확인하세요</p>
@@ -294,28 +296,29 @@ export default function Home() {
 
       {viewingBookmarks ? (
         <div className="section-header">
-          <button className="back-btn" onClick={() => setViewingBookmarks(false)}>←</button>
-          ❤️ 찜한 공구
+          <button className="back-btn" onClick={() => setViewingBookmarks(false)}><ArrowLeft size={16} /></button>
+          <Heart size={16} /> 찜한 공구
         </div>
       ) : viewingFollowed ? (
         <div className="section-header">
-          <button className="back-btn" onClick={() => setViewingFollowed(false)}>←</button>
-          ⭐ 팔로우한 카테고리·인플루언서
+          <button className="back-btn" onClick={() => setViewingFollowed(false)}><ArrowLeft size={16} /></button>
+          <Star size={16} /> 팔로우한 카테고리·인플루언서
         </div>
       ) : (
         <>
           {recentlyViewed.length > 0 && (
             <div className="recent-wrap">
-              <p className="recent-title">🕒 최근 본 상품</p>
+              <p className="recent-title"><Clock size={13} /> 최근 본 상품</p>
               <div className="recent-scroll">
                 {recentlyViewed.map(id => {
                   const p = posts.find(x => x.id === id)
                   if (!p) return null
                   const link = p.purchase_url || p.url
+                  const CatIcon = categoryIcon(p.cat)
                   return (
                     <a key={id} className="recent-item" href={link || '#'} target="_blank" rel="noopener noreferrer"
                       onClick={() => track('join', { postId: id })}>
-                      {p.img ? <img src={p.img} alt={p.title} /> : <div className="recent-placeholder">{p.avatar || '🛍️'}</div>}
+                      {p.img ? <img src={p.img} alt={p.title} /> : <div className="recent-placeholder"><CatIcon size={24} strokeWidth={1.5} /></div>}
                       <div className="recent-item-price">{p.price.toLocaleString()}원</div>
                     </a>
                   )
@@ -343,12 +346,14 @@ export default function Home() {
       <div className="feed">
         {loading ? (
           <div className="empty">
-            <div className="empty-icon">⏳</div>
+            <div className="empty-icon empty-icon-spin"><Loader2 size={36} /></div>
             <p>공구 불러오는 중...</p>
           </div>
         ) : sorted.length === 0 ? (
           <div className="empty">
-            <div className="empty-icon">{viewingBookmarks ? '🤍' : viewingFollowed ? '⭐' : '🔍'}</div>
+            <div className="empty-icon">
+              {viewingBookmarks ? <Heart size={36} /> : viewingFollowed ? <Star size={36} /> : <Search size={36} />}
+            </div>
             <p>{viewingBookmarks ? '아직 찜한 공구가 없어요' : viewingFollowed ? '아직 팔로우한 카테고리·인플루언서가 없어요' : '검색 결과가 없어요'}</p>
           </div>
         ) : (

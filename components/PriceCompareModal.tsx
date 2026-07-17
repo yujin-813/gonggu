@@ -1,7 +1,8 @@
 'use client'
 import type { Post } from '@/lib/types'
+import { Wallet, X } from 'lucide-react'
 
-const RANK_ICON = ['🥇', '🥈', '🥉']
+const RANK_COLORS = ['#f59e0b', '#94a3b8', '#b45309']
 
 function fmt(dateStr?: string) {
   if (!dateStr) return ''
@@ -35,14 +36,16 @@ export default function PriceCompareModal({ posts, onClose, onJoin }: Props) {
         {/* 헤더 */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
           <div>
-            <div style={{ fontWeight: 700, fontSize: 17, color: '#0f172a' }}>💰 가격 비교</div>
+            <div style={{ fontWeight: 700, fontSize: 17, color: '#0f172a', display: 'flex', alignItems: 'center', gap: 6 }}>
+              <Wallet size={17} /> 가격 비교
+            </div>
             <div style={{ fontSize: 12, color: '#64748b', marginTop: 2 }}>{sorted[0]?.title}</div>
           </div>
           <button
             onClick={onClose}
-            style={{ background: '#f1f5f9', border: 'none', borderRadius: '50%', width: 32, height: 32, cursor: 'pointer', fontSize: 16, color: '#475569' }}
+            style={{ background: '#f1f5f9', border: 'none', borderRadius: '50%', width: 32, height: 32, cursor: 'pointer', color: '#475569', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
           >
-            ✕
+            <X size={16} />
           </button>
         </div>
 
@@ -61,7 +64,16 @@ export default function PriceCompareModal({ posts, onClose, onJoin }: Props) {
                   border: `1.5px solid ${isCheapest ? '#fbbf24' : '#e2e8f0'}`,
                 }}
               >
-                <span style={{ fontSize: 22, flexShrink: 0 }}>{RANK_ICON[i] ?? `${i + 1}위`}</span>
+                <span
+                  style={{
+                    flexShrink: 0, width: 26, height: 26, borderRadius: '50%',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    fontSize: 12, fontWeight: 800, color: 'white',
+                    background: RANK_COLORS[i] ?? '#cbd5e1',
+                  }}
+                >
+                  {i + 1}
+                </span>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ fontSize: 13, fontWeight: 600, color: '#0f172a' }}>
                     {p.account}

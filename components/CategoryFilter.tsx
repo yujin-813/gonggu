@@ -1,17 +1,7 @@
 import type { Category } from '@/lib/types'
+import { CATEGORY_ICON, CATEGORY_LABEL } from '@/lib/categoryIcons'
 
-const CATEGORIES = [
-  { id: 'all' as const, label: '전체' },
-  { id: 'evergreen' as const, label: '📦 상시딜' },
-  { id: 'fashion' as const, label: '👗 패션' },
-  { id: 'beauty' as const, label: '💄 뷰티' },
-  { id: 'food' as const, label: '🍱 식품' },
-  { id: 'life' as const, label: '🏠 생활용품' },
-  { id: 'kids' as const, label: '🧸 유아동' },
-  { id: 'health' as const, label: '💊 건강' },
-  { id: 'pet' as const, label: '🐾 반려동물' },
-  { id: 'digital' as const, label: '📱 디지털' },
-]
+const CATEGORY_IDS = ['all', 'evergreen', 'fashion', 'beauty', 'food', 'life', 'kids', 'health', 'pet', 'digital'] as const
 
 interface CategoryFilterProps {
   current: Category | 'all' | 'evergreen'
@@ -21,15 +11,19 @@ interface CategoryFilterProps {
 export default function CategoryFilter({ current, onSelect }: CategoryFilterProps) {
   return (
     <div className="category-wrap">
-      {CATEGORIES.map(cat => (
-        <button
-          key={cat.id}
-          className={`cat-btn ${current === cat.id ? 'active' : ''}`}
-          onClick={() => onSelect(cat.id)}
-        >
-          {cat.label}
-        </button>
-      ))}
+      {CATEGORY_IDS.map(id => {
+        const Icon = CATEGORY_ICON[id]
+        return (
+          <button
+            key={id}
+            className={`cat-btn ${current === id ? 'active' : ''}`}
+            onClick={() => onSelect(id)}
+          >
+            <Icon size={14} strokeWidth={2.25} />
+            {CATEGORY_LABEL[id]}
+          </button>
+        )
+      })}
     </div>
   )
 }

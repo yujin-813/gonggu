@@ -75,23 +75,26 @@ export function isNewPost(scrapedAt?: string): boolean {
   return Date.now() - t <= NEW_WINDOW_HOURS * 60 * 60 * 1000
 }
 
+export type BadgeIcon = 'calendar-clock' | 'package' | 'flame' | 'lock' | 'timer'
+export type PeriodIcon = 'calendar' | 'zap'
+
 /** 카드 왼쪽 위 D-day 배지. 정보가 없으면(start_only/unknown) 거짓 정보를 주느니 배지를 숨긴다 */
-export function badgeFromState(state: PeriodState): { cls: string; icon: string; txt: string } | null {
+export function badgeFromState(state: PeriodState): { cls: string; icon: BadgeIcon; txt: string } | null {
   switch (state.kind) {
     case 'upcoming':
-      return { cls: 'soon', icon: '🗓️', txt: state.daysToOpen !== null && state.daysToOpen > 0 ? `D-${state.daysToOpen} 오픈` : '오늘 오픈!' }
+      return { cls: 'soon', icon: 'calendar-clock', txt: state.daysToOpen !== null && state.daysToOpen > 0 ? `D-${state.daysToOpen} 오픈` : '오늘 오픈!' }
     case 'evergreen':
-      return { cls: 'ok', icon: '📦', txt: '상시딜' }
+      return { cls: 'ok', icon: 'package', txt: '상시딜' }
     case 'sold_out_only':
-      return { cls: 'soon', icon: '🔥', txt: '소진시 마감' }
+      return { cls: 'soon', icon: 'flame', txt: '소진시 마감' }
     case 'range':
     case 'deadline_only': {
       const d = state.daysLeft
-      if (d < 0) return { cls: 'closed', icon: '🔒', txt: '마감' }
-      if (d === 0) return { cls: 'urgent', icon: '⏰', txt: '오늘 마감!' }
-      if (d === 1) return { cls: 'urgent', icon: '⏰', txt: 'D-1' }
-      if (d <= 3) return { cls: 'soon', icon: '⏰', txt: `D-${d}` }
-      return { cls: 'ok', icon: '⏰', txt: `D-${d}` }
+      if (d < 0) return { cls: 'closed', icon: 'lock', txt: '마감' }
+      if (d === 0) return { cls: 'urgent', icon: 'timer', txt: '오늘 마감!' }
+      if (d === 1) return { cls: 'urgent', icon: 'timer', txt: 'D-1' }
+      if (d <= 3) return { cls: 'soon', icon: 'timer', txt: `D-${d}` }
+      return { cls: 'ok', icon: 'timer', txt: `D-${d}` }
     }
     case 'start_only':
     case 'unknown':
@@ -100,22 +103,22 @@ export function badgeFromState(state: PeriodState): { cls: string; icon: string;
 }
 
 /** 카드 하단 기간 텍스트 줄 */
-export function periodTextFromState(state: PeriodState): { cls: string; txt: string } {
+export function periodTextFromState(state: PeriodState): { cls: string; icon: PeriodIcon; txt: string } {
   switch (state.kind) {
-    case 'upcoming':      return { cls: '', txt: `📅 ${fmtDate(state.startDate)} 오픈 예정` }
-    case 'evergreen':     return { cls: '', txt: '📅 상시딜' }
-    case 'sold_out_only': return { cls: '', txt: '📅 한정수량 · 소진시 마감' }
+    case 'upcoming':      return { cls: '', icon: 'calendar', txt: `${fmtDate(state.startDate)} 오픈 예정` }
+    case 'evergreen':     return { cls: '', icon: 'calendar', txt: '상시딜' }
+    case 'sold_out_only': return { cls: '', icon: 'calendar', txt: '한정수량 · 소진시 마감' }
     case 'range':
-      if (state.daysLeft < 0) return { cls: 'urgent', txt: '마감됨' }
-      if (state.daysLeft === 0) return { cls: 'urgent', txt: '⚡ 오늘 마감!' }
-      if (state.daysLeft === 1) return { cls: 'urgent', txt: '⚡ 내일 마감!' }
-      return { cls: '', txt: `📅 ${fmtDate(state.startDate)} ~ ${fmtDate(state.deadline)}` }
+      if (state.daysLeft < 0) return { cls: 'urgent', icon: 'calendar', txt: '마감됨' }
+      if (state.daysLeft === 0) return { cls: 'urgent', icon: 'zap', txt: '오늘 마감!' }
+      if (state.daysLeft === 1) return { cls: 'urgent', icon: 'zap', txt: '내일 마감!' }
+      return { cls: '', icon: 'calendar', txt: `${fmtDate(state.startDate)} ~ ${fmtDate(state.deadline)}` }
     case 'deadline_only':
-      if (state.daysLeft < 0) return { cls: 'urgent', txt: '마감됨' }
-      if (state.daysLeft === 0) return { cls: 'urgent', txt: '⚡ 오늘 마감!' }
-      if (state.daysLeft === 1) return { cls: 'urgent', txt: '⚡ 내일 마감!' }
-      return { cls: '', txt: `📅 ~ ${fmtDate(state.deadline)} 마감` }
-    case 'start_only':    return { cls: '', txt: `📅 ${fmtDate(state.startDate)} 시작 · 마감일 미확인` }
-    case 'unknown':       return { cls: '', txt: '' }
+      if (state.daysLeft < 0) return { cls: 'urgent', icon: 'calendar', txt: '마감됨' }
+      if (state.daysLeft === 0) return { cls: 'urgent', icon: 'zap', txt: '오늘 마감!' }
+      if (state.daysLeft === 1) return { cls: 'urgent', icon: 'zap', txt: '내일 마감!' }
+      return { cls: '', icon: 'calendar', txt: `~ ${fmtDate(state.deadline)} 마감` }
+    case 'start_only':    return { cls: '', icon: 'calendar', txt: `${fmtDate(state.startDate)} 시작 · 마감일 미확인` }
+    case 'unknown':       return { cls: '', icon: 'calendar', txt: '' }
   }
 }

@@ -38,13 +38,20 @@ header {
   gap: 12px;
 }
 .logo {
-  font-size: 22px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 19px;
   font-weight: 800;
-  color: var(--pink);
+  color: var(--text);
   letter-spacing: -0.5px;
   white-space: nowrap;
 }
-.logo span { font-size: 20px; }
+.logo-tagline {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--gray-3);
+}
 .search-bar {
   flex: 1;
   background: var(--gray-1);
@@ -56,21 +63,24 @@ header {
   outline: none;
   transition: border-color .2s;
 }
-.search-bar:focus { border-color: var(--pink); background: white; }
+.search-bar:focus { border-color: var(--gray-4); background: white; }
 .search-bar::placeholder { color: var(--gray-3); }
 .btn-icon {
-  background: var(--pink-light);
-  color: var(--pink);
+  background: var(--gray-1);
+  color: var(--gray-4);
   border: none;
   border-radius: 10px;
-  padding: 8px 12px;
+  padding: 8px 10px;
   cursor: pointer;
-  font-size: 18px;
-  transition: background .2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background .2s, color .2s;
   white-space: nowrap;
   flex-shrink: 0;
 }
-.btn-icon:hover { background: var(--pink-mid); }
+.btn-icon:hover { background: var(--gray-2); }
+.btn-icon.active { background: var(--pink-light); color: var(--pink); }
 .btn-icon:disabled { opacity: 0.5; cursor: not-allowed; }
 
 /* ── Recently viewed ── */
@@ -84,6 +94,9 @@ header {
   font-weight: 700;
   color: var(--gray-4);
   margin: 0 0 8px;
+  display: flex;
+  align-items: center;
+  gap: 5px;
 }
 .recent-scroll {
   display: flex;
@@ -103,8 +116,8 @@ header {
   border-radius: 12px;
   object-fit: cover;
   background: var(--gray-2);
+  color: var(--gray-3);
   display: flex; align-items: center; justify-content: center;
-  font-size: 28px;
 }
 .recent-item-price {
   font-size: 11px;
@@ -136,8 +149,11 @@ header {
   white-space: nowrap;
   transition: all .18s;
   color: var(--gray-4);
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
 }
-.cat-btn:hover { border-color: var(--pink); color: var(--pink); }
+.cat-btn:hover { border-color: var(--gray-3); color: var(--text); }
 .cat-btn.active { background: var(--pink); border-color: var(--pink); color: white; }
 
 /* ── Topbar ── */
@@ -212,8 +228,8 @@ header {
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 72px;
-  background: linear-gradient(135deg, var(--pink-light), var(--pink-mid));
+  color: var(--gray-3);
+  background: linear-gradient(135deg, var(--gray-1), var(--gray-2));
 }
 
 .badge-deadline {
@@ -253,12 +269,12 @@ header {
   width: 36px; height: 36px;
   display: flex; align-items: center; justify-content: center;
   cursor: pointer;
-  font-size: 18px;
-  transition: transform .15s;
+  color: var(--gray-4);
+  transition: transform .15s, color .15s;
   backdrop-filter: blur(4px);
 }
 .btn-bookmark:hover { transform: scale(1.15); }
-.btn-bookmark.active { background: var(--pink-light); }
+.btn-bookmark.active { color: var(--pink); }
 
 .card-body { padding: 14px 16px 16px; }
 .card-top {
@@ -270,18 +286,30 @@ header {
 .avatar {
   width: 30px; height: 30px;
   border-radius: 50%;
-  background: var(--pink-mid);
+  background: var(--gray-2);
+  color: var(--gray-4);
   display: flex; align-items: center; justify-content: center;
-  font-size: 14px;
   flex-shrink: 0;
 }
 .account-name { font-size: 13px; font-weight: 600; color: var(--gray-4); }
 .account-name a { color: inherit; text-decoration: none; }
 .account-name a:hover { color: var(--pink); }
+.btn-follow-star {
+  background: none;
+  border: none;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  padding: 0 2px;
+  line-height: 1;
+}
 .cat-tag {
   margin-left: auto;
-  background: var(--pink-light);
-  color: var(--pink);
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  background: var(--gray-1);
+  color: var(--gray-4);
   border-radius: 6px;
   padding: 3px 8px;
   font-size: 11px;
@@ -343,7 +371,14 @@ header {
 .deal-judgment-neutral { background: #fef9c3; color: #854d0e; }
 .deal-judgment-check   { background: #fff7ed; color: #c2410c; }
 
-.participants { font-size: 12px; color: var(--gray-3); margin-top: 2px; }
+.participants {
+  font-size: 12px;
+  color: var(--gray-3);
+  margin-top: 2px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
 
 /* CTA — 카드 맨 아래, 옆 여백 없이 가로 전체를 다 쓰는 버튼 */
 .card-cta {
@@ -371,7 +406,8 @@ header {
   padding: 60px 20px;
   color: var(--gray-3);
 }
-.empty-icon { font-size: 48px; margin-bottom: 12px; }
+.empty-icon { display: flex; align-items: center; justify-content: center; margin-bottom: 12px; }
+.empty-icon-spin { animation: spin 1.1s linear infinite; }
 .empty p { font-size: 15px; }
 
 /* ── FAB ── */
@@ -502,22 +538,30 @@ header {
   padding: 0 20px;
 }
 .notify-inner {
-  background: linear-gradient(135deg, #FF4B7B, #FF8FAB);
+  background: white;
+  border: 1.5px solid var(--gray-2);
   border-radius: 14px;
   padding: 14px 16px;
-  color: white;
+  color: var(--text);
   display: flex;
   align-items: center;
   gap: 12px;
 }
-.notify-icon { font-size: 24px; }
+.notify-icon {
+  width: 34px; height: 34px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  background: var(--gray-1);
+  color: var(--gray-4);
+  display: flex; align-items: center; justify-content: center;
+}
 .notify-text { flex: 1; }
 .notify-text p:first-child { font-weight: 700; font-size: 14px; }
-.notify-text p:last-child { font-size: 12px; opacity: .85; margin-top: 2px; }
+.notify-text p:last-child { font-size: 12px; color: var(--gray-3); margin-top: 2px; }
 .notify-btn {
-  background: white;
+  background: none;
   color: var(--pink);
-  border: none;
+  border: 1.5px solid var(--pink);
   border-radius: 8px;
   padding: 7px 14px;
   font-size: 12px;
@@ -544,7 +588,7 @@ header {
   border-radius: 50%;
   width: 30px; height: 30px;
   cursor: pointer;
-  font-size: 16px;
+  color: var(--gray-4);
   display: flex; align-items: center; justify-content: center;
 }
 
@@ -558,7 +602,7 @@ header {
   /* 헤더 */
   .header-inner { padding: 10px 14px; gap: 8px; }
   .logo { font-size: 18px; }
-  .logo span { font-size: 16px; }
+  .logo-tagline { display: none; }
   .search-bar { padding: 8px 10px; font-size: 13px; }
   .btn-icon { padding: 7px 10px; font-size: 16px; }
 
@@ -676,7 +720,7 @@ header {
     gap: 8px;
   }
   .logo { font-size: 18px; }
-  .logo span { font-size: 16px; }
+  .logo-tagline { display: none; }
   .search-bar { padding: 8px 11px; font-size: 13px; }
   .btn-icon { padding: 7px 10px; font-size: 16px; }
 
