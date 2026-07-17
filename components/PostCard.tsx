@@ -87,12 +87,17 @@ export default function PostCard({
     <div className="card">
       <div className="card-img-wrap">
         {post.img && !imgFailed ? (
-          <img
-            src={post.img}
-            alt={post.title}
-            onError={() => setImgFailed(true)}
-            loading="lazy"
-          />
+          <>
+            {/* 뒷배경: 꽉 채워 흐리게 — 앞의 원본 이미지가 잘리지 않게 여백을 자연스럽게 채워줌 */}
+            <img className="card-img-bg" src={post.img} alt="" aria-hidden="true" />
+            <img
+              className="card-img-fg"
+              src={post.img}
+              alt={post.title}
+              onError={() => setImgFailed(true)}
+              loading="lazy"
+            />
+          </>
         ) : (
           <div className="img-placeholder">{post.avatar || '🛍️'}</div>
         )}
@@ -148,17 +153,26 @@ export default function PostCard({
         )}
         <div className="card-title">{post.title}</div>
 
-        <div className="price-row">
-          <span className="price-sale">{post.price.toLocaleString()}원</span>
-          {discount > 0 && <span className="discount-rate">-{discount}%</span>}
-          {post.origPrice && post.origPrice > post.price && (
-            post.market_url
-              ? <a href={post.market_url} target="_blank" rel="noopener noreferrer" className="price-orig" style={{ textDecoration: 'none' }}>
-                  네이버쇼핑 {post.origPrice.toLocaleString()}원 →
-                </a>
-              : <span className="price-orig">정가 {post.origPrice.toLocaleString()}원</span>
-          )}
+        {/* 가장 중요한 정보: 얼마인지 · 얼마나 싼지 — 카드에서 가장 크게 */}
+        <div className="price-block">
+          <span className="price-sale-big">{post.price.toLocaleString()}원</span>
+          {discount > 0 && <span className="discount-chip">-{discount}%</span>}
         </div>
+        {post.origPrice && post.origPrice > post.price && (
+          post.market_url
+            ? <a href={post.market_url} target="_blank" rel="noopener noreferrer" className="price-orig" style={{ textDecoration: 'none', display: 'inline-block', marginBottom: 8 }}>
+                네이버쇼핑 {post.origPrice.toLocaleString()}원 →
+              </a>
+            : <span className="price-orig" style={{ display: 'inline-block', marginBottom: 8 }}>정가 {post.origPrice.toLocaleString()}원</span>
+        )}
+
+        {/* 두 번째로 중요한 정보: 기간이 언제까지인지 — 독립된 줄로 항상 노출 */}
+        {dt.txt && (
+          <div className={`period-row ${dt.cls}`}>
+            <span>📅</span>
+            <span>{dt.txt}</span>
+          </div>
+        )}
 
         {judgment && (
           <div className={`deal-judgment deal-judgment-${judgment.cls}`}>
@@ -188,28 +202,23 @@ export default function PostCard({
           </button>
         )}
 
-        <div className="card-footer">
-          <div>
-            <div className={`deadline-text ${dt.cls}`}>{dt.txt}</div>
-            {(post.participants || 0) > 0 && (
-              <div className="participants">
-                ❤️ {(post.participants || 0).toLocaleString()} 좋아요
-              </div>
-            )}
-          </div>
-          <button
-            className={`btn-join ${closed || isUpcoming || !(post.purchase_url || post.url) ? 'closed' : ''}`}
-            onClick={() => {
-              const link = post.purchase_url || post.url
-              if (!closed && !isUpcoming && link) { onJoin?.(post.id); window.open(link, '_blank') }
-            }}
-            disabled={closed || isUpcoming || !(post.purchase_url || post.url)}
-            style={isUpcoming ? { background: '#ede9fe', color: '#7c3aed', borderColor: '#c4b5fd' } : {}}
-          >
-            {closed ? '마감됨' : isUpcoming ? '오픈 예정 🗓️' : !(post.purchase_url || post.url) ? '링크 없음' : '공구 보기 →'}
-          </button>
-        </div>
+        {(post.participants || 0) > 0 && (
+          <div className="participants">❤️ {(post.participants || 0).toLocaleString()} 좋아요</div>
+        )}
       </div>
+
+      {/* CTA — 카드 맨 아래, 옆 여백 없이 가로 전체를 다 쓰는 버튼 */}
+      <button
+        className={`card-cta ${closed || isUpcoming || !(post.purchase_url || post.url) ? 'closed' : ''}`}
+        onClick={() => {
+          const link = post.purchase_url || post.url
+          if (!closed && !isUpcoming && link) { onJoin?.(post.id); window.open(link, '_blank') }
+        }}
+        disabled={closed || isUpcoming || !(post.purchase_url || post.url)}
+        style={isUpcoming ? { background: '#ede9fe', color: '#7c3aed' } : {}}
+      >
+        {closed ? '마감됨' : isUpcoming ? '오픈 예정 🗓️' : !(post.purchase_url || post.url) ? '링크 없음' : '공구 보기 →'}
+      </button>
 
       {showCompare && (
         <PriceCompareModal

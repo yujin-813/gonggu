@@ -458,7 +458,11 @@ def fetch_product_info(url, domain):
                         result["brand"] = cleaned
                 if not result.get("img"):
                     raw = item.get("image")
-                    if isinstance(raw, list): raw = raw[0]
+                    if isinstance(raw, list) and raw:
+                        # 갤러리 첫 장은 텍스트가 잔뜩 들어간 마케팅 커버 배너인 경우가 많아
+                        # 작은 카드 썸네일에서 상품이 잘 안 보인다. 2장 이상 있으면 두 번째
+                        # 사진(대체로 상품 자체를 더 깔끔하게 보여줌)을 우선 사용한다
+                        raw = raw[1] if len(raw) > 1 else raw[0]
                     if isinstance(raw, dict): raw = raw.get("url", "")
                     if raw: result["img"] = raw
                 offers = item.get("offers", {})
@@ -876,7 +880,10 @@ def block_to_post(b, ig_handle, price, domain, profile_url, purchase_url, deadli
     raw_title = page_title if (extraction_method == "jsonld" and page_title) else (block_title or page_title)
     # 버튼 텍스트성 suffix 제거 ("구매하기", "바로가기" 등)
     title = re.sub(r'\s*(구매하기|바로가기|구매링크|신청하기|주문하기|보러가기)\s*$', '', raw_title).strip()
-    img_src = b.get("image") or pi.get("img", "")
+    # 구매 페이지 갤러리에서 고른 이미지(2번째 사진 우선)를 인포크 블록 썸네일보다 우선한다 —
+    # 인포크 블록 썸네일은 대체로 판매 페이지의 첫 번째(마케팅 커버) 이미지를 그대로 가져온 것이라
+    # 상품이 잘 안 보이는 경우가 많음
+    img_src = pi.get("img") or b.get("image") or ""
     img, img_ok = resolve_img(img_src, sc)
     confidence = (debug_info or {}).get("extraction_confidence")
     # 고정 마감일이 없을 때, 구매 페이지 또는 인포크 제목에 "소진시/품절시" 문구가 있으면
