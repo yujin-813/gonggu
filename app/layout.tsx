@@ -6,11 +6,11 @@ const SITE_URL = 'https://gonggu.asknuggetdata.com'
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
   title: {
-    default: '딜조아 🛍️ — 인스타그램 공동구매 모아보기',
-    template: '%s | 딜조아',
+    default: '지니모아 🛍️ — 인스타그램 공동구매 모아보기',
+    template: '%s | 지니모아',
   },
-  description: '인스타그램 인플루언서 공동구매(공구) 정보를 한곳에 모아보는 딜조아. 마감 임박 공구, 카테고리별 공구, 최저가 비교까지 한눈에 확인하세요.',
-  keywords: ['공동구매', '공구', '인스타 공구', '인플루언서 공구', '딜조아', '공구모아', '공구 사이트'],
+  description: '인스타그램 인플루언서 공동구매(공구) 정보를 한곳에 모아보는 지니모아. 마감 임박 공구, 카테고리별 공구, 최저가 비교까지 한눈에 확인하세요.',
+  keywords: ['공동구매', '공구', '인스타 공구', '인플루언서 공구', '지니모아', '공구모아', '공구 사이트'],
   alternates: {
     canonical: SITE_URL,
   },
@@ -18,14 +18,14 @@ export const metadata: Metadata = {
     type: 'website',
     locale: 'ko_KR',
     url: SITE_URL,
-    siteName: '딜조아',
-    title: '딜조아 🛍️ — 인스타그램 공동구매 모아보기',
-    description: '인스타그램 인플루언서 공동구매(공구) 정보를 한곳에 모아보는 딜조아.',
+    siteName: '지니모아',
+    title: '지니모아 🛍️ — 인스타그램 공동구매 모아보기',
+    description: '인스타그램 인플루언서 공동구매(공구) 정보를 한곳에 모아보는 지니모아.',
   },
   twitter: {
     card: 'summary_large_image',
-    title: '딜조아 🛍️ — 인스타그램 공동구매 모아보기',
-    description: '인스타그램 인플루언서 공동구매(공구) 정보를 한곳에 모아보는 딜조아.',
+    title: '지니모아 🛍️ — 인스타그램 공동구매 모아보기',
+    description: '인스타그램 인플루언서 공동구매(공구) 정보를 한곳에 모아보는 지니모아.',
   },
   robots: {
     index: true,

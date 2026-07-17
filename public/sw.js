@@ -1,7 +1,7 @@
 self.addEventListener('push', event => {
   let data = {}
   try { data = event.data ? event.data.json() : {} } catch {}
-  const title = data.title || '딜조아'
+  const title = data.title || '지니모아'
   const options = {
     body: data.body || '',
     data: { url: data.url || '/' },

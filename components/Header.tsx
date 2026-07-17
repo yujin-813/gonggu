@@ -16,7 +16,7 @@ export default function Header({
   return (
     <header>
       <div className="header-inner">
-        <div className="logo">딜조아 <span>🛍️</span></div>
+        <div className="logo">지니모아 <span>🛍️</span></div>
         <input
           className="search-bar"
           type="search"
