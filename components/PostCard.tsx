@@ -78,10 +78,12 @@ export default function PostCard({
   const extractionConfidence = (post.extraction_debug as Record<string, unknown> | null)?.extraction_confidence as string | undefined
   const isVerified = post.source === 'manual' || extractionConfidence === 'high'
   const judgment = dealJudgment(post)
-  const discount =
+  // 절약 금액을 퍼센트가 아니라 실제 원화로 보여준다 — "18% 저렴"보다 "8,300원 저렴"이 체감이 더 잘 옴
+  const savedAmount =
     post.origPrice && post.origPrice > post.price
-      ? Math.round((1 - post.price / post.origPrice) * 100)
+      ? post.origPrice - post.price
       : 0
+  const savedLabel = post.market_url ? '네이버' : '정가'
 
   const profileUrl = post.account
     ? `https://instagram.com/${post.account.replace('@', '')}`
@@ -166,7 +168,7 @@ export default function PostCard({
         {/* 가장 중요한 정보: 얼마인지 · 얼마나 싼지 — 카드에서 가장 크게 */}
         <div className="price-block">
           <span className="price-sale-big">{post.price.toLocaleString()}원</span>
-          {discount > 0 && <span className="discount-chip">-{discount}%</span>}
+          {savedAmount > 0 && <span className="discount-chip">{savedLabel}보다 {savedAmount.toLocaleString()}원 저렴</span>}
         </div>
         {post.origPrice && post.origPrice > post.price && (
           post.market_url

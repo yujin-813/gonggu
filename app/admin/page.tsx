@@ -1219,7 +1219,10 @@ function CollectionManager({
   }
 
   const q = productSearch.trim().toLowerCase()
-  const pickerList = (q ? posts.filter(p => p.title.toLowerCase().includes(q)) : posts).slice(0, 50)
+  // 가격이 0원인 게시물은 실제 판매 상품이 아니라 공지·이벤트성 게시물인 경우가 대부분이라
+  // 컬렉션에 담을 대상에서 제외한다 (이미 담겨 있던 항목은 계속 칩으로 보이고 뺄 수 있음)
+  const pickableProducts = posts.filter(p => p.price > 0)
+  const pickerList = (q ? pickableProducts.filter(p => p.title.toLowerCase().includes(q)) : pickableProducts).slice(0, 50)
 
   function toggleProduct(id: number) {
     setForm(prev => ({

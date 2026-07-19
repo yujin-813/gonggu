@@ -375,11 +375,12 @@ header {
   -webkit-box-orient: vertical;
   overflow: hidden;
 }
-/* 가격 + 할인율 — 카드에서 가장 눈에 띄어야 하는 정보 */
+/* 가격 + 절약 금액 — 카드에서 가장 눈에 띄어야 하는 정보 */
 .price-block {
   display: flex;
   align-items: center;
-  gap: 8px;
+  flex-wrap: wrap;
+  gap: 6px 8px;
   margin-bottom: 2px;
 }
 .price-sale-big { font-size: 28px; font-weight: 900; color: var(--pink); letter-spacing: -0.02em; }
@@ -387,11 +388,12 @@ header {
 .discount-chip {
   background: #FF3B30;
   color: white;
-  font-size: 15px;
+  font-size: 12px;
   font-weight: 800;
   border-radius: 6px;
-  padding: 3px 8px;
+  padding: 4px 8px;
   line-height: 1.3;
+  white-space: nowrap;
 }
 /* 공구 기간 — 가격 다음으로 중요한 정보라 별도 줄로 항상 노출 */
 .period-row {
