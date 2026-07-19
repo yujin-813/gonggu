@@ -1,12 +1,13 @@
 import fs from 'fs'
 import path from 'path'
-import type { Post, ScraperStatus, InfluencerSource } from './types'
+import type { Post, ScraperStatus, InfluencerSource, Collection } from './types'
 
 // 배포 환경에서 git pull로 덮어쓰이지 않도록 data/ 디렉토리 사용
 const DATA_DIR    = path.join(process.cwd(), 'data')
 const POSTS_FILE  = path.join(DATA_DIR, 'posts.json')
 const STATUS_FILE = path.join(DATA_DIR, 'scraper_status.json')
 const PROFILES_FILE = path.join(DATA_DIR, 'tracked_profiles.json')
+const COLLECTIONS_FILE = path.join(DATA_DIR, 'collections.json')
 
 function ensureDir() {
   if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true })
@@ -148,4 +149,17 @@ export function updateInfluencerSource(id: string, patch: Partial<InfluencerSour
   sources[idx] = { ...sources[idx], ...patch }
   saveInfluencerSources(sources)
   return true
+}
+
+// 컬렉션 (홈 "지금 뜨는 컬렉션" 섹션 + /collection/:id) — 초기엔 관리자가 수동으로 큐레이션
+export function loadCollections(): Collection[] {
+  ensureDir()
+  if (!fs.existsSync(COLLECTIONS_FILE)) return []
+  try { return JSON.parse(fs.readFileSync(COLLECTIONS_FILE, 'utf-8')) }
+  catch { return [] }
+}
+
+export function saveCollections(collections: Collection[]): void {
+  ensureDir()
+  atomicWrite(COLLECTIONS_FILE, JSON.stringify(collections, null, 2))
 }

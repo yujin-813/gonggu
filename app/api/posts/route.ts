@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { loadPosts, savePosts } from '@/lib/store'
 import type { Post } from '@/lib/types'
-import { daysLeft } from '@/lib/period'
+import { daysLeft, isCustomerVisible } from '@/lib/period'
 
 const CAT_EMOJI: Record<string, string> = {
   fashion: '👗', beauty: '💄', food: '🍱', life: '🏠',
@@ -20,18 +20,7 @@ export async function GET(request: NextRequest) {
   let posts = loadPosts()
 
   // 고객 페이지: published + upcoming 포함, 마감일 미경과
-  if (!adminMode) {
-    const today = new Date()
-    today.setHours(0, 0, 0, 0)
-    posts = posts.filter(p => {
-      if (p.status === 'upcoming' && p.published !== false) return true  // 오픈 예정 (명시적 숨김 제외)
-      const isPublished = p.status === 'published' || (!p.status && p.published !== false)
-      if (!isPublished) return false
-      if (p.is_evergreen_deal || p.is_always_on) return true
-      if (!p.deadline) return true  // 마감일 미확인 + 소진시 마감(sale_until_sold_out) 둘 다 포함 — 지난 게 아니므로 계속 노출
-      return new Date(p.deadline) >= today
-    })
-  }
+  if (!adminMode) posts = posts.filter(isCustomerVisible)
 
   if (cat && cat !== 'all') posts = posts.filter(p => p.cat === cat)
   if (search) {

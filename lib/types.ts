@@ -60,6 +60,20 @@ export interface Post {
   custom_verdict?: string | null
   custom_verdict_detail?: string | null
   custom_verdict_cls?: 'great' | 'good' | 'neutral' | 'check' | null
+  // 이 상품이 속한 컬렉션 id 목록 — 컬렉션 소속 여부의 SSOT는 Collection.productIds 쪽이며,
+  // 이 필드는 상품 쪽에서 역으로 조회하고 싶을 때를 위한 참고용(파생) 값이다.
+  collectionIds?: string[]
+}
+
+export interface Collection {
+  id: string
+  title: string
+  description: string
+  emoji: string
+  color: string
+  productIds: number[]
+  expiresAt?: string | null
+  createdAt: string
 }
 
 export interface ScraperStatus {

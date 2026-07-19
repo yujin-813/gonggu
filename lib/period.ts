@@ -65,6 +65,17 @@ export function isExpired(post: PeriodInput): boolean {
   return (s.kind === 'range' || s.kind === 'deadline_only') && s.daysLeft < 0
 }
 
+/** 고객 화면에 노출해도 되는 상품인지 — api/posts, api/collections/[id] 등에서 공통으로 쓴다 */
+export function isCustomerVisible(post: Pick<Post, 'status' | 'published' | 'is_evergreen_deal' | 'is_always_on' | 'deadline'>): boolean {
+  if (post.status === 'upcoming') return post.published !== false
+  const isPublished = post.status === 'published' || (!post.status && post.published !== false)
+  if (!isPublished) return false
+  if (post.is_evergreen_deal || post.is_always_on) return true
+  if (!post.deadline) return true
+  const today = new Date(); today.setHours(0, 0, 0, 0)
+  return new Date(post.deadline) >= today
+}
+
 const NEW_WINDOW_HOURS = 48
 
 /** 최근(기본 48시간 이내) 수집된 공구인지 — "NEW" 배지용 */

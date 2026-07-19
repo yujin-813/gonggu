@@ -1,11 +1,12 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
+import Link from 'next/link'
 import Header from '@/components/Header'
 import CategoryFilter from '@/components/CategoryFilter'
 import PostCard from '@/components/PostCard'
 import Toast from '@/components/Toast'
-import type { Post, Category, SortOrder } from '@/lib/types'
+import type { Post, Category, SortOrder, Collection } from '@/lib/types'
 import { categoryIcon } from '@/lib/categoryIcons'
 import { Bell, ArrowLeft, Heart, Star, Clock, Loader2, Search } from 'lucide-react'
 
@@ -67,6 +68,7 @@ export default function Home() {
   const [followedInfluencers, setFollowedInfluencers] = useState<Set<string>>(new Set())
   const [viewingFollowed, setViewingFollowed] = useState(false)
   const [pushSubscribed, setPushSubscribed] = useState(false)
+  const [collections, setCollections] = useState<Collection[]>([])
 
   useEffect(() => {
     const saved = JSON.parse(localStorage.getItem('gonggu_bookmarks') || '[]')
@@ -75,6 +77,7 @@ export default function Home() {
     setFollowedCategories(new Set(JSON.parse(localStorage.getItem('gonggu_followed_cats') || '[]')))
     setFollowedInfluencers(new Set(JSON.parse(localStorage.getItem('gonggu_followed_accounts') || '[]')))
     fetchPosts()
+    fetchCollections()
     track('view')
     if (pushSupported()) {
       navigator.serviceWorker.getRegistration('/sw.js')
@@ -187,6 +190,17 @@ export default function Home() {
       setPosts([])
     } finally {
       setLoading(false)
+    }
+  }
+
+  async function fetchCollections() {
+    try {
+      const res = await fetch('/api/collections')
+      if (!res.ok) throw new Error()
+      const data = await res.json()
+      setCollections(data.collections ?? [])
+    } catch {
+      setCollections([])
     }
   }
 
@@ -323,6 +337,26 @@ export default function Home() {
                     </a>
                   )
                 })}
+              </div>
+            </div>
+          )}
+          {collections.length > 0 && (
+            <div className="collection-wrap">
+              <p className="collection-title">지금 뜨는 컬렉션</p>
+              <div className="collection-scroll">
+                {collections.map(c => (
+                  <Link
+                    key={c.id}
+                    href={`/collection/${c.id}`}
+                    className="collection-card"
+                    style={{ background: `linear-gradient(135deg, ${c.color}, ${c.color}cc)` }}
+                    onClick={() => track('collection_click')}
+                  >
+                    <span className="collection-card-emoji">{c.emoji}</span>
+                    <span className="collection-card-title">{c.title}</span>
+                    <span className="collection-card-count">{c.productIds.length}개 상품</span>
+                  </Link>
+                ))}
               </div>
             </div>
           )}

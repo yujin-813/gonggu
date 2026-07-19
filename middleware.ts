@@ -12,6 +12,14 @@ function isProtected(req: NextRequest): boolean {
   }
   if (pathname.startsWith('/api/posts/')) return true // PATCH/PUT/DELETE
 
+  // 컬렉션: 일반 GET(고객 페이지)은 허용, admin=1 조회와 모든 쓰기는 보호
+  if (pathname === '/api/collections') {
+    return method !== 'GET' || searchParams.get('admin') === '1'
+  }
+  if (pathname.startsWith('/api/collections/')) {
+    return method !== 'GET' || searchParams.get('admin') === '1'
+  }
+
   // 스크래퍼 실행/상태
   if (pathname.startsWith('/api/scrape')) return true
 
@@ -57,6 +65,8 @@ export const config = {
   matcher: [
     '/api/posts',
     '/api/posts/:path*',
+    '/api/collections',
+    '/api/collections/:path*',
     '/api/scrape',
     '/api/scrape/:path*',
     '/api/profiles',

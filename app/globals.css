@@ -127,6 +127,56 @@ header {
   text-align: center;
 }
 
+/* ── Collections ── */
+.collection-wrap {
+  max-width: 680px;
+  margin: 0 auto;
+  padding: 14px 20px 0;
+}
+.collection-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--gray-4);
+  margin: 0 0 8px;
+}
+.collection-scroll {
+  display: flex;
+  gap: 10px;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.collection-scroll::-webkit-scrollbar { display: none; }
+.collection-card {
+  flex-shrink: 0;
+  width: 130px;
+  height: 96px;
+  border-radius: 14px;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  text-decoration: none;
+  cursor: pointer;
+  transition: transform .15s;
+}
+.collection-card:hover { transform: translateY(-2px); }
+.collection-card-emoji { font-size: 22px; line-height: 1; }
+.collection-card-title {
+  font-size: 13px;
+  font-weight: 800;
+  color: white;
+  line-height: 1.25;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.collection-card-count {
+  font-size: 11px;
+  font-weight: 600;
+  color: rgba(255,255,255,0.85);
+}
+
 /* ── Category ── */
 .category-wrap {
   max-width: 680px;
@@ -590,6 +640,61 @@ header {
   cursor: pointer;
   color: var(--gray-4);
   display: flex; align-items: center; justify-content: center;
+  text-decoration: none;
+  flex-shrink: 0;
+}
+
+/* ── Collection detail ── */
+.collection-hero {
+  padding: 32px 20px 28px;
+  text-align: center;
+  color: white;
+}
+.collection-hero-emoji { font-size: 40px; margin-bottom: 8px; line-height: 1; }
+.collection-hero-title { font-size: 22px; font-weight: 900; margin-bottom: 6px; }
+.collection-hero-desc {
+  font-size: 13px;
+  opacity: 0.9;
+  margin: 0 auto 14px;
+  max-width: 480px;
+  line-height: 1.5;
+}
+.collection-hero-meta {
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+  font-size: 13px;
+  font-weight: 700;
+}
+.collection-hero-meta span {
+  background: rgba(255,255,255,0.22);
+  padding: 4px 12px;
+  border-radius: 20px;
+}
+.collection-share-bar {
+  position: fixed;
+  bottom: 0; left: 0; right: 0;
+  background: white;
+  padding: 12px 20px calc(12px + env(safe-area-inset-bottom));
+  box-shadow: 0 -2px 12px rgba(0,0,0,0.08);
+  z-index: 200;
+}
+.collection-share-btn {
+  width: 100%;
+  max-width: 680px;
+  margin: 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  background: #FEE500;
+  color: #191919;
+  border: none;
+  border-radius: 12px;
+  padding: 14px 0;
+  font-size: 15px;
+  font-weight: 800;
+  cursor: pointer;
 }
 
 @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }

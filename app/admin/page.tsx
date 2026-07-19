@@ -1,6 +1,6 @@
 'use client'
 import { useState, useEffect, useCallback } from 'react'
-import type { Post, ScraperStatus, InfluencerSource } from '@/lib/types'
+import type { Post, ScraperStatus, InfluencerSource, Collection } from '@/lib/types'
 import { daysLeft, periodLabel, isExpired } from '@/lib/period'
 import AddPostModal from '@/components/AddPostModal'
 
@@ -110,7 +110,8 @@ export default function AdminPage() {
   const [instPostUrl, setInstPostUrl] = useState('')
   const [instPostBusy, setInstPostBusy] = useState(false)
   const [instPostMsg, setInstPostMsg] = useState('')
-  const [adminTab, setAdminTab] = useState<'posts' | 'influencers'>('posts')
+  const [adminTab, setAdminTab] = useState<'posts' | 'influencers' | 'collections'>('posts')
+  const [collections, setCollections] = useState<Collection[]>([])
   const [editingInfluencer, setEditingInfluencer] = useState<string | null>(null)
   const [editInfluencerDraft, setEditInfluencerDraft] = useState<Partial<InfluencerSource>>({})
   const [influencerBusy, setInfluencerBusy] = useState<string | null>(null)
@@ -150,6 +151,41 @@ export default function AdminPage() {
     const r = await fetch('/api/inpock')
     if (r.ok) setInpockStatus(await r.json())
   }, [])
+
+  const fetchCollections = useCallback(async () => {
+    const r = await fetch('/api/collections?admin=1')
+    if (r.ok) { const d = await r.json(); setCollections(d.collections || []) }
+  }, [])
+
+  async function createCollection(data: Partial<Collection>) {
+    const r = await fetch('/api/collections', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    })
+    if (r.ok) { await fetchCollections(); return true }
+    const d = await r.json().catch(() => ({}))
+    alert(d.error || '컬렉션 생성 실패')
+    return false
+  }
+
+  async function updateCollection(id: string, patch: Partial<Collection>) {
+    const r = await fetch(`/api/collections/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(patch),
+    })
+    if (r.ok) { await fetchCollections(); return true }
+    const d = await r.json().catch(() => ({}))
+    alert(d.error || '컬렉션 수정 실패')
+    return false
+  }
+
+  async function deleteCollection(id: string, title: string) {
+    if (!confirm(`'${title}' 컬렉션을 삭제할까요?`)) return
+    await fetch(`/api/collections/${id}`, { method: 'DELETE' })
+    await fetchCollections()
+  }
 
   async function addInfluencerSource() {
     const url = newSourceUrl.trim()
@@ -258,9 +294,10 @@ export default function AdminPage() {
     fetchConfig()
     fetchInfluencerSources()
     fetchInpockStatus()
+    fetchCollections()
     const iv = setInterval(() => { fetchInpockStatus() }, 5000)
     return () => clearInterval(iv)
-  }, [fetchPosts, fetchAnalytics, fetchConfig, fetchInfluencerSources, fetchInpockStatus])
+  }, [fetchPosts, fetchAnalytics, fetchConfig, fetchInfluencerSources, fetchInpockStatus, fetchCollections])
 
   async function togglePublished(p: Post) {
     const isPublished = p.status === 'published' || (!p.status && p.published !== false)
@@ -428,6 +465,7 @@ export default function AdminPage() {
           {([
             { key: 'posts',       label: '공구 관리' },
             { key: 'influencers', label: '인플루언서 관리' },
+            { key: 'collections', label: '컬렉션 관리' },
           ] as const).map(({ key, label }) => (
             <button key={key} onClick={() => setAdminTab(key)}
               style={{
@@ -603,6 +641,17 @@ export default function AdminPage() {
                 excluded:     sp.filter(p => effectiveStatus(p) === 'excluded').length,
               }
             }}
+          />
+        )}
+
+        {/* 컬렉션 관리 탭 */}
+        {adminTab === 'collections' && (
+          <CollectionManager
+            collections={collections}
+            posts={posts}
+            onCreate={createCollection}
+            onUpdate={updateCollection}
+            onDelete={deleteCollection}
           />
         )}
       </div>
@@ -1105,6 +1154,221 @@ function InfluencerManager({
               </div>
             )
           })}
+        </div>
+      )}
+    </div>
+  )
+}
+
+const COLLECTION_COLORS = ['#FF4B7B', '#6366f1', '#0ea5e9', '#22c55e', '#f97316', '#a855f7', '#eab308', '#14b8a6']
+
+const emptyCollectionForm = {
+  title: '', description: '', emoji: '🛍️', color: COLLECTION_COLORS[0], expiresAt: '', productIds: [] as number[],
+}
+
+function CollectionManager({
+  collections, posts, onCreate, onUpdate, onDelete,
+}: {
+  collections: Collection[]
+  posts: Post[]
+  onCreate: (data: Partial<Collection>) => Promise<boolean>
+  onUpdate: (id: string, patch: Partial<Collection>) => Promise<boolean>
+  onDelete: (id: string, title: string) => void
+}) {
+  const [showForm, setShowForm] = useState(false)
+  const [editingId, setEditingId] = useState<string | null>(null)
+  const [form, setForm] = useState(emptyCollectionForm)
+  const [productSearch, setProductSearch] = useState('')
+  const [saving, setSaving] = useState(false)
+
+  const inputStyle: React.CSSProperties = {
+    padding: '8px 12px', borderRadius: 8, border: '1.5px solid #e2e8f0', fontSize: 13, outline: 'none', width: '100%', boxSizing: 'border-box',
+  }
+
+  function startCreate() {
+    setEditingId(null)
+    setForm(emptyCollectionForm)
+    setProductSearch('')
+    setShowForm(true)
+  }
+
+  function startEdit(c: Collection) {
+    setEditingId(c.id)
+    setForm({
+      title: c.title, description: c.description, emoji: c.emoji, color: c.color,
+      expiresAt: c.expiresAt ? c.expiresAt.slice(0, 10) : '', productIds: [...c.productIds],
+    })
+    setProductSearch('')
+    setShowForm(true)
+  }
+
+  async function submit() {
+    if (!form.title.trim()) { alert('제목을 입력하세요'); return }
+    setSaving(true)
+    const payload = {
+      title: form.title.trim(),
+      description: form.description.trim(),
+      emoji: form.emoji.trim() || '🛍️',
+      color: form.color,
+      expiresAt: form.expiresAt || null,
+      productIds: form.productIds,
+    }
+    const ok = editingId ? await onUpdate(editingId, payload) : await onCreate(payload)
+    setSaving(false)
+    if (ok) { setShowForm(false); setEditingId(null) }
+  }
+
+  const q = productSearch.trim().toLowerCase()
+  const searchResults = q
+    ? posts.filter(p => p.title.toLowerCase().includes(q) && !form.productIds.includes(p.id)).slice(0, 8)
+    : []
+
+  function addProduct(id: number) {
+    setForm(prev => ({ ...prev, productIds: [...prev.productIds, id] }))
+    setProductSearch('')
+  }
+  function removeProduct(id: number) {
+    setForm(prev => ({ ...prev, productIds: prev.productIds.filter(x => x !== id) }))
+  }
+
+  return (
+    <div>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+        <p style={{ margin: 0, fontSize: 13, color: '#64748b' }}>홈 화면 &quot;지금 뜨는 컬렉션&quot; 섹션에 노출되는 컬렉션을 관리해요. 상품이 1개 이상 담긴 컬렉션만 고객 화면에 보여요.</p>
+        <button onClick={startCreate}
+          style={{ background: '#6366f1', color: '#fff', border: 'none', borderRadius: 8, padding: '9px 18px', fontWeight: 700, fontSize: 13, cursor: 'pointer', flexShrink: 0, marginLeft: 12 }}>
+          ＋ 컬렉션 추가
+        </button>
+      </div>
+
+      {showForm && (
+        <div style={{ background: '#fff', borderRadius: 12, padding: 20, marginBottom: 20, border: '1.5px solid #6366f1' }}>
+          <h3 style={{ margin: '0 0 14px', fontSize: 15, fontWeight: 700, color: '#1e293b' }}>
+            {editingId ? '컬렉션 수정' : '새 컬렉션'}
+          </h3>
+          <div style={{ display: 'flex', gap: 10, marginBottom: 10 }}>
+            <div style={{ width: 70 }}>
+              <label style={{ fontSize: 12, fontWeight: 600, color: '#475569', display: 'block', marginBottom: 4 }}>이모지</label>
+              <input value={form.emoji} onChange={e => setForm(f => ({ ...f, emoji: e.target.value }))}
+                style={{ ...inputStyle, fontSize: 20, textAlign: 'center' }} maxLength={4} />
+            </div>
+            <div style={{ flex: 1 }}>
+              <label style={{ fontSize: 12, fontWeight: 600, color: '#475569', display: 'block', marginBottom: 4 }}>제목</label>
+              <input value={form.title} onChange={e => setForm(f => ({ ...f, title: e.target.value }))}
+                placeholder="예: 여름 휴가 준비물" style={inputStyle} />
+            </div>
+          </div>
+          <div style={{ marginBottom: 10 }}>
+            <label style={{ fontSize: 12, fontWeight: 600, color: '#475569', display: 'block', marginBottom: 4 }}>설명</label>
+            <textarea value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))}
+              rows={2} placeholder="컬렉션 상세 페이지 상단에 표시될 설명" style={{ ...inputStyle, resize: 'vertical' }} />
+          </div>
+          <div style={{ display: 'flex', gap: 10, marginBottom: 14, alignItems: 'flex-end' }}>
+            <div>
+              <label style={{ fontSize: 12, fontWeight: 600, color: '#475569', display: 'block', marginBottom: 4 }}>색상</label>
+              <div style={{ display: 'flex', gap: 6 }}>
+                {COLLECTION_COLORS.map(c => (
+                  <button key={c} onClick={() => setForm(f => ({ ...f, color: c }))}
+                    style={{
+                      width: 24, height: 24, borderRadius: '50%', background: c, cursor: 'pointer',
+                      border: form.color === c ? '2.5px solid #1e293b' : '2px solid transparent',
+                    }} />
+                ))}
+              </div>
+            </div>
+            <div style={{ flex: 1 }}>
+              <label style={{ fontSize: 12, fontWeight: 600, color: '#475569', display: 'block', marginBottom: 4 }}>마감일 (선택)</label>
+              <input type="date" value={form.expiresAt} onChange={e => setForm(f => ({ ...f, expiresAt: e.target.value }))} style={inputStyle} />
+            </div>
+          </div>
+
+          <div style={{ marginBottom: 14 }}>
+            <label style={{ fontSize: 12, fontWeight: 600, color: '#475569', display: 'block', marginBottom: 4 }}>
+              담긴 상품 ({form.productIds.length}개)
+            </label>
+            {form.productIds.length > 0 && (
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 8 }}>
+                {form.productIds.map(id => {
+                  const p = posts.find(x => x.id === id)
+                  return (
+                    <span key={id} style={{
+                      display: 'inline-flex', alignItems: 'center', gap: 6, background: '#eef2ff', color: '#4338ca',
+                      borderRadius: 8, padding: '4px 8px 4px 10px', fontSize: 12, fontWeight: 600,
+                    }}>
+                      {p ? p.title.slice(0, 24) : `#${id}`}
+                      <button onClick={() => removeProduct(id)}
+                        style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#4338ca', fontWeight: 800, padding: 0 }}>✕</button>
+                    </span>
+                  )
+                })}
+              </div>
+            )}
+            <input value={productSearch} onChange={e => setProductSearch(e.target.value)}
+              placeholder="상품명으로 검색해서 추가" style={inputStyle} />
+            {searchResults.length > 0 && (
+              <div style={{ marginTop: 6, border: '1px solid #e2e8f0', borderRadius: 8, overflow: 'hidden' }}>
+                {searchResults.map(p => (
+                  <button key={p.id} onClick={() => addProduct(p.id)}
+                    style={{
+                      display: 'block', width: '100%', textAlign: 'left', padding: '8px 10px', background: '#fff',
+                      border: 'none', borderBottom: '1px solid #f1f5f9', cursor: 'pointer', fontSize: 13, color: '#1e293b',
+                    }}>
+                    {p.title.slice(0, 40)} · {p.price.toLocaleString()}원
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button onClick={submit} disabled={saving}
+              style={{ background: saving ? '#94a3b8' : '#6366f1', color: '#fff', border: 'none', borderRadius: 8, padding: '9px 20px', fontWeight: 700, fontSize: 13, cursor: saving ? 'wait' : 'pointer' }}>
+              {saving ? '저장 중...' : editingId ? '수정 저장' : '컬렉션 만들기'}
+            </button>
+            <button onClick={() => { setShowForm(false); setEditingId(null) }}
+              style={{ background: '#f1f5f9', color: '#475569', border: 'none', borderRadius: 8, padding: '9px 20px', fontWeight: 600, fontSize: 13, cursor: 'pointer' }}>
+              취소
+            </button>
+          </div>
+        </div>
+      )}
+
+      {collections.length === 0 ? (
+        <p style={{ color: '#94a3b8', fontSize: 13, textAlign: 'center', padding: '32px 0' }}>아직 만든 컬렉션이 없어요</p>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+          {collections.map(c => (
+            <div key={c.id} className="admin-row" style={{ background: '#fff', borderRadius: 12, padding: 16, border: '1px solid #e2e8f0' }}>
+              <div style={{
+                width: 44, height: 44, borderRadius: 10, flexShrink: 0,
+                background: c.color, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20,
+              }}>
+                {c.emoji}
+              </div>
+              <div className="admin-row-info">
+                <div style={{ fontWeight: 700, fontSize: 14, color: '#1e293b' }}>{c.title}</div>
+                <div style={{ fontSize: 12, color: '#64748b', marginTop: 2 }}>
+                  상품 {c.productIds.length}개 · id: {c.id}
+                  {c.expiresAt && ` · ~${c.expiresAt.slice(0, 10)} 마감`}
+                  {c.productIds.length === 0 && <span style={{ color: '#f97316', fontWeight: 600 }}> · 상품 없음(고객 화면 비노출)</span>}
+                </div>
+              </div>
+              <div className="admin-row-actions">
+                <a href={`/collection/${c.id}`} target="_blank" rel="noreferrer"
+                  style={{ fontSize: 12, fontWeight: 600, color: '#0ea5e9', textDecoration: 'none', padding: '6px 10px' }}>
+                  보기
+                </a>
+                <button onClick={() => startEdit(c)}
+                  style={{ background: '#f1f5f9', color: '#475569', border: 'none', borderRadius: 8, padding: '6px 12px', fontWeight: 600, fontSize: 12, cursor: 'pointer' }}>
+                  수정
+                </button>
+                <button onClick={() => onDelete(c.id, c.title)}
+                  style={{ background: '#fef2f2', color: '#dc2626', border: 'none', borderRadius: 8, padding: '6px 12px', fontWeight: 600, fontSize: 12, cursor: 'pointer' }}>
+                  삭제
+                </button>
+              </div>
+            </div>
+          ))}
         </div>
       )}
     </div>
