@@ -1219,13 +1219,15 @@ function CollectionManager({
   }
 
   const q = productSearch.trim().toLowerCase()
-  const searchResults = q
-    ? posts.filter(p => p.title.toLowerCase().includes(q) && !form.productIds.includes(p.id)).slice(0, 8)
-    : []
+  const pickerList = (q ? posts.filter(p => p.title.toLowerCase().includes(q)) : posts).slice(0, 50)
 
-  function addProduct(id: number) {
-    setForm(prev => ({ ...prev, productIds: [...prev.productIds, id] }))
-    setProductSearch('')
+  function toggleProduct(id: number) {
+    setForm(prev => ({
+      ...prev,
+      productIds: prev.productIds.includes(id)
+        ? prev.productIds.filter(x => x !== id)
+        : [...prev.productIds, id],
+    }))
   }
   function removeProduct(id: number) {
     setForm(prev => ({ ...prev, productIds: prev.productIds.filter(x => x !== id) }))
@@ -1304,20 +1306,37 @@ function CollectionManager({
               </div>
             )}
             <input value={productSearch} onChange={e => setProductSearch(e.target.value)}
-              placeholder="상품명으로 검색해서 추가" style={inputStyle} />
-            {searchResults.length > 0 && (
-              <div style={{ marginTop: 6, border: '1px solid #e2e8f0', borderRadius: 8, overflow: 'hidden' }}>
-                {searchResults.map(p => (
-                  <button key={p.id} onClick={() => addProduct(p.id)}
-                    style={{
-                      display: 'block', width: '100%', textAlign: 'left', padding: '8px 10px', background: '#fff',
-                      border: 'none', borderBottom: '1px solid #f1f5f9', cursor: 'pointer', fontSize: 13, color: '#1e293b',
-                    }}>
-                    {p.title.slice(0, 40)} · {p.price.toLocaleString()}원
-                  </button>
-                ))}
-              </div>
-            )}
+              placeholder="목록에서 검색으로 좁혀보기 (비워두면 전체 목록)" style={inputStyle} />
+            <div style={{ marginTop: 6, border: '1px solid #e2e8f0', borderRadius: 8, maxHeight: 260, overflowY: 'auto' }}>
+              {pickerList.length === 0 ? (
+                <p style={{ padding: '12px 10px', fontSize: 12, color: '#94a3b8', margin: 0 }}>일치하는 상품이 없어요</p>
+              ) : (
+                pickerList.map(p => {
+                  const checked = form.productIds.includes(p.id)
+                  return (
+                    <button key={p.id} onClick={() => toggleProduct(p.id)}
+                      style={{
+                        display: 'flex', alignItems: 'center', gap: 8, width: '100%', textAlign: 'left',
+                        padding: '8px 10px', background: checked ? '#eef2ff' : '#fff',
+                        border: 'none', borderBottom: '1px solid #f1f5f9', cursor: 'pointer', fontSize: 13,
+                        color: checked ? '#4338ca' : '#1e293b', fontWeight: checked ? 700 : 400,
+                      }}>
+                      <span style={{
+                        flexShrink: 0, width: 16, height: 16, borderRadius: 4,
+                        border: checked ? 'none' : '1.5px solid #cbd5e1',
+                        background: checked ? '#6366f1' : 'transparent',
+                        color: '#fff', fontSize: 11, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      }}>
+                        {checked && '✓'}
+                      </span>
+                      <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {p.title.slice(0, 40)} · {p.price.toLocaleString()}원
+                      </span>
+                    </button>
+                  )
+                })
+              )}
+            </div>
           </div>
 
           <div style={{ display: 'flex', gap: 8 }}>
