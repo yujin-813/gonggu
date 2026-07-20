@@ -93,9 +93,7 @@ export default function AdminPage() {
   const [showAddModal, setShowAddModal] = useState(false)
   const [editingPost, setEditingPost]   = useState<Post | null>(null)
   const [loading, setLoading]         = useState(true)
-  const [filter, setFilter]           = useState<'all' | 'candidate' | 'needs_review' | 'ready' | 'published' | 'excluded' | 'upcoming'>('all')
-  // "공개됨"에 마감 지난 것까지 섞여 있으면 수정할 대상을 찾기 어려우니 기본으로 숨긴다
-  const [hideExpired, setHideExpired] = useState(true)
+  const [filter, setFilter]           = useState<'all' | 'candidate' | 'needs_review' | 'ready' | 'published' | 'expired' | 'excluded' | 'upcoming'>('all')
   const [searchQ, setSearchQ]         = useState('')
   const [analytics, setAnalytics]     = useState<DayStat[]>([])
   const [topPosts, setTopPosts]       = useState<TopPost[]>([])
@@ -404,25 +402,29 @@ export default function AdminPage() {
     return p.published !== false ? 'published' : 'ready'
   }
 
+  // "공개됨"엔 마감 지난 것까지 섞여 있으면 수정할 대상을 찾기 어려우니, 마감 지난 공개
+  // 게시물은 "공개됨"과 분리된 별도 "마감됨" 탭으로 뺀다
+  const isPublishedLive = (p: Post) => effectiveStatus(p) === 'published' && !isExpired(p)
+  const isPublishedExpired = (p: Post) => effectiveStatus(p) === 'published' && isExpired(p)
+
   const visible = posts.filter(p => {
     const st = effectiveStatus(p)
-    const matchFilter = filter === 'all' ? true : st === filter
+    const matchFilter =
+      filter === 'all'       ? true :
+      filter === 'published' ? isPublishedLive(p) :
+      filter === 'expired'   ? isPublishedExpired(p) :
+      st === filter
     const q = searchQ.toLowerCase()
     const matchQ = !q || p.title.toLowerCase().includes(q) || p.account.toLowerCase().includes(q)
-    const published = st === 'published'
-    const matchExpired = !hideExpired || !(published && isExpired(p))
-    return matchFilter && matchQ && matchExpired
+    return matchFilter && matchQ
   })
-  const expiredHiddenCount = posts.filter(p => {
-    const st = effectiveStatus(p)
-    return st === 'published' && isExpired(p)
-  }).length
 
   const countBy = (s: Post['status']) => posts.filter(p => effectiveStatus(p) === s).length
   const candidateCount   = countBy('candidate')
   const needsReviewCount = countBy('needs_review')
   const readyCount       = countBy('ready')
-  const publishedCount   = countBy('published')
+  const publishedCount   = posts.filter(isPublishedLive).length
+  const expiredCount     = posts.filter(isPublishedExpired).length
   const excludedCount    = countBy('excluded')
   const upcomingCount    = countBy('upcoming')
 
@@ -578,6 +580,7 @@ export default function AdminPage() {
                   { key: 'needs_review', label: `검수 필요 ${needsReviewCount}`, color: '#f97316' },
                   { key: 'ready',        label: `공개 가능 ${readyCount}`,       color: '#22c55e' },
                   { key: 'published',    label: `공개됨 ${publishedCount}`,      color: '#0ea5e9' },
+                  { key: 'expired',      label: `마감됨 ${expiredCount}`,        color: '#94a3b8' },
                   { key: 'excluded',     label: `제외 ${excludedCount}`,         color: '#94a3b8' },
                   { key: 'upcoming',     label: `오픈예정 ${upcomingCount}`,      color: '#7c3aed' },
                 ] as const).map(({ key, label, color }) => (
@@ -593,10 +596,6 @@ export default function AdminPage() {
               </div>
               <input type="text" value={searchQ} onChange={e => setSearchQ(e.target.value)}
                 placeholder="제목 / 계정 검색..." className="admin-filter-search" />
-              <label style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 12, color: '#64748b', cursor: 'pointer', flexShrink: 0 }}>
-                <input type="checkbox" checked={hideExpired} onChange={e => setHideExpired(e.target.checked)} />
-                마감 지난 것 숨기기{expiredHiddenCount > 0 && ` (${expiredHiddenCount})`}
-              </label>
               <span style={{ fontSize: 13, color: '#94a3b8', marginLeft: 'auto' }}>{visible.length}개</span>
             </div>
 
