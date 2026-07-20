@@ -919,6 +919,13 @@ function AdminPostRow({ post: p, onToggle, onDelete, onEdit, onToggleAlwaysOn, o
               background: p.sale_until_sold_out ? '#fee2e2' : '#f1f5f9', color: p.sale_until_sold_out ? '#b91c1c' : '#94a3b8' }}>
             {p.sale_until_sold_out ? '🔥 소진시' : '소진시'}
           </button>
+          {p.status !== 'excluded' && (
+            <button onClick={() => onQuickReview(p, 'exclude')}
+              title="이 공구를 제외 처리 (고객 화면에서 숨겨짐)"
+              style={{ padding: '6px 10px', background: '#fee2e2', color: '#dc2626', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 12, fontWeight: 600, whiteSpace: 'nowrap' }}>
+              🚫 제외
+            </button>
+          )}
           <button onClick={() => onDelete(p.id)}
             style={{ padding: '6px 10px', background: '#fee2e2', color: '#dc2626', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 12, fontWeight: 600 }}>
             삭제
