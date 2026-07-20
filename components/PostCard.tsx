@@ -25,7 +25,11 @@ function dealJudgment(post: Post): { verdict: string; detail: string; cls: strin
   // 네이버 자동 매칭가가 있으면 우선 사용하고, 없으면 직접 입력된 정가라도 기준으로 삼는다
   // (자동 매칭은 니치 상품이면 실패하는 경우가 많아, 절반 가까운 공구가 아예 판단을 못 받고 있었음)
   const mp = post.market_price || post.origPrice
-  if (!mp) return null
+  // 비교 기준가가 아예 없는 경우 — "여기서만 판매"처럼 확인 안 된 걸 단정하지 않고,
+  // 검색에 안 걸렸다는 사실만 담백하게 알려준다
+  if (!mp) {
+    return { verdict: '네이버 최저가 정보가 없어요', detail: '이 상품은 네이버 쇼핑에서 검색되지 않았어요', cls: 'neutral' }
+  }
   const p  = post.price
   const label = post.market_price ? '네이버 최저가' : '정가'
 
