@@ -8,6 +8,7 @@ import PostCard from '@/components/PostCard'
 import Toast from '@/components/Toast'
 import type { Post, Category, SortOrder, Collection } from '@/lib/types'
 import { categoryIcon } from '@/lib/categoryIcons'
+import { isEvergreen } from '@/lib/period'
 import { Bell, ArrowLeft, Heart, Star, Clock, Loader2, Search } from 'lucide-react'
 
 function daysLeft(deadline?: string): number {
@@ -237,7 +238,7 @@ export default function Home() {
 
   const showingMainFeed = !viewingBookmarks && !viewingFollowed
   if (showingMainFeed && currentCat === 'evergreen') {
-    filtered = filtered.filter(p => p.is_evergreen_deal || p.is_always_on)
+    filtered = filtered.filter(isEvergreen)
   } else if (showingMainFeed && currentCat !== 'all') {
     filtered = filtered.filter(p => p.cat === currentCat)
   }

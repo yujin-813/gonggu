@@ -4,8 +4,7 @@ import type { Post } from '@/lib/types'
 import { daysLeft, isCustomerVisible } from '@/lib/period'
 
 const CAT_EMOJI: Record<string, string> = {
-  fashion: '👗', beauty: '💄', food: '🍱', life: '🏠',
-  kids: '🧸', health: '💊', pet: '🐾', digital: '📱',
+  kids: '👶', life: '🏠', food: '🍽️', health: '💊', beauty: '💄',
 }
 
 export async function GET(request: NextRequest) {

@@ -83,9 +83,8 @@ function LoginScreen({ onLogin }: { onLogin: () => void }) {
 }
 
 const CAT_LABEL: Record<string, string> = {
-  fashion: '👗 패션', beauty: '💄 뷰티', food: '🍱 식품',
-  life: '🏠 생활용품', kids: '🧸 유아동', health: '💊 건강',
-  pet: '🐾 반려동물', digital: '📱 디지털',
+  kids: '👶 유아동', life: '🏠 생활', food: '🍽️ 식품',
+  health: '💊 건강', beauty: '💄 뷰티',
 }
 
 export default function AdminPage() {
@@ -95,6 +94,8 @@ export default function AdminPage() {
   const [editingPost, setEditingPost]   = useState<Post | null>(null)
   const [loading, setLoading]         = useState(true)
   const [filter, setFilter]           = useState<'all' | 'candidate' | 'needs_review' | 'ready' | 'published' | 'excluded' | 'upcoming'>('all')
+  // "공개됨"에 마감 지난 것까지 섞여 있으면 수정할 대상을 찾기 어려우니 기본으로 숨긴다
+  const [hideExpired, setHideExpired] = useState(true)
   const [searchQ, setSearchQ]         = useState('')
   const [analytics, setAnalytics]     = useState<DayStat[]>([])
   const [topPosts, setTopPosts]       = useState<TopPost[]>([])
@@ -408,8 +409,14 @@ export default function AdminPage() {
     const matchFilter = filter === 'all' ? true : st === filter
     const q = searchQ.toLowerCase()
     const matchQ = !q || p.title.toLowerCase().includes(q) || p.account.toLowerCase().includes(q)
-    return matchFilter && matchQ
+    const published = st === 'published'
+    const matchExpired = !hideExpired || !(published && isExpired(p))
+    return matchFilter && matchQ && matchExpired
   })
+  const expiredHiddenCount = posts.filter(p => {
+    const st = effectiveStatus(p)
+    return st === 'published' && isExpired(p)
+  }).length
 
   const countBy = (s: Post['status']) => posts.filter(p => effectiveStatus(p) === s).length
   const candidateCount   = countBy('candidate')
@@ -586,6 +593,10 @@ export default function AdminPage() {
               </div>
               <input type="text" value={searchQ} onChange={e => setSearchQ(e.target.value)}
                 placeholder="제목 / 계정 검색..." className="admin-filter-search" />
+              <label style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 12, color: '#64748b', cursor: 'pointer', flexShrink: 0 }}>
+                <input type="checkbox" checked={hideExpired} onChange={e => setHideExpired(e.target.checked)} />
+                마감 지난 것 숨기기{expiredHiddenCount > 0 && ` (${expiredHiddenCount})`}
+              </label>
               <span style={{ fontSize: 13, color: '#94a3b8', marginLeft: 'auto' }}>{visible.length}개</span>
             </div>
 
@@ -926,14 +937,11 @@ const SOURCE_TYPE_COLORS: Record<string, string> = {
 
 const CAT_OPTIONS = [
   { value: '', label: '카테고리 없음' },
-  { value: 'fashion', label: '👗 패션' },
-  { value: 'beauty', label: '💄 뷰티' },
-  { value: 'food', label: '🍱 식품' },
-  { value: 'life', label: '🏠 생활용품' },
-  { value: 'kids', label: '🧸 유아동' },
+  { value: 'kids', label: '👶 유아동' },
+  { value: 'life', label: '🏠 생활' },
+  { value: 'food', label: '🍽️ 식품' },
   { value: 'health', label: '💊 건강' },
-  { value: 'pet', label: '🐾 반려동물' },
-  { value: 'digital', label: '📱 디지털' },
+  { value: 'beauty', label: '💄 뷰티' },
 ]
 
 interface InfluencerManagerProps {

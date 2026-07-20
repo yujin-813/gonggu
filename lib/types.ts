@@ -1,4 +1,4 @@
-export type Category = 'fashion' | 'beauty' | 'food' | 'life' | 'kids' | 'health' | 'pet' | 'digital'
+export type Category = 'kids' | 'life' | 'food' | 'health' | 'beauty'
 export type SortOrder = 'latest' | 'deadline' | 'discount' | 'popular'
 export type LinkSourceType = 'inpock' | 'linktree' | 'littly' | 'smartstore' | 'instagram' | 'custom' | 'unknown'
 

@@ -3,18 +3,14 @@ import { useState, useEffect, useRef } from 'react'
 import type { Post, Category } from '@/lib/types'
 
 const CATEGORIES = [
-  { value: 'fashion', label: '👗 패션' },
-  { value: 'beauty',  label: '💄 뷰티' },
-  { value: 'food',    label: '🍱 식품' },
-  { value: 'life',    label: '🏠 생활용품' },
-  { value: 'kids',    label: '🧸 유아동' },
-  { value: 'health',  label: '💊 건강' },
-  { value: 'pet',     label: '🐾 반려동물' },
-  { value: 'digital', label: '📱 디지털' },
+  { value: 'kids',   label: '👶 유아동' },
+  { value: 'life',   label: '🏠 생활' },
+  { value: 'food',   label: '🍽️ 식품' },
+  { value: 'health', label: '💊 건강' },
+  { value: 'beauty', label: '💄 뷰티' },
 ]
 const CAT_EMOJI: Record<string, string> = {
-  fashion:'👗', beauty:'💄', food:'🍱', life:'🏠',
-  kids:'🧸', health:'💊', pet:'🐾', digital:'📱',
+  kids:'👶', life:'🏠', food:'🍽️', health:'💊', beauty:'💄',
 }
 
 function todayStr() { return new Date().toISOString().split('T')[0] }
@@ -50,7 +46,7 @@ export default function AddPostModal({ onClose, onSubmit, editPost, existingGrou
   const [title,     setTitle]     = useState('')
   const [brand,     setBrand]     = useState('')
   const [account,   setAccount]   = useState('')
-  const [cat,       setCat]       = useState<Category>('fashion')
+  const [cat,       setCat]       = useState<Category>('life')
   const [startDate, setStartDate] = useState(todayStr())
   const [endDate,   setEndDate]   = useState(defaultDate(7))
   const [price,         setPrice]         = useState('')
@@ -94,7 +90,7 @@ export default function AddPostModal({ onClose, onSubmit, editPost, existingGrou
     setUrl(editPost.url || '')
     setTitle(editPost.title || '')
     setAccount(editPost.account || '')
-    setCat(editPost.cat || 'fashion')
+    setCat(editPost.cat || 'life')
     // 원본에서 확인 안 된 날짜는 오늘/+7일로 임의 대체하지 않고 비워둔다 — 확인된 것처럼 보이는 걸 방지
     setStartDate(editPost.start_date || '')
     setEndDate(editPost.deadline || '')

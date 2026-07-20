@@ -39,10 +39,16 @@ export function getPeriodState(post: PeriodInput): PeriodState {
       ? { kind: 'range', startDate: post.start_date, deadline: post.deadline, daysLeft: daysLeft(post.deadline) }
       : { kind: 'deadline_only', deadline: post.deadline, daysLeft: daysLeft(post.deadline) }
   }
-  // 마감일이 없을 때: "소진시 마감"으로 확인된 경우와, 시작일만 있는 경우, 아예 모르는 경우를 구분한다
+  // 마감일이 없을 때: "소진시 마감"으로 명시된 경우만 예외로 두고, 그 외(시작일만 있거나
+  // 기간 정보가 아예 없는 경우)는 전부 "상시딜"로 취급한다 — 마감일이 없다는 건 특정 시점에
+  // 끝나지 않고 계속 판매된다는 뜻이라, "마감일 미확인"보다 상시딜이 더 정확한 표현이다
   if (post.sale_until_sold_out) return { kind: 'sold_out_only' }
-  if (post.start_date) return { kind: 'start_only', startDate: post.start_date }
-  return { kind: 'unknown' }
+  return { kind: 'evergreen' }
+}
+
+/** 이 공구가 "상시딜" 탭에 노출돼야 하는지 (명시적 상시딜 플래그 + 마감일 없는 공구 전부 포함) */
+export function isEvergreen(post: PeriodInput): boolean {
+  return getPeriodState(post).kind === 'evergreen'
 }
 
 /** 관리자 목록용 한 줄 텍스트 */

@@ -1,7 +1,5 @@
 import type { Category } from '@/lib/types'
-import { CATEGORY_ICON, CATEGORY_LABEL } from '@/lib/categoryIcons'
-
-const CATEGORY_IDS = ['all', 'evergreen', 'fashion', 'beauty', 'food', 'life', 'kids', 'health', 'pet', 'digital'] as const
+import { CATEGORY_ICON, CATEGORY_LABEL, CATEGORY_ORDER } from '@/lib/categoryIcons'
 
 interface CategoryFilterProps {
   current: Category | 'all' | 'evergreen'
@@ -11,7 +9,7 @@ interface CategoryFilterProps {
 export default function CategoryFilter({ current, onSelect }: CategoryFilterProps) {
   return (
     <div className="category-wrap">
-      {CATEGORY_IDS.map(id => {
+      {CATEGORY_ORDER.map(id => {
         const Icon = CATEGORY_ICON[id]
         return (
           <button
