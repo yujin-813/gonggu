@@ -56,6 +56,10 @@ export interface Post {
   extraction_debug?: Record<string, unknown> | null
   market_price?: number | null
   market_source?: string | null
+  // 자동 매칭된 네이버 가격이 이 공구와 구성이 달라(예: 세트 구성 차이) 단순 가격 비교가
+  // 부정확할 수 있을 때 관리자가 남기는 짧은 참고 문구 — 자동 계산은 그대로 두고 판단 문구
+  // 뒤에 덧붙여서 보여준다 (custom_verdict처럼 전체를 덮어쓰지 않음)
+  market_price_note?: string | null
   // 관리자가 자동 판단(dealJudgment) 대신 직접 입력한 구매 판단 문구 — 값이 있으면 이걸 우선 사용
   custom_verdict?: string | null
   custom_verdict_detail?: string | null

@@ -51,6 +51,7 @@ export default function AddPostModal({ onClose, onSubmit, editPost, existingGrou
   const [endDate,   setEndDate]   = useState(defaultDate(7))
   const [price,         setPrice]         = useState('')
   const [origPrice,     setOrigPrice]     = useState('')
+  const [marketPriceNote, setMarketPriceNote] = useState('')
   const [groupKey,      setGroupKey]      = useState('')
   const [newGroupMode,  setNewGroupMode]  = useState(false)
   const [newGroupInput, setNewGroupInput] = useState('')
@@ -99,6 +100,7 @@ export default function AddPostModal({ onClose, onSubmit, editPost, existingGrou
     // 눌러도 그 시점의 market_price가 origPrice로 영구 고정돼버려서(재검증돼도 origPrice는 안 바뀜),
     // 자동 수집된 값은 아래 "자동 매칭" 안내로만 보여주고 이 입력칸엔 절대 자동으로 채우지 않는다
     setOrigPrice(editPost.origPrice ? String(editPost.origPrice) : '')
+    setMarketPriceNote(editPost.market_price_note || '')
     setMarketUrl(editPost.market_url || '')
     setCustomVerdict(editPost.custom_verdict || '')
     setCustomVerdictDetail(editPost.custom_verdict_detail || '')
@@ -203,6 +205,13 @@ export default function AddPostModal({ onClose, onSubmit, editPost, existingGrou
     setLoading(true)
     try {
       const uploadedImg = await uploadImage()
+      // 가격/마감일을 채워 넣어도 예전에 자동 분류 때 붙은 "가격 미입력"/"마감일 미확인"
+      // 검수 사유가 그대로 남아있던 문제 — 지금 값 기준으로 더는 해당 안 되는 사유는 지운다
+      const hasPrice = !!(price && parseInt(price) > 0)
+      const hasDeadline = !!endDate || !!(editPost?.is_evergreen_deal || editPost?.is_always_on || editPost?.sale_until_sold_out)
+      const review_reason = (editPost?.review_reason || []).filter(r =>
+        !(r === '가격 미입력' && hasPrice) && !(r === '마감일 미확인' && hasDeadline)
+      )
       await onSubmit({
         shortcode:    editPost?.shortcode ?? null,
         title:        title.trim(),
@@ -211,6 +220,7 @@ export default function AddPostModal({ onClose, onSubmit, editPost, existingGrou
         cat,
         price:        price ? parseInt(price) : 0,
         origPrice:    origPrice ? parseInt(origPrice) : null,
+        market_price_note: marketPriceNote.trim() || null,
         start_date:   startDate || '',
         deadline:     endDate,
         img:          uploadedImg || '',
@@ -222,6 +232,7 @@ export default function AddPostModal({ onClose, onSubmit, editPost, existingGrou
         market_url:   marketUrl.trim() || null,
         published:    editPost?.published ?? !isUpcomingPost,
         status:       editPost?.status ?? (isUpcomingPost ? 'upcoming' : 'ready'),
+        review_reason,
         custom_verdict:        customVerdict.trim() || null,
         custom_verdict_detail: customVerdict.trim() ? (customVerdictDetail.trim() || null) : null,
         custom_verdict_cls:    customVerdict.trim() ? customVerdictCls : null,
@@ -379,6 +390,15 @@ export default function AddPostModal({ onClose, onSubmit, editPost, existingGrou
                 <span style={{ fontSize: 11, color: '#16a34a' }}>✅ 네이버쇼핑 링크 연결됨</span>
                 <a href={marketUrl} target="_blank" rel="noopener noreferrer" style={{ fontSize: 11, color: '#6366f1' }}>미리보기 →</a>
                 <button type="button" onClick={() => { setMarketUrl(''); }} style={{ fontSize: 11, color: '#94a3b8', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>링크 제거</button>
+              </div>
+            )}
+            {origPrice && (
+              <div style={{ marginTop: 8 }}>
+                <input type="text" value={marketPriceNote} onChange={e => setMarketPriceNote(e.target.value)}
+                  placeholder="가격 비교 참고사항 (선택 — 예: 네이버가는 칫솔살균기 단품 기준, 이 공구는 칫솔 포함)" />
+                <p style={{ fontSize: 11, color: '#94a3b8', margin: '4px 0 0' }}>
+                  구성이 달라 단순 비교가 부정확할 때만 채워주세요 — 자동 계산은 그대로 두고 이 문구를 판단 문구 뒤에 덧붙여요
+                </p>
               </div>
             )}
             {marketResults.length > 0 && (

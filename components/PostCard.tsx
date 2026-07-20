@@ -32,10 +32,13 @@ function dealJudgment(post: Post): { verdict: string; detail: string; cls: strin
   }
   const p  = post.price
   const label = post.market_price ? '네이버 최저가' : '정가'
+  // 자동 매칭된 가격이 이 공구와 구성이 달라 단순 비교가 부정확할 수 있을 때 관리자가 남긴
+  // 참고 문구 — 자동 계산 결과를 지우지 않고 뒤에 그대로 덧붙인다
+  const noteSuffix = post.market_price_note ? ` · ${post.market_price_note}` : ''
 
   // 가격이 기준가 이상이면 할인 근거가 없는 것 — 괜히 좋다고 했다가 나중에 신뢰만 잃는다
   if (p >= mp) {
-    return { verdict: '가격은 직접 비교해보세요', detail: '온라인 최저가와 비슷하거나 더 비쌀 수 있어요 — 구성품·배송비도 함께 확인해보세요', cls: 'check' }
+    return { verdict: '가격은 직접 비교해보세요', detail: `온라인 최저가와 비슷하거나 더 비쌀 수 있어요 — 구성품·배송비도 함께 확인해보세요${noteSuffix}`, cls: 'check' }
   }
 
   const diff = mp - p
@@ -46,10 +49,10 @@ function dealJudgment(post: Post): { verdict: string; detail: string; cls: strin
   const urgentSuffix = urgent ? ' · 마감임박' : ''
 
   if (p <= mp * 0.7)
-    return { verdict: '완전 득템이에요', detail: `${label}보다 ${diff.toLocaleString()}원(${rate}%) 저렴${urgentSuffix}`, cls: 'great' }
+    return { verdict: '완전 득템이에요', detail: `${label}보다 ${diff.toLocaleString()}원(${rate}%) 저렴${urgentSuffix}${noteSuffix}`, cls: 'great' }
   if (p <= mp * 0.9)
-    return { verdict: '살만해요', detail: `${label}보다 ${diff.toLocaleString()}원 저렴${urgentSuffix}`, cls: 'good' }
-  return { verdict: '가격 보통', detail: `온라인 최저가와 큰 차이 없어요${urgentSuffix}`, cls: 'neutral' }
+    return { verdict: '살만해요', detail: `${label}보다 ${diff.toLocaleString()}원 저렴${urgentSuffix}${noteSuffix}`, cls: 'good' }
+  return { verdict: '가격 보통', detail: `온라인 최저가와 큰 차이 없어요${urgentSuffix}${noteSuffix}`, cls: 'neutral' }
 }
 
 interface PostCardProps {

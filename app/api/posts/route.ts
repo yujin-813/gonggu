@@ -82,6 +82,7 @@ export async function POST(request: NextRequest) {
     origPrice:  data.origPrice ? parseInt(data.origPrice) : null,
     group_key:     data.group_key?.trim() || null,
     market_url:    data.market_url?.trim() || null,
+    market_price_note: data.market_price_note?.trim() || null,
     purchase_url:     data.purchase_url?.trim() || null,
     is_always_on:     Boolean(data.is_always_on),
     is_evergreen_deal: Boolean(data.is_evergreen_deal),
