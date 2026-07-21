@@ -62,14 +62,12 @@ interface PostCardProps {
   onJoin?: (id: number) => void
   siblings?: Post[]
   isFollowingAccount?: boolean
-  isFollowingCategory?: boolean
   onToggleFollowAccount?: (account: string) => void
-  onToggleFollowCategory?: (cat: string) => void
 }
 
 export default function PostCard({
   post, isBookmarked, onToggleBookmark, onJoin, siblings = [],
-  isFollowingAccount, isFollowingCategory, onToggleFollowAccount, onToggleFollowCategory,
+  isFollowingAccount, onToggleFollowAccount,
 }: PostCardProps) {
   const [imgFailed, setImgFailed] = useState(false)
   const [showCompare, setShowCompare] = useState(false)
@@ -153,16 +151,6 @@ export default function PostCard({
           )}
           <span className="cat-tag">
             {CATEGORY_LABEL[post.cat] || post.cat}
-            {onToggleFollowCategory && (
-              <button
-                onClick={() => onToggleFollowCategory(post.cat)}
-                title={isFollowingCategory ? '카테고리 팔로우 취소' : '이 카테고리 팔로우'}
-                className="btn-follow-star"
-                style={{ color: isFollowingCategory ? '#f59e0b' : '#94a3b8' }}
-              >
-                <Star size={12} fill={isFollowingCategory ? 'currentColor' : 'none'} />
-              </button>
-            )}
           </span>
         </div>
 

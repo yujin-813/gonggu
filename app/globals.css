@@ -64,20 +64,6 @@ header {
   font-weight: 500;
   color: var(--gray-3);
 }
-.search-bar {
-  flex: 1;
-  min-width: 0;
-  background: var(--gray-1);
-  border: 1.5px solid var(--gray-2);
-  border-radius: 12px;
-  padding: 9px 14px;
-  font-size: 14px;
-  color: var(--text);
-  outline: none;
-  transition: border-color .2s;
-}
-.search-bar:focus { border-color: var(--gray-4); background: white; }
-.search-bar::placeholder { color: var(--gray-3); }
 .btn-icon {
   background: var(--gray-1);
   color: var(--gray-4);
@@ -776,7 +762,6 @@ header {
   .header-inner { padding: 10px 14px; gap: 8px; }
   .logo { font-size: 18px; }
   .logo-tagline { display: none; }
-  .search-bar { padding: 8px 10px; font-size: 13px; }
   .btn-icon { padding: 7px 10px; font-size: 16px; }
 
   /* 카테고리 */
@@ -894,7 +879,6 @@ header {
   }
   .logo { font-size: 18px; }
   .logo-tagline { display: none; }
-  .search-bar { padding: 8px 11px; font-size: 13px; }
   .btn-icon { padding: 7px 10px; font-size: 16px; }
 
   /* 카테고리 */

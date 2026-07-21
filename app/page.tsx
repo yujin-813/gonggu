@@ -68,7 +68,6 @@ export default function Home() {
   const [toast, setToast] = useState({ message: '', visible: false })
   const [loading, setLoading] = useState(true)
   const [recentlyViewed, setRecentlyViewed] = useState<number[]>([])
-  const [followedCategories, setFollowedCategories] = useState<Set<string>>(new Set())
   const [followedInfluencers, setFollowedInfluencers] = useState<Set<string>>(new Set())
   const [viewingFollowed, setViewingFollowed] = useState(false)
   const [pushSubscribed, setPushSubscribed] = useState(false)
@@ -79,7 +78,6 @@ export default function Home() {
     const saved = JSON.parse(localStorage.getItem('gonggu_bookmarks') || '[]')
     setBookmarks(new Set(saved))
     setRecentlyViewed(JSON.parse(localStorage.getItem('gonggu_recent') || '[]'))
-    setFollowedCategories(new Set(JSON.parse(localStorage.getItem('gonggu_followed_cats') || '[]')))
     setFollowedInfluencers(new Set(JSON.parse(localStorage.getItem('gonggu_followed_accounts') || '[]')))
     setKakaoBannerDismissed(localStorage.getItem('gonggu_kakao_dismissed') === '1')
     fetchPosts()
@@ -156,16 +154,6 @@ export default function Home() {
     else subscribeToPush()
   }
 
-  function toggleFollowCategory(cat: string) {
-    setFollowedCategories(prev => {
-      const next = new Set(prev)
-      if (next.has(cat)) { next.delete(cat); showToast('카테고리 팔로우를 취소했어요') }
-      else { next.add(cat); showToast('카테고리를 팔로우했어요!') }
-      localStorage.setItem('gonggu_followed_cats', JSON.stringify([...next]))
-      return next
-    })
-  }
-
   function toggleFollowInfluencer(account: string) {
     setFollowedInfluencers(prev => {
       const next = new Set(prev)
@@ -238,7 +226,7 @@ export default function Home() {
   let filtered = viewingBookmarks
     ? posts.filter(p => bookmarks.has(p.id))
     : viewingFollowed
-    ? posts.filter(p => followedInfluencers.has(p.account) || followedCategories.has(p.cat))
+    ? posts.filter(p => followedInfluencers.has(p.account))
     : posts
 
   const showingMainFeed = !viewingBookmarks && !viewingFollowed
@@ -287,8 +275,6 @@ export default function Home() {
     <>
       <h1 className="sr-only">지니모아 — 인스타그램 공동구매(공구) 모아보기</h1>
       <Header
-        searchQuery={searchQuery}
-        onSearch={setSearchQuery}
         onBookmarkView={() => { setViewingBookmarks(v => !v); setViewingFollowed(false) }}
         viewingBookmarks={viewingBookmarks}
         onFollowView={() => { setViewingFollowed(v => !v); setViewingBookmarks(false) }}
@@ -297,19 +283,17 @@ export default function Home() {
         pushSubscribed={pushSubscribed}
       />
 
-      {showingMainFeed && (
-        <div className="hero-search-wrap">
-          <div className="hero-search">
-            <Search size={18} />
-            <input
-              type="search"
-              placeholder="찾고 싶은 상품을 검색해보세요"
-              value={searchQuery}
-              onChange={e => setSearchQuery(e.target.value)}
-            />
-          </div>
+      <div className="hero-search-wrap">
+        <div className="hero-search">
+          <Search size={18} />
+          <input
+            type="search"
+            placeholder="찾고 싶은 상품을 검색해보세요"
+            value={searchQuery}
+            onChange={e => setSearchQuery(e.target.value)}
+          />
         </div>
-      )}
+      </div>
 
       {showingMainFeed && !kakaoBannerDismissed && (
         <div className="notify-banner">
@@ -365,7 +349,7 @@ export default function Home() {
       ) : viewingFollowed ? (
         <div className="section-header">
           <button className="back-btn" onClick={() => setViewingFollowed(false)}><ArrowLeft size={16} /></button>
-          <Star size={16} /> 팔로우한 카테고리·인플루언서
+          <Star size={16} /> 팔로우한 인플루언서
         </div>
       ) : (
         <>
@@ -437,7 +421,7 @@ export default function Home() {
             <div className="empty-icon">
               {viewingBookmarks ? <Heart size={36} /> : viewingFollowed ? <Star size={36} /> : <Search size={36} />}
             </div>
-            <p>{viewingBookmarks ? '아직 찜한 공구가 없어요' : viewingFollowed ? '아직 팔로우한 카테고리·인플루언서가 없어요' : '검색 결과가 없어요'}</p>
+            <p>{viewingBookmarks ? '아직 찜한 공구가 없어요' : viewingFollowed ? '아직 팔로우한 인플루언서가 없어요' : '검색 결과가 없어요'}</p>
           </div>
         ) : (
           sorted.map(post => (
@@ -449,9 +433,7 @@ export default function Home() {
               onJoin={id => { track('join', { postId: id }); recordRecentlyViewed(id) }}
               siblings={post.group_key ? groupMap.get(post.group_key) : undefined}
               isFollowingAccount={followedInfluencers.has(post.account)}
-              isFollowingCategory={followedCategories.has(post.cat)}
               onToggleFollowAccount={toggleFollowInfluencer}
-              onToggleFollowCategory={toggleFollowCategory}
             />
           ))
         )}

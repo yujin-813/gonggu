@@ -1,8 +1,6 @@
 import { ShoppingBag, Bell, BellOff, Star, House, Heart } from 'lucide-react'
 
 interface HeaderProps {
-  searchQuery: string
-  onSearch: (q: string) => void
   onBookmarkView: () => void
   viewingBookmarks: boolean
   onFollowView: () => void
@@ -12,7 +10,7 @@ interface HeaderProps {
 }
 
 export default function Header({
-  searchQuery, onSearch, onBookmarkView, viewingBookmarks, onFollowView, viewingFollowed,
+  onBookmarkView, viewingBookmarks, onFollowView, viewingFollowed,
   onPushToggle, pushSubscribed,
 }: HeaderProps) {
   return (
@@ -23,13 +21,7 @@ export default function Header({
           <span className="logo-text">지니모아</span>
           <span className="logo-tagline">| 인스타 공구 모아보기</span>
         </div>
-        <input
-          className="search-bar"
-          type="search"
-          placeholder="브랜드, 상품 검색..."
-          value={searchQuery}
-          onChange={e => onSearch(e.target.value)}
-        />
+        <div style={{ flex: 1 }} />
         <button
           className={`btn-icon ${pushSubscribed ? 'active' : ''}`}
           onClick={onPushToggle}
@@ -40,7 +32,7 @@ export default function Header({
         <button
           className={`btn-icon ${viewingFollowed ? 'active' : ''}`}
           onClick={onFollowView}
-          title="팔로우한 카테고리·인플루언서"
+          title="팔로우한 인플루언서"
         >
           {viewingFollowed ? <House size={18} /> : <Star size={18} />}
         </button>
