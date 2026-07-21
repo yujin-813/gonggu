@@ -3,7 +3,9 @@ import { loadInfluencerSources, saveInfluencerSources, updateInfluencerSource } 
 import type { LinkSourceType, InfluencerSource } from '@/lib/types'
 
 function detectSourceType(url: string): LinkSourceType {
-  if (/inpock\.co\.kr/i.test(url)) return 'inpock'
+  // inpk.link는 inpock의 커스텀 단축 도메인 — 같은 __NEXT_DATA__ 구조를 쓰고
+  // handle이 link.inpock.co.kr에서도 그대로 동작해서 동일하게 취급한다
+  if (/inpock\.co\.kr|inpk\.link/i.test(url)) return 'inpock'
   if (/linktr\.ee/i.test(url)) return 'linktree'
   if (/litt\.ly/i.test(url)) return 'littly'
   if (/smartstore\.naver\.com/i.test(url)) return 'smartstore'
