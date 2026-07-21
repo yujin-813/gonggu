@@ -11,10 +11,15 @@
 """
 import os
 import time
+import warnings
 from datetime import date
 from pathlib import Path
 
 import requests
+import urllib3
+
+# 인증서 체인이 불완전한 소규모 쇼핑몰 확인용 verify=False 재시도에서 나오는 경고 억제
+warnings.filterwarnings("ignore", category=urllib3.exceptions.InsecureRequestWarning)
 
 _env_file = Path(__file__).parent / ".env.local"
 if _env_file.exists():
@@ -61,6 +66,13 @@ def check_link(url):
     """(dead: bool | None, reason: str) — dead=True 확실히 죽음, False 확실히 살아있음, None 애매함"""
     try:
         r = requests.get(url, headers={"User-Agent": UA}, timeout=12, allow_redirects=True)
+    except requests.exceptions.SSLError:
+        # 소규모 쇼핑몰 중 인증서 체인이 불완전해 파이썬 기본 검증에서만 실패하는 경우가
+        # 흔하다(브라우저는 대개 문제없이 연다) — 콘텐츠만 확인하는 용도라 재시도는 허용한다
+        try:
+            r = requests.get(url, headers={"User-Agent": UA}, timeout=12, allow_redirects=True, verify=False)
+        except requests.RequestException as e:
+            return None, f"접속 실패: {e.__class__.__name__}"
     except requests.RequestException as e:
         return None, f"접속 실패: {e.__class__.__name__}"
 
