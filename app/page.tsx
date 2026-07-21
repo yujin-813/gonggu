@@ -280,6 +280,7 @@ export default function Home() {
 
   return (
     <>
+      <h1 className="sr-only">지니모아 — 인스타그램 공동구매(공구) 모아보기</h1>
       <Header
         searchQuery={searchQuery}
         onSearch={setSearchQuery}

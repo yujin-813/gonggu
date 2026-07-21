@@ -1,5 +1,17 @@
 * { box-sizing: border-box; margin: 0; padding: 0; }
 
+/* 시각적으로는 숨기되 스크린리더·검색엔진은 읽을 수 있게 — 로고가 아이콘 위주라 별도로
+   페이지 핵심 주제를 알려주는 h1이 필요할 때 씀 */
+.sr-only {
+  position: absolute;
+  width: 1px; height: 1px;
+  padding: 0; margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
 :root {
   --pink: #FF4B7B;
   --pink-light: #FFF0F4;
