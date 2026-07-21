@@ -66,6 +66,7 @@ header {
 }
 .search-bar {
   flex: 1;
+  min-width: 0;
   background: var(--gray-1);
   border: 1.5px solid var(--gray-2);
   border-radius: 12px;
@@ -212,6 +213,7 @@ header {
 }
 .hero-search input {
   flex: 1;
+  min-width: 0;
   border: none;
   outline: none;
   background: none;
