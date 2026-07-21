@@ -9,7 +9,7 @@ import Toast from '@/components/Toast'
 import type { Post, Category, SortOrder, Collection } from '@/lib/types'
 import { categoryIcon } from '@/lib/categoryIcons'
 import { isEvergreen } from '@/lib/period'
-import { Bell, ArrowLeft, Heart, Star, Clock, Loader2, Search } from 'lucide-react'
+import { Bell, ArrowLeft, Heart, Star, Clock, Loader2, Search, MessageCircle, X } from 'lucide-react'
 
 function daysLeft(deadline?: string): number {
   if (!deadline) return 999
@@ -55,6 +55,9 @@ function pushSupported(): boolean {
   return typeof window !== 'undefined' && 'serviceWorker' in navigator && 'PushManager' in window
 }
 
+// 카카오톡 채널 추가 링크 — 별도 SDK 없이도 앱/웹 어디서나 동작하는 공식 딥링크 형식
+const KAKAO_CHANNEL_URL = 'http://pf.kakao.com/_WVxgfX/friend'
+
 export default function Home() {
   const [posts, setPosts] = useState<Post[]>([])
   const [bookmarks, setBookmarks] = useState<Set<number>>(new Set())
@@ -70,6 +73,7 @@ export default function Home() {
   const [viewingFollowed, setViewingFollowed] = useState(false)
   const [pushSubscribed, setPushSubscribed] = useState(false)
   const [collections, setCollections] = useState<Collection[]>([])
+  const [kakaoBannerDismissed, setKakaoBannerDismissed] = useState(true)  // 초기 렌더 깜빡임 방지 — mount 시 localStorage 값으로 교체
 
   useEffect(() => {
     const saved = JSON.parse(localStorage.getItem('gonggu_bookmarks') || '[]')
@@ -77,6 +81,7 @@ export default function Home() {
     setRecentlyViewed(JSON.parse(localStorage.getItem('gonggu_recent') || '[]'))
     setFollowedCategories(new Set(JSON.parse(localStorage.getItem('gonggu_followed_cats') || '[]')))
     setFollowedInfluencers(new Set(JSON.parse(localStorage.getItem('gonggu_followed_accounts') || '[]')))
+    setKakaoBannerDismissed(localStorage.getItem('gonggu_kakao_dismissed') === '1')
     fetchPosts()
     fetchCollections()
     track('view')
@@ -302,6 +307,34 @@ export default function Home() {
               value={searchQuery}
               onChange={e => setSearchQuery(e.target.value)}
             />
+          </div>
+        </div>
+      )}
+
+      {showingMainFeed && !kakaoBannerDismissed && (
+        <div className="notify-banner">
+          <div className="notify-inner kakao-banner">
+            <div className="notify-icon kakao-banner-icon"><MessageCircle size={18} /></div>
+            <div className="notify-text">
+              <p>카카오톡 채널 추가하고 공구 소식 받아보세요</p>
+              <p>가입 없이 채널만 추가하면 새 공구를 놓치지 않아요</p>
+            </div>
+            <a
+              href={KAKAO_CHANNEL_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="notify-btn kakao-banner-btn"
+              onClick={() => { localStorage.setItem('gonggu_kakao_dismissed', '1'); setKakaoBannerDismissed(true) }}
+            >
+              채널 추가
+            </a>
+            <button
+              className="notify-close"
+              title="닫기"
+              onClick={() => { localStorage.setItem('gonggu_kakao_dismissed', '1'); setKakaoBannerDismissed(true) }}
+            >
+              <X size={14} />
+            </button>
           </div>
         </div>
       )}

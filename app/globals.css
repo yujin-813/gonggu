@@ -669,7 +669,24 @@ header {
   font-weight: 700;
   cursor: pointer;
   white-space: nowrap;
+  text-decoration: none;
+  display: inline-block;
 }
+.notify-close {
+  background: none;
+  border: none;
+  color: var(--gray-3);
+  cursor: pointer;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px;
+}
+/* 카카오톡 채널 배너 — 카카오 공식 브랜드 컬러(#FEE500) */
+.kakao-banner-icon { background: #FFF6D6; color: #3C1E1E; }
+.kakao-banner-btn { background: #FEE500; color: #3C1E1E; border: none; }
+.kakao-banner-btn:hover { background: #F5DC00; }
 
 /* ── Bookmark header ── */
 .section-header {
