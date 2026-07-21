@@ -292,6 +292,20 @@ export default function Home() {
         pushSubscribed={pushSubscribed}
       />
 
+      {showingMainFeed && (
+        <div className="hero-search-wrap">
+          <div className="hero-search">
+            <Search size={18} />
+            <input
+              type="search"
+              placeholder="찾고 싶은 상품을 검색해보세요"
+              value={searchQuery}
+              onChange={e => setSearchQuery(e.target.value)}
+            />
+          </div>
+        </div>
+      )}
+
       {showingMainFeed && urgentCount > 0 && (
         <div className="notify-banner">
           <div className="notify-inner">

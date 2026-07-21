@@ -189,6 +189,41 @@ header {
   color: rgba(255,255,255,0.85);
 }
 
+/* ── Hero search ── */
+.hero-search-wrap {
+  max-width: 680px;
+  margin: 0 auto;
+  padding: 16px 20px 0;
+}
+.hero-search {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: white;
+  border: 1.5px solid var(--gray-2);
+  border-radius: 14px;
+  padding: 14px 16px;
+  color: var(--gray-3);
+  transition: border-color .2s;
+}
+.hero-search:focus-within {
+  border-color: var(--pink);
+  color: var(--pink);
+}
+.hero-search input {
+  flex: 1;
+  border: none;
+  outline: none;
+  background: none;
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text);
+}
+.hero-search input::placeholder {
+  color: var(--gray-3);
+  font-weight: 600;
+}
+
 /* ── Category ── */
 .category-wrap {
   max-width: 680px;

@@ -18,8 +18,10 @@ export default function sitemap(): MetadataRoute.Sitemap {
       changeFrequency: 'hourly',
       priority: 1,
     },
+    // sitemap 프로토콜은 URL이 RFC 3986대로 이스케이프돼 있어야 해서, 한글 등 컬렉션 id를
+    // encodeURI로 퍼센트 인코딩한다 (Next가 자동으로 해주지 않음)
     ...collections.map(c => ({
-      url: `${SITE_URL}/collection/${c.id}`,
+      url: encodeURI(`${SITE_URL}/collection/${c.id}`),
       lastModified: new Date(c.createdAt),
       changeFrequency: 'daily' as const,
       priority: 0.7,
