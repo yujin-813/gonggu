@@ -55,6 +55,11 @@ BLOCK_DOMAINS = (
     "t.me", "band.us", "youtube.com", "youtu.be",
     "forms.gle", "docs.google.com",
 )
+# 상담/CS 도메인 — 가격 뱃지가 있어도 구매 페이지가 아니므로 무조건 제외
+# (네이버톡톡 상담 링크를 "구매하기" 버튼에 걸어둔 판매자가 있어 가격 예외를 두지 않는다)
+HARD_BLOCK_DOMAINS = (
+    "talk.naver.com",
+)
 # 상시판매 신호 — 제목에 있으면 공구가 아님
 ALWAYS_ON_KW = ("상시판매", "상시 판매", "상시할인", "상시 할인", "상시구매", "상시 구매")
 
@@ -631,17 +636,22 @@ def fetch_product_info(url, domain):
     return result, debug
 
 
+def _domain_matches(domain, domains):
+    return any(domain == b or domain.endswith("." + b) or domain.endswith(b) for b in domains)
+
+
 def is_product(domain, price, title=""):
     """공구인지 판정. 가격 뱃지가 있으면 도메인 무관 공구. 상시판매·비커머스는 제외.
     도메인을 못 구하면 보수적으로 공구로 간주(검수 대기에서 사람이 판단)."""
     if any(kw in title for kw in ALWAYS_ON_KW):
         return False
+    if domain and _domain_matches(domain, HARD_BLOCK_DOMAINS):
+        return False
     if price:
         return True
     if domain is None:
         return True
-    return not any(domain == b or domain.endswith("." + b) or domain.endswith(b)
-                   for b in BLOCK_DOMAINS)
+    return not _domain_matches(domain, BLOCK_DOMAINS)
 
 
 def resolve_img(img, shortcode):
@@ -832,14 +842,17 @@ def fetch_naver_market_price(title, price=None):
     return {}
 
 
-def classify_status(title, purchase_url, price, deadline, extraction_confidence=None, sold_out_only=False):
+def classify_status(title, purchase_url, price, deadline, extraction_confidence=None, sold_out_only=False, block_title=""):
     if not title:
         return "excluded", ["상품명 없음"]
 
     t = title.lower()
+    # 인포크 블록 원제목도 함께 검사 — 구매 페이지에서 추출한 title(JSON-LD 등)이
+    # block_title을 덮어써서 "네이버톡톡"/"고객센터" 같은 원래 라벨이 사라지는 경우를 방지
+    bt = (block_title or "").lower()
 
     # 비공구 신호 즉시 제외
-    if any(kw in t for kw in NON_DEAL_KW):
+    if any(kw in t or kw in bt for kw in NON_DEAL_KW):
         return "excluded", ["비공구"]
 
     # 가격·마감일·공구 키워드 모두 없으면 상품 추천 링크로 판단
@@ -887,7 +900,7 @@ def block_to_post(b, ig_handle, price, domain, profile_url, purchase_url, deadli
     # 고정 마감일이 없을 때, 구매 페이지 또는 인포크 제목에 "소진시/품절시" 문구가 있으면
     # 추출 실패가 아니라 원래 마감일이 없는 판매 방식으로 본다
     sold_out_only = bool(pi.get("sold_out_only")) or (not deadline and bool(_SOLD_OUT_PATTERN.search(block_title)))
-    status, review_reason = classify_status(title, purchase_url, price, deadline, confidence, sold_out_only)
+    status, review_reason = classify_status(title, purchase_url, price, deadline, confidence, sold_out_only, block_title)
     # 신뢰도 낮은 매칭(판매가의 30% 미만)은 fetch_naver_market_price 내부에서 이미 걸러진다
     market = fetch_naver_market_price(title, price) if title else {}
     mp = market.get("market_price")

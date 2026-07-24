@@ -273,7 +273,7 @@ export default function Home() {
 
   return (
     <>
-      <h1 className="sr-only">지니모아 — 인스타그램 공동구매(공구) 모아보기</h1>
+      <h1 className="sr-only">꿀공구 — 인스타그램 공동구매(공구) 모아보기</h1>
       <Header
         onBookmarkView={() => { setViewingBookmarks(v => !v); setViewingFollowed(false) }}
         viewingBookmarks={viewingBookmarks}

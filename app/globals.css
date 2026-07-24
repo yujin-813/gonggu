@@ -13,9 +13,9 @@
 }
 
 :root {
-  --pink: #FF4B7B;
-  --pink-light: #FFF0F4;
-  --pink-mid: #FFD6E3;
+  --brand: #F0A500;
+  --brand-light: #FFF8E7;
+  --brand-mid: #FFE29C;
   --gray-1: #F8F8F8;
   --gray-2: #EEEEEE;
   --gray-3: #AAAAAA;
@@ -59,6 +59,11 @@ header {
   letter-spacing: -0.5px;
   white-space: nowrap;
 }
+.logo-symbol {
+  display: block;
+  object-fit: contain;
+  flex-shrink: 0;
+}
 .logo-tagline {
   font-size: 12px;
   font-weight: 500;
@@ -79,7 +84,7 @@ header {
   flex-shrink: 0;
 }
 .btn-icon:hover { background: var(--gray-2); }
-.btn-icon.active { background: var(--pink-light); color: var(--pink); }
+.btn-icon.active { background: var(--brand-light); color: var(--brand); }
 .btn-icon:disabled { opacity: 0.5; cursor: not-allowed; }
 
 /* ── Recently viewed ── */
@@ -194,8 +199,8 @@ header {
   transition: border-color .2s;
 }
 .hero-search:focus-within {
-  border-color: var(--pink);
-  color: var(--pink);
+  border-color: var(--brand);
+  color: var(--brand);
 }
 .hero-search input {
   flex: 1;
@@ -239,7 +244,7 @@ header {
   gap: 5px;
 }
 .cat-btn:hover { border-color: var(--gray-3); color: var(--text); }
-.cat-btn.active { background: var(--pink); border-color: var(--pink); color: white; }
+.cat-btn.active { background: var(--brand); border-color: var(--brand); color: white; }
 
 /* ── Topbar ── */
 .topbar {
@@ -328,7 +333,7 @@ header {
   align-items: center;
   gap: 4px;
 }
-.badge-deadline.urgent { background: #FF3B30; color: white; }
+.badge-deadline.urgent { background: #D02B1F; color: white; }
 .badge-deadline.soon   { background: #FF9500; color: white; }
 .badge-deadline.ok     { background: #34C759; color: white; }
 .badge-deadline.closed { background: #8E8E93; color: white; }
@@ -341,7 +346,7 @@ header {
   font-size: 11px;
   font-weight: 800;
   letter-spacing: 0.03em;
-  background: var(--pink);
+  background: var(--brand);
   color: white;
 }
 
@@ -359,7 +364,7 @@ header {
   backdrop-filter: blur(4px);
 }
 .btn-bookmark:hover { transform: scale(1.15); }
-.btn-bookmark.active { color: var(--pink); }
+.btn-bookmark.active { color: var(--brand); }
 
 .card-body { padding: 14px 16px 16px; }
 .card-top {
@@ -378,7 +383,7 @@ header {
 }
 .account-name { font-size: 13px; font-weight: 600; color: var(--gray-4); }
 .account-name a { color: inherit; text-decoration: none; }
-.account-name a:hover { color: var(--pink); }
+.account-name a:hover { color: var(--brand); }
 .btn-follow-star {
   background: none;
   border: none;
@@ -418,10 +423,10 @@ header {
   gap: 6px 8px;
   margin-bottom: 2px;
 }
-.price-sale-big { font-size: 28px; font-weight: 900; color: var(--pink); letter-spacing: -0.02em; }
+.price-sale-big { font-size: 28px; font-weight: 900; color: var(--brand); letter-spacing: -0.02em; }
 .price-orig { font-size: 13px; color: var(--gray-3); text-decoration: line-through; }
 .discount-chip {
-  background: #FF3B30;
+  background: #D02B1F;
   color: white;
   font-size: 12px;
   font-weight: 800;
@@ -440,7 +445,7 @@ header {
   color: var(--gray-4);
   margin-bottom: 8px;
 }
-.period-row.urgent { color: #FF3B30; }
+.period-row.urgent { color: #D02B1F; }
 .deal-judgment {
   display: flex;
   align-items: center;
@@ -453,7 +458,7 @@ header {
 }
 .judgment-verdict { font-weight: 700; white-space: nowrap; }
 .judgment-detail  { opacity: 0.85; }
-.deal-judgment-great    { background: var(--pink-light); color: var(--pink); }
+.deal-judgment-great    { background: var(--brand-light); color: var(--brand); }
 .deal-judgment-good    { background: #dcfce7; color: #15803d; }
 .deal-judgment-neutral { background: #fef9c3; color: #854d0e; }
 .deal-judgment-check   { background: #fff7ed; color: #c2410c; }
@@ -471,7 +476,7 @@ header {
 .card-cta {
   display: block;
   width: 100%;
-  background: var(--pink);
+  background: var(--brand);
   color: white;
   border: none;
   padding: 15px 0;
@@ -501,7 +506,7 @@ header {
 .fab-pill {
   position: fixed;
   bottom: 28px; right: 20px;
-  background: var(--pink);
+  background: var(--brand);
   color: white;
   border: none;
   border-radius: 30px;
@@ -569,12 +574,12 @@ header {
   font-family: inherit;
   background: white;
 }
-.modal input:focus, .modal select:focus { border-color: var(--pink); }
+.modal input:focus, .modal select:focus { border-color: var(--brand); }
 .modal-row { display: flex; gap: 12px; }
 .modal-row > div { flex: 1; }
 .btn-submit {
   width: 100%;
-  background: var(--pink);
+  background: var(--brand);
   color: white;
   border: none;
   border-radius: 12px;
@@ -647,8 +652,8 @@ header {
 .notify-text p:last-child { font-size: 12px; color: var(--gray-3); margin-top: 2px; }
 .notify-btn {
   background: none;
-  color: var(--pink);
-  border: 1.5px solid var(--pink);
+  color: var(--brand);
+  border: 1.5px solid var(--brand);
   border-radius: 8px;
   padding: 7px 14px;
   font-size: 12px;

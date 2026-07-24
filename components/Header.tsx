@@ -1,4 +1,4 @@
-import { ShoppingBag, Bell, BellOff, Star, House, Heart } from 'lucide-react'
+import { Bell, BellOff, Star, House, Heart } from 'lucide-react'
 
 interface HeaderProps {
   onBookmarkView: () => void
@@ -17,9 +17,10 @@ export default function Header({
     <header>
       <div className="header-inner">
         <div className="logo">
-          <ShoppingBag size={20} strokeWidth={2.2} />
-          <span className="logo-text">지니모아</span>
-          <span className="logo-tagline">| 인스타 공구 모아보기</span>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/logo-symbol.png" alt="" className="logo-symbol" width={20} height={20} />
+          <span className="logo-text">꿀공구</span>
+          <span className="logo-tagline">| 꿀 같은 공구만 모아드려요</span>
         </div>
         <div style={{ flex: 1 }} />
         <button
