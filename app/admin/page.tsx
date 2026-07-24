@@ -794,7 +794,11 @@ function AdminPostRow({ post: p, onToggle, onDelete, onEdit, onToggleAlwaysOn, o
   onQuickReview: (p: Post, action: 'approve' | 'always_on' | 'exclude') => void
   periodLabel: string
 }) {
-  const published = p.status === 'published' || (!p.status && p.published !== false)
+  // upcoming 공구는 status가 'upcoming' 그대로 유지된 채 published 필드만으로 공개 여부를 결정한다
+  // (togglePublished와 동일한 기준을 써야 버튼 표시가 실제 공개 상태와 어긋나지 않는다)
+  const published = p.status === 'upcoming'
+    ? p.published !== false
+    : p.status === 'published' || (!p.status && p.published !== false)
   const expired   = isExpired(p)
   // 관리자엔 "공개됨"으로 보여도 마감일이 지나면 고객 화면(/api/posts) 필터에서 자동 제외됨 — 상시딜/소진시는 예외
   const hiddenFromCustomers = published && expired
@@ -1174,7 +1178,7 @@ function InfluencerManager({
   )
 }
 
-const COLLECTION_COLORS = ['#FF4B7B', '#6366f1', '#0ea5e9', '#22c55e', '#f97316', '#a855f7', '#eab308', '#14b8a6']
+const COLLECTION_COLORS = ['#F0A500', '#6366f1', '#0ea5e9', '#22c55e', '#f97316', '#a855f7', '#eab308', '#14b8a6']
 
 const emptyCollectionForm = {
   title: '', description: '', emoji: '🛍️', color: COLLECTION_COLORS[0], expiresAt: '', productIds: [] as number[],

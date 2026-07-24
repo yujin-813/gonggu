@@ -31,7 +31,7 @@ export async function POST(request: NextRequest) {
     title: data.title,
     description: data.description || '',
     emoji: data.emoji || '🛍️',
-    color: data.color || '#FF4B7B',
+    color: data.color || '#F0A500',
     productIds: Array.isArray(data.productIds) ? data.productIds.map(Number) : [],
     expiresAt: data.expiresAt || null,
     createdAt: new Date().toISOString(),
