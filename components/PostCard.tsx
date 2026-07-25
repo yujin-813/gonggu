@@ -95,13 +95,24 @@ export default function PostCard({
     ? `https://instagram.com/${post.account.replace('@', '')}`
     : '#'
 
+  const purchaseLink = post.purchase_url || post.url
+  const canOpenPurchase = !closed && !isUpcoming && !!purchaseLink
+  const openPurchaseLink = () => {
+    if (!canOpenPurchase) return
+    onJoin?.(post.id)
+    window.open(purchaseLink, '_blank')
+  }
+
   const CatIcon = categoryIcon(post.cat)
   const BadgeIconEl = badge ? BADGE_ICON[badge.icon] : null
   const PeriodIconEl = PERIOD_ICON[dt.icon]
 
   return (
     <div className="card">
-      <div className="card-img-wrap">
+      <div
+        className={`card-img-wrap ${canOpenPurchase ? 'clickable' : ''}`}
+        onClick={openPurchaseLink}
+      >
         {post.img && !imgFailed ? (
           <>
             {/* 뒷배경: 꽉 채워 흐리게 — 앞의 원본 이미지가 잘리지 않게 여백을 자연스럽게 채워줌 */}
@@ -125,7 +136,7 @@ export default function PostCard({
         {isNew && <div className="badge-new">NEW</div>}
         <button
           className={`btn-bookmark ${isBookmarked ? 'active' : ''}`}
-          onClick={() => onToggleBookmark(post.id)}
+          onClick={(e) => { e.stopPropagation(); onToggleBookmark(post.id) }}
         >
           <Heart size={16} fill={isBookmarked ? 'currentColor' : 'none'} />
         </button>
@@ -225,12 +236,9 @@ export default function PostCard({
 
       {/* CTA — 카드 맨 아래, 옆 여백 없이 가로 전체를 다 쓰는 버튼 */}
       <button
-        className={`card-cta ${closed || isUpcoming || !(post.purchase_url || post.url) ? 'closed' : ''}`}
-        onClick={() => {
-          const link = post.purchase_url || post.url
-          if (!closed && !isUpcoming && link) { onJoin?.(post.id); window.open(link, '_blank') }
-        }}
-        disabled={closed || isUpcoming || !(post.purchase_url || post.url)}
+        className={`card-cta ${canOpenPurchase ? '' : 'closed'}`}
+        onClick={openPurchaseLink}
+        disabled={!canOpenPurchase}
         style={isUpcoming ? { background: '#ede9fe', color: '#7c3aed' } : {}}
       >
         {closed

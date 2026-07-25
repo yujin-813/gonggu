@@ -287,6 +287,7 @@ header {
   transition: transform .18s, box-shadow .18s;
 }
 .card:hover { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(0,0,0,0.1); }
+.card-img-wrap.clickable { cursor: pointer; }
 .card-img-wrap {
   position: relative;
   width: 100%;
