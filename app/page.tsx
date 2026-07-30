@@ -33,7 +33,14 @@ function getVisitorId(): string {
   return id
 }
 
+// 방문 URL에 ?notrack=1을 한 번 붙이면 이 브라우저는 이후 계속 통계에서 제외된다
+// (?notrack=0으로 다시 접속하면 해제) — 테스트를 많이 하는 운영자 본인 브라우저용
+function isTrackingDisabled(): boolean {
+  return localStorage.getItem('gonggu_no_track') === '1'
+}
+
 function track(type: string, extra?: { postId?: number }) {
+  if (isTrackingDisabled()) return
   fetch('/api/analytics', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -75,6 +82,10 @@ export default function Home() {
   const [kakaoBannerDismissed, setKakaoBannerDismissed] = useState(true)  // 초기 렌더 깜빡임 방지 — mount 시 localStorage 값으로 교체
 
   useEffect(() => {
+    const notrack = new URLSearchParams(window.location.search).get('notrack')
+    if (notrack === '1') localStorage.setItem('gonggu_no_track', '1')
+    else if (notrack === '0') localStorage.removeItem('gonggu_no_track')
+
     const saved = JSON.parse(localStorage.getItem('gonggu_bookmarks') || '[]')
     setBookmarks(new Set(saved))
     setRecentlyViewed(JSON.parse(localStorage.getItem('gonggu_recent') || '[]'))
