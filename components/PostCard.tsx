@@ -22,16 +22,19 @@ function dealJudgment(post: Post): { verdict: string; detail: string; cls: strin
   if (post.custom_verdict) {
     return { verdict: post.custom_verdict, detail: post.custom_verdict_detail || '', cls: post.custom_verdict_cls || 'neutral' }
   }
-  // 네이버 자동 매칭가가 있으면 우선 사용하고, 없으면 직접 입력된 정가라도 기준으로 삼는다
-  // (자동 매칭은 니치 상품이면 실패하는 경우가 많아, 절반 가까운 공구가 아예 판단을 못 받고 있었음)
-  const mp = post.market_price || post.origPrice
+  // 관리자가 직접 입력/검색해 확인한 정가(origPrice)가 있으면 그걸 우선 기준으로 삼는다 —
+  // 자동 매칭(market_price)은 니치 상품이거나 옵션이 다르면 엉뚱한 상품과 매칭돼 있을 수 있어서,
+  // 사람이 직접 확인한 값보다 신뢰도가 낮다. AddPostModal에도 "직접 입력하면 그 값이 우선
+  // 사용돼요"라고 안내하고 있으니 계산도 그 안내와 일치해야 한다.
+  const mp = post.origPrice || post.market_price
   // 비교 기준가가 아예 없는 경우 — "여기서만 판매"처럼 확인 안 된 걸 단정하지 않고,
   // 검색에 안 걸렸다는 사실만 담백하게 알려준다
   if (!mp) {
     return { verdict: '네이버 최저가 정보가 없어요', detail: '이 상품은 네이버 쇼핑에서 검색되지 않았어요', cls: 'neutral' }
   }
   const p  = post.price
-  const label = post.market_price ? '네이버 최저가' : '정가'
+  // origPrice를 직접 타이핑만 하고 네이버 링크(market_url)를 안 남겼으면 "정가", 그 외엔 네이버 기준
+  const label = post.origPrice && !post.market_url ? '정가' : '네이버 최저가'
   // 자동 매칭된 가격이 이 공구와 구성이 달라 단순 비교가 부정확할 수 있을 때 관리자가 남긴
   // 참고 문구 — 자동 계산 결과를 지우지 않고 뒤에 그대로 덧붙인다
   const noteSuffix = post.market_price_note ? ` · ${post.market_price_note}` : ''
