@@ -5,7 +5,7 @@ import { daysLeft, getPeriodState, badgeFromState, periodTextFromState, isExpire
 import { CATEGORY_LABEL, categoryIcon } from '@/lib/categoryIcons'
 import {
   Heart, Star, Wallet, CheckCircle2, Calendar, CalendarClock,
-  Package, Flame, Lock, Timer, Zap,
+  Package, Flame, Lock, Timer, Zap, ExternalLink,
 } from 'lucide-react'
 import PriceCompareModal from './PriceCompareModal'
 
@@ -13,6 +13,7 @@ const BADGE_ICON: Record<BadgeIcon, typeof Calendar> = {
   'calendar-clock': CalendarClock, package: Package, flame: Flame, lock: Lock, timer: Timer,
 }
 const PERIOD_ICON: Record<PeriodIcon, typeof Calendar> = { calendar: Calendar, zap: Zap }
+const PARTNERS_LABEL: Record<'naver' | 'coupang', string> = { naver: '네이버', coupang: '쿠팡' }
 
 function dealJudgment(post: Post): { verdict: string; detail: string; cls: string } | null {
   if (!post.price || post.status === 'upcoming') return null
@@ -206,6 +207,27 @@ export default function PostCard({
             <span className="judgment-verdict">{judgment.verdict}</span>
             <span className="judgment-detail">{judgment.detail}</span>
           </div>
+        )}
+
+        {/* 파트너스(제휴) 대체 구매 링크 — dealJudgment(공구 가격 판단)와는 별개로, 참고용 대체
+            구매처만 담백하게 안내한다. 관리자가 platform/price/url을 모두 채우고 노출을 켰을 때만 표시 */}
+        {post.partners_visible && post.partners_platform && post.partners_price && post.partners_url && (
+          <a
+            href={post.partners_url}
+            target="_blank"
+            rel="noopener noreferrer sponsored"
+            onClick={e => e.stopPropagation()}
+            style={{
+              display: 'flex', alignItems: 'center', gap: 4,
+              fontSize: 11, color: '#0369a1', background: '#f0f9ff',
+              border: '1px solid #bae6fd', borderRadius: 8,
+              padding: '5px 8px', marginBottom: 8, textDecoration: 'none',
+            }}
+          >
+            <ExternalLink size={11} />
+            {PARTNERS_LABEL[post.partners_platform]}에서도 {post.partners_price.toLocaleString()}원에 구매 가능
+            {post.partners_option_note && <span style={{ color: '#64748b' }}>· {post.partners_option_note}</span>}
+          </a>
         )}
 
         {isVerified && (

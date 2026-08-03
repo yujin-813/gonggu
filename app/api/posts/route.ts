@@ -103,6 +103,12 @@ export async function POST(request: NextRequest) {
     custom_verdict:        data.custom_verdict?.trim() || null,
     custom_verdict_detail: data.custom_verdict_detail?.trim() || null,
     custom_verdict_cls:    data.custom_verdict_cls || null,
+    partners_platform:     data.partners_platform || null,
+    partners_price:        data.partners_price ? parseInt(data.partners_price) : null,
+    partners_url:          data.partners_url?.trim() || null,
+    partners_option_note:  data.partners_option_note?.trim() || null,
+    partners_checked_at:   data.partners_checked_at || null,
+    partners_visible:      Boolean(data.partners_visible),
   }
 
   posts.unshift(newPost)

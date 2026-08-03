@@ -67,6 +67,16 @@ export interface Post {
   // 이 상품이 속한 컬렉션 id 목록 — 컬렉션 소속 여부의 SSOT는 Collection.productIds 쪽이며,
   // 이 필드는 상품 쪽에서 역으로 조회하고 싶을 때를 위한 참고용(파생) 값이다.
   collectionIds?: string[]
+  // 파트너스(제휴) 대체 구매 링크 — 공구 자체와는 별개로, 같은 상품을 네이버/쿠팡 파트너스
+  // 링크로도 구매할 수 있을 때 참고용으로 보여주는 보조 정보. dealJudgment(공구 가격 판단)와는
+  // 완전히 분리되어 있으며, partners_visible이 true고 platform/price/url이 모두 있을 때만
+  // 고객 화면에 노출된다.
+  partners_platform?: 'naver' | 'coupang' | null
+  partners_price?: number | null
+  partners_url?: string | null
+  partners_option_note?: string | null
+  partners_checked_at?: string | null
+  partners_visible?: boolean
 }
 
 export interface Collection {

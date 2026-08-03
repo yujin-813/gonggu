@@ -78,6 +78,12 @@ export default function AddPostModal({ onClose, onSubmit, editPost, existingGrou
   const [customVerdictDetail, setCustomVerdictDetail] = useState('')
   const [customVerdictCls,    setCustomVerdictCls]    = useState<'great' | 'good' | 'neutral' | 'check'>('good')
 
+  const [partnersPlatform,   setPartnersPlatform]   = useState<'' | 'naver' | 'coupang'>('')
+  const [partnersPrice,      setPartnersPrice]      = useState('')
+  const [partnersUrl,        setPartnersUrl]        = useState('')
+  const [partnersOptionNote, setPartnersOptionNote] = useState('')
+  const [partnersVisible,    setPartnersVisible]    = useState(false)
+
   const [imgFile,    setImgFile]    = useState<File | null>(null)
   const [imgPreview, setImgPreview] = useState('')   // blob URL or existing img URL
   const [imgSaved,   setImgSaved]   = useState('')   // uploaded path from server
@@ -105,6 +111,11 @@ export default function AddPostModal({ onClose, onSubmit, editPost, existingGrou
     setCustomVerdict(editPost.custom_verdict || '')
     setCustomVerdictDetail(editPost.custom_verdict_detail || '')
     setCustomVerdictCls(editPost.custom_verdict_cls || 'good')
+    setPartnersPlatform(editPost.partners_platform || '')
+    setPartnersPrice(editPost.partners_price ? String(editPost.partners_price) : '')
+    setPartnersUrl(editPost.partners_url || '')
+    setPartnersOptionNote(editPost.partners_option_note || '')
+    setPartnersVisible(editPost.partners_visible ?? false)
     const gk = editPost.group_key || ''
     setGroupKey(gk)
     setNewGroupMode(false)
@@ -212,6 +223,8 @@ export default function AddPostModal({ onClose, onSubmit, editPost, existingGrou
       const review_reason = (editPost?.review_reason || []).filter(r =>
         !(r === '가격 미입력' && hasPrice) && !(r === '마감일 미확인' && hasDeadline)
       )
+      // 플랫폼/가격/링크가 다 채워져야 파트너스 정보로 인정 — 하나라도 비면 고객 노출도 강제로 끈다
+      const partnersComplete = !!(partnersPlatform && partnersPrice && partnersUrl.trim())
       await onSubmit({
         shortcode:    editPost?.shortcode ?? null,
         title:        title.trim(),
@@ -236,6 +249,12 @@ export default function AddPostModal({ onClose, onSubmit, editPost, existingGrou
         custom_verdict:        customVerdict.trim() || null,
         custom_verdict_detail: customVerdict.trim() ? (customVerdictDetail.trim() || null) : null,
         custom_verdict_cls:    customVerdict.trim() ? customVerdictCls : null,
+        partners_platform:     partnersPlatform || null,
+        partners_price:        partnersPrice ? parseInt(partnersPrice) : null,
+        partners_url:          partnersUrl.trim() || null,
+        partners_option_note:  partnersOptionNote.trim() || null,
+        partners_checked_at:   partnersComplete ? new Date().toISOString() : null,
+        partners_visible:      partnersComplete && partnersVisible,
       })
     } catch (err) {
       console.error(err)
@@ -504,6 +523,65 @@ export default function AddPostModal({ onClose, onSubmit, editPost, existingGrou
               취소
             </button>
           </div>
+        )}
+
+        {/* 파트너스(제휴) 대체 구매 링크 — 구매 판단 문구와는 완전히 별개 정보 */}
+        <label>
+          파트너스(제휴) 대체 구매 링크
+          <span style={{ fontSize: 12, color: '#94a3b8', fontWeight: 400, marginLeft: 6 }}>
+            (선택 — 같은 상품을 네이버/쿠팡 파트너스로도 구매할 수 있을 때만)
+          </span>
+        </label>
+        <div className="modal-row">
+          <div>
+            <select value={partnersPlatform} onChange={e => setPartnersPlatform(e.target.value as typeof partnersPlatform)}>
+              <option value="">연결 안 함</option>
+              <option value="naver">네이버 파트너스</option>
+              <option value="coupang">쿠팡 파트너스</option>
+            </select>
+          </div>
+          <div>
+            <input
+              type="number"
+              value={partnersPrice}
+              onChange={e => setPartnersPrice(e.target.value)}
+              placeholder="가격 (원)"
+              disabled={!partnersPlatform}
+            />
+          </div>
+        </div>
+        {partnersPlatform && (
+          <>
+            <input
+              type="url"
+              value={partnersUrl}
+              onChange={e => setPartnersUrl(e.target.value)}
+              placeholder="https://..."
+              style={{ marginTop: 6 }}
+            />
+            <input
+              type="text"
+              value={partnersOptionNote}
+              onChange={e => setPartnersOptionNote(e.target.value)}
+              placeholder="옵션/구성 참고사항 (선택 — 예: 2개입 기준)"
+              style={{ marginTop: 6 }}
+            />
+            <label style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 8, fontWeight: 400, fontSize: 13 }}>
+              <input
+                type="checkbox"
+                checked={partnersVisible}
+                onChange={e => setPartnersVisible(e.target.checked)}
+                disabled={!(partnersPlatform && partnersPrice && partnersUrl.trim())}
+                style={{ width: 'auto' }}
+              />
+              고객 화면에 노출
+            </label>
+            {!(partnersPlatform && partnersPrice && partnersUrl.trim()) && (
+              <p style={{ fontSize: 11, color: '#94a3b8', margin: '4px 0 0' }}>
+                가격과 링크를 모두 입력해야 노출할 수 있어요
+              </p>
+            )}
+          </>
         )}
 
         {/* 이미지 업로드 */}
