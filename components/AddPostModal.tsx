@@ -56,23 +56,7 @@ export default function AddPostModal({ onClose, onSubmit, editPost, existingGrou
   const [newGroupMode,  setNewGroupMode]  = useState(false)
   const [newGroupInput, setNewGroupInput] = useState('')
 
-  const [marketUrl,       setMarketUrl]       = useState('')
-  const [marketQuery,     setMarketQuery]     = useState('')
-  const [marketSearching, setMarketSearching] = useState(false)
-  const [marketResults,   setMarketResults]   = useState<{ title: string; lprice: number; mallName: string; link: string }[]>([])
-
-  async function searchMarketPrice(q: string) {
-    const query = q.trim()
-    if (!query) return
-    setMarketSearching(true)
-    setMarketResults([])
-    try {
-      const r = await fetch(`/api/market-price?q=${encodeURIComponent(query)}`)
-      const d = await r.json()
-      setMarketResults(d.items ?? [])
-    } catch {}
-    finally { setMarketSearching(false) }
-  }
+  const [marketUrl, setMarketUrl] = useState('')
 
   const [customVerdict,       setCustomVerdict]       = useState('')
   const [customVerdictDetail, setCustomVerdictDetail] = useState('')
@@ -373,35 +357,27 @@ export default function AddPostModal({ onClose, onSubmit, editPost, existingGrou
           </div>
           <div>
             <label style={{ margin: '0 0 6px', display: 'block' }}>네이버쇼핑 가격 (원, 선택)</label>
-            <div style={{ display: 'flex', gap: 6, marginBottom: 6 }}>
-              <input
-                type="text"
-                value={marketQuery}
-                onChange={e => setMarketQuery(e.target.value)}
-                onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); searchMarketPrice(marketQuery || title) } }}
-                placeholder={title.trim() || '검색어 입력 (예: 모로오렌지)'}
-                style={{ flex: 1, padding: '7px 10px', borderRadius: 7, border: '1.5px solid #e2e8f0', fontSize: 12, outline: 'none' }}
-              />
-              <button
-                type="button"
-                onClick={() => searchMarketPrice(marketQuery || title)}
-                disabled={marketSearching || !(marketQuery.trim() || title.trim())}
+            <div style={{ marginBottom: 6 }}>
+              <a
+                href={`https://search.shopping.naver.com/search/all?query=${encodeURIComponent(title)}`}
+                target="_blank"
+                rel="noopener noreferrer"
                 style={{
-                  background: (marketQuery.trim() || title.trim()) ? '#6366f1' : '#94a3b8', color: '#fff', border: 'none',
-                  borderRadius: 7, padding: '0 12px', fontSize: 12, fontWeight: 600,
-                  cursor: (marketQuery.trim() || title.trim()) ? 'pointer' : 'default', whiteSpace: 'nowrap',
+                  display: 'inline-flex', alignItems: 'center', gap: 4,
+                  background: '#f1f5f9', color: '#475569', border: '1.5px solid #e2e8f0',
+                  borderRadius: 7, padding: '6px 12px', fontSize: 12, fontWeight: 600, textDecoration: 'none',
                 }}
               >
-                {marketSearching ? '검색 중...' : '🔍 검색'}
-              </button>
+                🔍 네이버쇼핑에서 검색 →
+              </a>
             </div>
             <p style={{ fontSize: 11, color: '#94a3b8', margin: '0 0 6px' }}>
-              기본값은 상품명 전체예요 — 검색이 안 되면 위 칸에 핵심 단어만 직접 입력해서 다시 검색해보세요 (예: 상품명 전체 대신 브랜드명만)
+              네이버 쇼핑 검색 API가 더 이상 지원되지 않아 자동 검색은 종료됐어요 — 위 링크로 새 탭에서 직접 검색해 가격/링크를 아래에 입력해주세요
             </p>
             <input type="number" value={origPrice} onChange={e => { setOrigPrice(e.target.value); if (!e.target.value) setMarketUrl('') }} placeholder="60000" />
             {isEdit && editPost?.market_price && !origPrice && (
               <p style={{ fontSize: 11, color: '#6366f1', margin: '4px 0 0' }}>
-                🔍 자동 매칭된 네이버 최저가: {editPost.market_price.toLocaleString()}원 (이 값은 자동 재검증되며, 직접 입력하면 그 값이 우선 사용돼요)
+                🔍 과거 자동 매칭된 네이버 최저가: {editPost.market_price.toLocaleString()}원 (자동 검색 종료로 더 이상 갱신되지 않는 값이에요 — 직접 입력하면 그 값이 우선 사용돼요)
               </p>
             )}
             {marketUrl && origPrice && (
@@ -418,33 +394,6 @@ export default function AddPostModal({ onClose, onSubmit, editPost, existingGrou
                 <p style={{ fontSize: 11, color: '#94a3b8', margin: '4px 0 0' }}>
                   구성이 달라 단순 비교가 부정확할 때만 채워주세요 — 자동 계산은 그대로 두고 이 문구를 판단 문구 뒤에 덧붙여요
                 </p>
-              </div>
-            )}
-            {marketResults.length > 0 && (
-              <div style={{ marginTop: 6, border: '1.5px solid #e2e8f0', borderRadius: 8, overflow: 'hidden' }}>
-                {marketResults.map((item, i) => (
-                  <button
-                    key={i}
-                    type="button"
-                    onClick={() => { setOrigPrice(String(item.lprice)); setMarketUrl(item.link); setMarketResults([]) }}
-                    style={{
-                      display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-                      width: '100%', padding: '8px 12px', background: i % 2 === 0 ? '#f8fafc' : '#fff',
-                      border: 'none', borderBottom: i < marketResults.length - 1 ? '1px solid #f1f5f9' : 'none',
-                      cursor: 'pointer', textAlign: 'left', gap: 8,
-                    }}
-                  >
-                    <span style={{ fontSize: 12, color: '#0f172a', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.title}</span>
-                    <span style={{ fontSize: 12, fontWeight: 700, color: '#e11d48', flexShrink: 0 }}>{item.lprice.toLocaleString()}원</span>
-                  </button>
-                ))}
-                <button
-                  type="button"
-                  onClick={() => setMarketResults([])}
-                  style={{ width: '100%', padding: '6px', background: '#f1f5f9', border: 'none', fontSize: 11, color: '#94a3b8', cursor: 'pointer' }}
-                >
-                  닫기
-                </button>
               </div>
             )}
           </div>
