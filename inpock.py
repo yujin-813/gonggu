@@ -18,7 +18,7 @@ import json
 import os
 import re
 import sys
-from datetime import datetime, date
+from datetime import datetime, date, timezone
 from pathlib import Path
 
 import requests
@@ -149,7 +149,7 @@ def load_sources():
 def write_status(new_count, skipped_count, error=None):
     STATUS_FILE.write_text(json.dumps({
         "running": False,
-        "last_run": datetime.now().isoformat(),
+        "last_run": datetime.now(timezone.utc).isoformat(),
         "last_count": new_count,
         "skipped_count": skipped_count,
         "error": error,
@@ -951,7 +951,7 @@ def block_to_post(b, sc, ig_handle, price, domain, profile_url, purchase_url, de
         "participants":    0,
         "avatar":          "🛍️",
         "caption":         "",
-        "scraped_at":      datetime.now().isoformat(),
+        "scraped_at":      datetime.now(timezone.utc).isoformat(),
         "source":          "inpock",
         "is_always_on":    False,
         "is_evergreen_deal": False,

@@ -7,7 +7,7 @@ import argparse
 import json
 import os
 import sys
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 
 # cron 실행 시 .env.local 환경변수 주입 (Next.js가 로드해주지 않으므로 직접 파싱)
@@ -35,7 +35,7 @@ def load_sources():
     if INPOCK_SOURCES_FILE.exists():
         try:
             handles = json.loads(INPOCK_SOURCES_FILE.read_text("utf-8"))
-            now = datetime.now().isoformat()
+            now = datetime.now(timezone.utc).isoformat()
             migrated = [
                 {
                     "id": f"inpock_{h}",
@@ -59,7 +59,7 @@ def load_sources():
 def write_status(new_count, skipped_count, error=None):
     status = {
         "running": False,
-        "last_run": datetime.now().isoformat(),
+        "last_run": datetime.now(timezone.utc).isoformat(),
         "last_count": new_count,
         "skipped_count": skipped_count,
         "error": error,
@@ -151,10 +151,10 @@ def run():
                 new, skipped = collect_linkhub(source)
             else:
                 new, skipped = collect_unknown(source)
-            _update_source_status(source.get("id", ""), "active", datetime.now().isoformat())
+            _update_source_status(source.get("id", ""), "active", datetime.now(timezone.utc).isoformat())
         except Exception as e:
             print(f"  ⚠️  수집 실패: {e}")
-            _update_source_status(source.get("id", ""), "failed", datetime.now().isoformat())
+            _update_source_status(source.get("id", ""), "failed", datetime.now(timezone.utc).isoformat())
             new, skipped = 0, 0
 
         total_new     += new

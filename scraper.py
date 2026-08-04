@@ -26,7 +26,7 @@ import argparse
 import os
 import getpass
 from pathlib import Path
-from datetime import datetime, date
+from datetime import datetime, date, timezone
 
 try:
     import requests as _requests
@@ -444,7 +444,7 @@ def post_to_dict(post, shortcode):
         "comments":   getattr(post, "comments", 0) or 0,
         "avatar":     CAT_EMOJI.get(cat, "🛍️"),
         "caption":    caption[:500],
-        "scraped_at": datetime.now().isoformat(),
+        "scraped_at": datetime.now(timezone.utc).isoformat(),
         "source":     "scraper",
         "published":  False,                         # 검수 대기 (관리자 보완 후 공개)
     }
@@ -473,7 +473,7 @@ def write_status(last_count, error=None):
     """스크래퍼 종료 상태를 기록. 웹앱(route.ts)이 이 값을 읽어 last_count를 표시한다."""
     STATUS_FILE.write_text(json.dumps({
         "running": False,
-        "last_run": datetime.now().isoformat(),
+        "last_run": datetime.now(timezone.utc).isoformat(),
         "last_count": last_count,
         "error": error,
     }, ensure_ascii=False, indent=2), encoding="utf-8")
@@ -585,7 +585,7 @@ def _fetch_profile_posts_api(username, cookies, limit, seen, loader=None, config
             "comments":    node.get("edge_media_to_comment", {}).get("count", 0),
             "avatar":      CAT_EMOJI.get(cat, "🛍️"),
             "caption":     caption_text[:500],
-            "scraped_at":  datetime.now().isoformat(),
+            "scraped_at":  datetime.now(timezone.utc).isoformat(),
             "source":      "scraper",
             "published":   False,
         }
