@@ -668,10 +668,21 @@ export default function AdminPage() {
 
       {(() => {
         const existingGroups = [...new Set(posts.map(p => p.group_key).filter(Boolean) as string[])]
+        // 같은 group_key로 묶인 지난 공구들의 가격을 모아둠 — 새 공구 등록/수정 시
+        // "이 상품 지난번엔 얼마였지?" 바로 참고할 수 있게. 날짜 최신순으로 정렬
+        const groupPriceHistory: Record<string, { id: number; price: number; origPrice: number | null; date: string }[]> = {}
+        for (const p of posts) {
+          if (!p.group_key || !p.price) continue
+          const date = p.start_date || (p.scraped_at || '').slice(0, 10) || ''
+          ;(groupPriceHistory[p.group_key] ??= []).push({ id: p.id, price: p.price, origPrice: p.origPrice ?? null, date })
+        }
+        for (const g in groupPriceHistory) {
+          groupPriceHistory[g].sort((a, b) => b.date.localeCompare(a.date))
+        }
         return (
           <>
-            {showAddModal && <AddPostModal onClose={() => setShowAddModal(false)} onSubmit={addPost} existingGroups={existingGroups} />}
-            {editingPost  && <AddPostModal onClose={() => setEditingPost(null)} onSubmit={updatePost} editPost={editingPost ?? undefined} existingGroups={existingGroups} />}
+            {showAddModal && <AddPostModal onClose={() => setShowAddModal(false)} onSubmit={addPost} existingGroups={existingGroups} groupPriceHistory={groupPriceHistory} />}
+            {editingPost  && <AddPostModal onClose={() => setEditingPost(null)} onSubmit={updatePost} editPost={editingPost ?? undefined} existingGroups={existingGroups} groupPriceHistory={groupPriceHistory} />}
           </>
         )
       })()}

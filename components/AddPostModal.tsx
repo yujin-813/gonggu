@@ -44,9 +44,10 @@ interface Props {
   onSubmit:       (post: PostInput) => Promise<void>
   editPost?:      Post
   existingGroups?: string[]
+  groupPriceHistory?: Record<string, { id: number; price: number; origPrice: number | null; date: string }[]>
 }
 
-export default function AddPostModal({ onClose, onSubmit, editPost, existingGroups = [] }: Props) {
+export default function AddPostModal({ onClose, onSubmit, editPost, existingGroups = [], groupPriceHistory = {} }: Props) {
   const isEdit = !!editPost
   const fileRef = useRef<HTMLInputElement>(null)
 
@@ -508,6 +509,22 @@ export default function AddPostModal({ onClose, onSubmit, editPost, existingGrou
             >
               취소
             </button>
+          </div>
+        )}
+        {!newGroupMode && groupKey && groupPriceHistory[groupKey]?.some(h => h.id !== editPost?.id) && (
+          <div style={{ marginTop: 6, background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 8, padding: '8px 10px' }}>
+            <p style={{ fontSize: 11, color: '#64748b', margin: '0 0 4px', fontWeight: 600 }}>📈 이 그룹 지난 공구가</p>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+              {groupPriceHistory[groupKey]
+                .filter(h => h.id !== editPost?.id)
+                .slice(0, 6)
+                .map(h => (
+                  <span key={h.id} style={{ fontSize: 12, background: '#fff', border: '1px solid #e2e8f0', borderRadius: 6, padding: '2px 8px', color: '#334155' }}>
+                    {h.date ? `${h.date.slice(5).replace('-', '.')} · ` : ''}{h.price.toLocaleString()}원
+                    {h.origPrice && h.origPrice > h.price && <span style={{ color: '#94a3b8' }}> (정가 {h.origPrice.toLocaleString()})</span>}
+                  </span>
+                ))}
+            </div>
           </div>
         )}
 
