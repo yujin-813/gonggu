@@ -351,11 +351,11 @@ export default function AdminPage() {
     })
   }
 
-  async function quickReview(p: Post, action: 'approve' | 'always_on' | 'exclude') {
+  async function quickReview(p: Post, action: 'approve' | 'always_on' | 'exclude', reason?: string) {
     const patch =
       action === 'approve'   ? { status: 'ready' as const, published: false } :
       action === 'always_on' ? { status: 'ready' as const, published: false, is_evergreen_deal: true, is_always_on: true } :
-                               { status: 'excluded' as const, published: false }
+                               { status: 'excluded' as const, published: false, review_reason: reason ? [reason] : [] }
     setPosts(prev => prev.map(x => x.id === p.id ? { ...x, ...patch } : x))
     await fetch(`/api/posts/${p.id}`, {
       method: 'PATCH',
@@ -791,7 +791,7 @@ function AdminPostRow({ post: p, onToggle, onDelete, onEdit, onToggleAlwaysOn, o
   onEdit:   (p: Post) => void
   onToggleAlwaysOn: (p: Post) => void
   onToggleSoldOutOnly: (p: Post) => void
-  onQuickReview: (p: Post, action: 'approve' | 'always_on' | 'exclude') => void
+  onQuickReview: (p: Post, action: 'approve' | 'always_on' | 'exclude', reason?: string) => void
   periodLabel: string
 }) {
   // upcoming 공구는 status가 'upcoming' 그대로 유지된 채 published 필드만으로 공개 여부를 결정한다
@@ -802,6 +802,12 @@ function AdminPostRow({ post: p, onToggle, onDelete, onEdit, onToggleAlwaysOn, o
   const expired   = isExpired(p)
   // 관리자엔 "공개됨"으로 보여도 마감일이 지나면 고객 화면(/api/posts) 필터에서 자동 제외됨 — 상시딜/소진시는 예외
   const hiddenFromCustomers = published && expired
+  // 제외 사유를 고르게 해서 나중에 "이거 왜 뺐었지?" 할 때 바로 알 수 있게 함
+  const [showExcludeReasons, setShowExcludeReasons] = useState(false)
+  function exclude(reason: string) {
+    onQuickReview(p, 'exclude', reason)
+    setShowExcludeReasons(false)
+  }
 
   return (
     <div style={{
@@ -875,9 +881,26 @@ function AdminPostRow({ post: p, onToggle, onDelete, onEdit, onToggleAlwaysOn, o
               style={{ flex: 1, padding: '7px 0', background: '#fef9c3', color: '#92400e', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 12, fontWeight: 700 }}>
               📦 상시판매
             </button>
-            <button onClick={() => onQuickReview(p, 'exclude')}
+            <button onClick={() => setShowExcludeReasons(true)}
               style={{ flex: 1, padding: '7px 0', background: '#fee2e2', color: '#dc2626', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 12, fontWeight: 700 }}>
               🚫 제외
+            </button>
+          </div>
+        )}
+
+        {/* 제외 사유 선택 — 나중에 "왜 뺐었지?" 바로 알 수 있게 */}
+        {showExcludeReasons && (
+          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 8, paddingTop: 8, borderTop: '1px solid #e2e8f0' }}>
+            <span style={{ fontSize: 12, color: '#64748b', alignSelf: 'center', marginRight: 2 }}>제외 사유:</span>
+            {['품절', '너무 비쌈', '공구 마감', '기타'].map(reason => (
+              <button key={reason} onClick={() => exclude(reason)}
+                style={{ padding: '5px 10px', background: '#fee2e2', color: '#dc2626', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 12, fontWeight: 600 }}>
+                {reason}
+              </button>
+            ))}
+            <button onClick={() => setShowExcludeReasons(false)}
+              style={{ padding: '5px 10px', background: '#f1f5f9', color: '#64748b', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 12 }}>
+              취소
             </button>
           </div>
         )}
@@ -924,7 +947,7 @@ function AdminPostRow({ post: p, onToggle, onDelete, onEdit, onToggleAlwaysOn, o
             {p.sale_until_sold_out ? '🔥 소진시' : '소진시'}
           </button>
           {p.status !== 'excluded' && (
-            <button onClick={() => onQuickReview(p, 'exclude')}
+            <button onClick={() => setShowExcludeReasons(true)}
               title="이 공구를 제외 처리 (고객 화면에서 숨겨짐)"
               style={{ padding: '6px 10px', background: '#fee2e2', color: '#dc2626', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 12, fontWeight: 600, whiteSpace: 'nowrap' }}>
               🚫 제외
