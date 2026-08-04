@@ -71,12 +71,13 @@ interface PostCardProps {
   onToggleBookmark: (id: number) => void
   onJoin?: (id: number) => void
   siblings?: Post[]
+  pastPrices?: { id: number; price: number; origPrice: number | null; date: string }[]
   isFollowingAccount?: boolean
   onToggleFollowAccount?: (account: string) => void
 }
 
 export default function PostCard({
-  post, isBookmarked, onToggleBookmark, onJoin, siblings = [],
+  post, isBookmarked, onToggleBookmark, onJoin, siblings = [], pastPrices = [],
   isFollowingAccount, onToggleFollowAccount,
 }: PostCardProps) {
   const [imgFailed, setImgFailed] = useState(false)
@@ -198,6 +199,13 @@ export default function PostCard({
         )}
         {post.market_price && (
           <div style={{ fontSize: 10, color: 'var(--gray-3)', marginBottom: 8 }}>네이버 최저가 기준 비교</div>
+        )}
+        {/* 같은 상품(비교그룹)의 지난 공구가 — 지금 공구가 판단(dealJudgment)과는 별개로,
+            "예전엔 얼마였지" 참고만 담백하게. 가장 최근 것 하나만 보여줌 */}
+        {pastPrices.length > 0 && (
+          <div style={{ fontSize: 10, color: 'var(--gray-3)', marginBottom: 8 }}>
+            📈 지난 공구가 {pastPrices[0].date && `${pastPrices[0].date.slice(5).replace('-', '.')} · `}{pastPrices[0].price.toLocaleString()}원
+          </div>
         )}
 
         {/* 두 번째로 중요한 정보: 기간이 언제까지인지 — 독립된 줄로 항상 노출 */}

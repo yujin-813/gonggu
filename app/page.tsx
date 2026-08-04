@@ -79,6 +79,7 @@ export default function Home() {
   const [viewingFollowed, setViewingFollowed] = useState(false)
   const [pushSubscribed, setPushSubscribed] = useState(false)
   const [collections, setCollections] = useState<Collection[]>([])
+  const [groupHistory, setGroupHistory] = useState<Record<string, { id: number; price: number; origPrice: number | null; date: string }[]>>({})
   const [kakaoBannerDismissed, setKakaoBannerDismissed] = useState(true)  // 초기 렌더 깜빡임 방지 — mount 시 localStorage 값으로 교체
 
   useEffect(() => {
@@ -190,12 +191,26 @@ export default function Home() {
       const res = await fetch('/api/posts?per_page=200')
       if (!res.ok) throw new Error()
       const data = await res.json()
-      setPosts(data.posts ?? [])
+      const fetchedPosts: Post[] = data.posts ?? []
+      setPosts(fetchedPosts)
+      fetchGroupHistory(fetchedPosts)
     } catch {
       setPosts([])
     } finally {
       setLoading(false)
     }
+  }
+
+  // "지난 공구가" 참고용 — 지금 화면에 뜬 공구들의 비교그룹만 모아서 한 번에 조회
+  async function fetchGroupHistory(list: Post[]) {
+    const keys = [...new Set(list.map(p => p.group_key).filter(Boolean) as string[])]
+    if (keys.length === 0) return
+    try {
+      const res = await fetch(`/api/posts/group-history?keys=${encodeURIComponent(keys.join(','))}`)
+      if (!res.ok) throw new Error()
+      const data = await res.json()
+      setGroupHistory(data.history ?? {})
+    } catch {}
   }
 
   async function fetchCollections() {
@@ -443,6 +458,7 @@ export default function Home() {
               onToggleBookmark={toggleBookmark}
               onJoin={id => { track('join', { postId: id }); recordRecentlyViewed(id) }}
               siblings={post.group_key ? groupMap.get(post.group_key) : undefined}
+              pastPrices={post.group_key ? groupHistory[post.group_key]?.filter(h => h.id !== post.id) : undefined}
               isFollowingAccount={followedInfluencers.has(post.account)}
               onToggleFollowAccount={toggleFollowInfluencer}
             />
