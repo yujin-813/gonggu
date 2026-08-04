@@ -943,7 +943,7 @@ def block_to_post(b, ig_handle, price, domain, profile_url, purchase_url, deadli
         "status":          status,
         "review_reason":   review_reason,
         "published":       False,
-        "is_open":         bool(b.get("is_open", True)),
+        "is_open":         b.get("is_open") is not False,
         "source_type":     source_obj.get("source_type", "inpock") if source_obj else "inpock",
         "source_url":      source_obj.get("url") if source_obj else None,
         "influencer_name": source_obj.get("influencer_name") if source_obj else ig_handle,
@@ -991,7 +991,9 @@ def collect(handles, source_obj=None, write_result=True):
             if not (b.get("title") and b.get("url")):
                 continue
 
-            if not bool(b.get("is_open", True)):
+            # is_open이 None인 블록이 꽤 있는데(예: 예약된 일정형 블록), bool(None)=False라
+            # "닫힘"으로 오판되고 있었음 — 명시적으로 False인 것만 닫힌 공구로 취급한다
+            if b.get("is_open") is False:
                 continue  # 닫힌 공구는 추가 안 함
 
             # 인플루언서가 같은 슬롯(블록 ID)을 재사용해 새 공구로 갈아끼우는 경우가 있어서,
