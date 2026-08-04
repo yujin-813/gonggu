@@ -977,7 +977,11 @@ def collect(handles, source_obj=None, write_result=True):
             print(f"  ⚠️  실패: {e}")
             continue
 
-        ig_handle = extract_instagram(pp, handle)
+        # 인포크 페이지에서 인스타 아이콘을 못 찾으면 인포크 URL 슬러그(handle)로 대충 추측하는데,
+        # 둘이 다른 경우(예: maytwoone vs 실제 lupinus_co)가 있어 관리자가 직접 확인해 등록한
+        # instagram_handle이 있으면 그걸 슬러그보다 먼저 대체값으로 사용한다
+        fallback_handle = (source_obj.get("instagram_handle") if source_obj else None) or handle
+        ig_handle = extract_instagram(pp, fallback_handle)
         profile_url = f"https://instagram.com/{ig_handle}"
 
         for b in blocks:
