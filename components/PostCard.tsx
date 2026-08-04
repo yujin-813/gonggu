@@ -14,6 +14,12 @@ const BADGE_ICON: Record<BadgeIcon, typeof Calendar> = {
 }
 const PERIOD_ICON: Record<PeriodIcon, typeof Calendar> = { calendar: Calendar, zap: Zap }
 const PARTNERS_LABEL: Record<'naver' | 'coupang', string> = { naver: '네이버', coupang: '쿠팡' }
+// 공정거래위원회 지침상 추천인(당사)이 경제적 대가를 받는 관계는 반드시 고지해야 함 —
+// 쿠팡 파트너스는 운영정책에 명시된 지정 문구를 그대로 사용
+const PARTNERS_DISCLOSURE: Record<'naver' | 'coupang', string> = {
+  coupang: '이 포스팅은 쿠팡 파트너스 활동의 일환으로, 이에 따른 일정액의 수수료를 제공받습니다.',
+  naver: '이 포스팅은 네이버 파트너스 활동의 일환으로, 이에 따른 일정액의 수수료를 제공받을 수 있습니다.',
+}
 
 function dealJudgment(post: Post): { verdict: string; detail: string; cls: string } | null {
   if (!post.price || post.status === 'upcoming') return null
@@ -210,24 +216,35 @@ export default function PostCard({
         )}
 
         {/* 파트너스(제휴) 대체 구매 링크 — dealJudgment(공구 가격 판단)와는 별개로, 참고용 대체
-            구매처만 담백하게 안내한다. 관리자가 platform/price/url을 모두 채우고 노출을 켰을 때만 표시 */}
+            구매처만 담백하게 안내한다. 관리자가 platform/price/url을 모두 채우고 노출을 켰을 때만 표시.
+            쿠팡 파트너스는 공정위 지침에 따라 경제적 대가 관계를 고지하는 문구를 반드시 함께 노출해야 함
+            (쿠팡 파트너스 운영정책에 명시된 지정 문구) — 네이버도 같은 취지로 동일 원칙 적용 */}
         {post.partners_visible && post.partners_platform && post.partners_price && post.partners_url && (
-          <a
-            href={post.partners_url}
-            target="_blank"
-            rel="noopener noreferrer sponsored"
-            onClick={e => e.stopPropagation()}
-            style={{
-              display: 'flex', alignItems: 'center', gap: 4,
-              fontSize: 11, color: '#0369a1', background: '#f0f9ff',
-              border: '1px solid #bae6fd', borderRadius: 8,
-              padding: '5px 8px', marginBottom: 8, textDecoration: 'none',
-            }}
-          >
-            <ExternalLink size={11} />
-            {PARTNERS_LABEL[post.partners_platform]}에서도 {post.partners_price.toLocaleString()}원에 구매 가능
-            {post.partners_option_note && <span style={{ color: '#64748b' }}>· {post.partners_option_note}</span>}
-          </a>
+          <div style={{ marginBottom: 8 }}>
+            <a
+              href={post.partners_url}
+              target="_blank"
+              rel="noopener noreferrer sponsored"
+              onClick={e => e.stopPropagation()}
+              style={{
+                display: 'flex', alignItems: 'center', gap: 4,
+                fontSize: 11, color: '#0369a1', background: '#f0f9ff',
+                border: '1px solid #bae6fd', borderRadius: '8px 8px 0 0',
+                padding: '5px 8px', textDecoration: 'none',
+              }}
+            >
+              <ExternalLink size={11} />
+              {PARTNERS_LABEL[post.partners_platform]}에서도 {post.partners_price.toLocaleString()}원에 구매 가능
+              {post.partners_option_note && <span style={{ color: '#64748b' }}>· {post.partners_option_note}</span>}
+            </a>
+            <div style={{
+              fontSize: 10, color: '#64748b', background: '#f8fafc',
+              border: '1px solid #e2e8f0', borderTop: 'none', borderRadius: '0 0 8px 8px',
+              padding: '4px 8px',
+            }}>
+              {PARTNERS_DISCLOSURE[post.partners_platform]}
+            </div>
+          </div>
         )}
 
         {isVerified && (
