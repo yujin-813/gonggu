@@ -19,6 +19,18 @@ function defaultDate(days = 7) {
   return d.toISOString().split('T')[0]
 }
 
+// 관리자가 입력 화면과 나란히 비교할 수 있도록 새 탭 대신 화면 오른쪽에 작은 팝업 창으로 띄움 —
+// 같은 창 이름을 재사용해 버튼을 다시 눌러도 창이 계속 늘어나지 않고 검색어만 갱신됨
+function openNaverSearchPopup(query: string) {
+  const width  = 480
+  const height = Math.min(900, window.screen.availHeight - 80)
+  const left   = window.screen.availWidth - width - 20
+  const top    = 40
+  const url = `https://search.shopping.naver.com/search/all?query=${encodeURIComponent(query)}`
+  const popup = window.open(url, 'naver_price_search_popup', `width=${width},height=${height},left=${left},top=${top}`)
+  popup?.focus()
+}
+
 function isInstagramUrl(url: string) {
   // 게시글/릴스 URL 또는 프로필 URL(인포크 수집 공구는 게시글 링크가 없어 프로필 URL만 저장됨) 모두 허용
   if (/instagram\.com\/(p|reel)\/[^/?#]+/.test(url)) return true
@@ -358,21 +370,20 @@ export default function AddPostModal({ onClose, onSubmit, editPost, existingGrou
           <div>
             <label style={{ margin: '0 0 6px', display: 'block' }}>네이버쇼핑 가격 (원, 선택)</label>
             <div style={{ marginBottom: 6 }}>
-              <a
-                href={`https://search.shopping.naver.com/search/all?query=${encodeURIComponent(title)}`}
-                target="_blank"
-                rel="noopener noreferrer"
+              <button
+                type="button"
+                onClick={() => openNaverSearchPopup(title)}
                 style={{
                   display: 'inline-flex', alignItems: 'center', gap: 4,
                   background: '#f1f5f9', color: '#475569', border: '1.5px solid #e2e8f0',
-                  borderRadius: 7, padding: '6px 12px', fontSize: 12, fontWeight: 600, textDecoration: 'none',
+                  borderRadius: 7, padding: '6px 12px', fontSize: 12, fontWeight: 600, cursor: 'pointer',
                 }}
               >
-                🔍 네이버쇼핑에서 검색 →
-              </a>
+                🔍 네이버쇼핑에서 검색 (팝업)
+              </button>
             </div>
             <p style={{ fontSize: 11, color: '#94a3b8', margin: '0 0 6px' }}>
-              네이버 쇼핑 검색 API가 더 이상 지원되지 않아 자동 검색은 종료됐어요 — 위 링크로 새 탭에서 직접 검색해 가격/링크를 아래에 입력해주세요
+              네이버 쇼핑 검색 API가 더 이상 지원되지 않아 자동 검색은 종료됐어요 — 위 버튼으로 화면 옆에 작은 창을 띄워서 이 입력 화면과 나란히 비교하며 가격/링크를 아래에 입력해주세요
             </p>
             <input type="number" value={origPrice} onChange={e => { setOrigPrice(e.target.value); if (!e.target.value) setMarketUrl('') }} placeholder="60000" />
             {isEdit && editPost?.market_price && !origPrice && (
