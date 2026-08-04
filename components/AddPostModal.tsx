@@ -52,6 +52,7 @@ export default function AddPostModal({ onClose, onSubmit, editPost, existingGrou
 
   const [url,        setUrl]        = useState('')
   const [urlError,   setUrlError]   = useState('')
+  const [purchaseUrl, setPurchaseUrl] = useState('')
   const [fetching,   setFetching]   = useState(false)
   const [autoFilled, setAutoFilled] = useState<string[]>([])
 
@@ -91,6 +92,7 @@ export default function AddPostModal({ onClose, onSubmit, editPost, existingGrou
   useEffect(() => {
     if (!editPost) return
     setUrl(editPost.url || '')
+    setPurchaseUrl(editPost.purchase_url || '')
     setTitle(editPost.title || '')
     setAccount(editPost.account || '')
     setCat(editPost.cat || 'life')
@@ -234,6 +236,7 @@ export default function AddPostModal({ onClose, onSubmit, editPost, existingGrou
         deadline:     endDate,
         img:          uploadedImg || '',
         url:          url.trim(),
+        purchase_url: purchaseUrl.trim() || null,
         participants: editPost?.participants ?? 0,
         avatar:       CAT_EMOJI[cat] || '🛍️',
         caption:      editPost?.caption || '',
@@ -308,6 +311,29 @@ export default function AddPostModal({ onClose, onSubmit, editPost, existingGrou
             ✅ {autoFilled.map(f => f === 'account' ? '계정명' : '상품명').join(', ')} 자동 입력됨 — 확인 후 수정하세요
           </p>
         )}
+
+        {/* 구매 링크 — "공구 보기" 버튼이 실제로 이동하는 곳. 인포크로 수집된 공구는 인스타 게시글
+            URL이 프로필 링크로만 남아있어서(개별 게시글 링크가 없음), 실제 구매처는 여기서만 확인·수정 가능 */}
+        <label style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          {purchaseUrl ? (
+            <a href={purchaseUrl} target="_blank" rel="noopener noreferrer"
+              style={{ color: '#16a34a', fontWeight: 700, textDecoration: 'none' }}>
+              구매 링크
+              <span style={{ fontSize: 11, background: '#dcfce7', padding: '1px 6px', borderRadius: 10, marginLeft: 4 }}>열기 →</span>
+            </a>
+          ) : (
+            <span>구매 링크</span>
+          )}
+          <span style={{ fontSize: 12, color: '#94a3b8', fontWeight: 400 }}>
+            (선택 — &quot;공구 보기&quot; 버튼이 실제로 이동하는 링크. 비워두면 위 인스타 URL로 대신 이동해요)
+          </span>
+        </label>
+        <input
+          type="url"
+          value={purchaseUrl}
+          onChange={e => setPurchaseUrl(e.target.value)}
+          placeholder="https://smartstore.naver.com/... 또는 쿠팡/자사몰 등"
+        />
 
         {/* 계정명 */}
         <label>계정명 *</label>
