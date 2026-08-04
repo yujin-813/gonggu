@@ -179,6 +179,24 @@ def extract_instagram(pp, fallback):
     return fallback
 
 
+def _is_closed_or_excluded(p):
+    """관리자가 이미 제외했거나, 공개된 채 마감일이 지난(마감됨) 글인지"""
+    if p.get("status") == "excluded":
+        return True
+    is_published = p.get("status") == "published" or (not p.get("status") and p.get("published") is not False)
+    if is_published and p.get("deadline"):
+        try:
+            if date.fromisoformat(p["deadline"]) < date.today():
+                return True
+        except ValueError:
+            pass
+    return False
+
+
+def _normalize_title(t):
+    return re.sub(r"\s+", "", (t or "")).strip().lower()
+
+
 def resolve_link(url):
     """리다이렉트를 따라가 (최종 URL, 최종 도메인) 반환. 실패 시 (None, None)."""
     if not url or not url.startswith("http"):
@@ -1022,7 +1040,23 @@ def collect(handles, source_obj=None, write_result=True):
                 print(f"  - (제외) {b.get('title', '')[:34]} [{domain}]")
                 continue
 
-            posts.insert(0, block_to_post(b, sc, ig_handle, price, domain, profile_url, purchase_url, deadline, product_info, debug_info, source_obj))
+            new_post = block_to_post(b, sc, ig_handle, price, domain, profile_url, purchase_url, deadline, product_info, debug_info, source_obj)
+
+            # 같은 슬롯(블록 ID)에서 나온 글 중 이미 제외됐거나 마감된 채로 남아있는 글과
+            # 제목이 같으면(=관리자가 이미 판단 끝낸 것과 사실상 동일 내용) 다시 검수 목록에
+            # 안 올린다 — 내용이 정말 바뀐 경우(새 공구)만 새로 올라가야 하므로 제목까지 비교
+            block_id_prefix = f"inpock_{b['id']}"
+            new_title_norm = _normalize_title(new_post["title"])
+            if any(
+                (p.get("shortcode") or "").startswith(block_id_prefix)
+                and _is_closed_or_excluded(p)
+                and _normalize_title(p.get("title")) == new_title_norm
+                for p in posts
+            ):
+                print(f"  - (스킵: 이미 제외/마감된 것과 동일) {b['title'][:34]}")
+                continue
+
+            posts.insert(0, new_post)
             by_sc[sc] = posts[0]
             new_count += 1
             print(f"  + {b['title'][:34]} [{domain}]")
