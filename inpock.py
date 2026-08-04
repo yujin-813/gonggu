@@ -881,8 +881,7 @@ def classify_status(title, purchase_url, price, deadline, extraction_confidence=
     return "needs_review", reasons
 
 
-def block_to_post(b, ig_handle, price, domain, profile_url, purchase_url, deadline, product_info=None, debug_info=None, source_obj=None):
-    sc = f"inpock_{b['id']}"
+def block_to_post(b, sc, ig_handle, price, domain, profile_url, purchase_url, deadline, product_info=None, debug_info=None, source_obj=None):
     pi = product_info or {}
     block_title = (b.get("title") or "").strip()
     page_title  = (pi.get("title") or "").strip()
@@ -1023,7 +1022,7 @@ def collect(handles, source_obj=None, write_result=True):
                 print(f"  - (제외) {b.get('title', '')[:34]} [{domain}]")
                 continue
 
-            posts.insert(0, block_to_post(b, ig_handle, price, domain, profile_url, purchase_url, deadline, product_info, debug_info, source_obj))
+            posts.insert(0, block_to_post(b, sc, ig_handle, price, domain, profile_url, purchase_url, deadline, product_info, debug_info, source_obj))
             by_sc[sc] = posts[0]
             new_count += 1
             print(f"  + {b['title'][:34]} [{domain}]")
