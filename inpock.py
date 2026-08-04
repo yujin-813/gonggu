@@ -13,6 +13,7 @@ __NEXT_DATA__ JSON을 파싱한다. 인스타 API를 거치지 않으므로 차�
 """
 
 import argparse
+import hashlib
 import json
 import os
 import re
@@ -990,15 +991,22 @@ def collect(handles, source_obj=None, write_result=True):
             if not (b.get("title") and b.get("url")):
                 continue
 
-            sc = f"inpock_{b['id']}"
-            if sc in by_sc:
-                continue  # 이미 수집됨 (검수상태 보존)
             if not bool(b.get("is_open", True)):
                 continue  # 닫힌 공구는 추가 안 함
 
-            url_abs = b["url"] if b["url"].startswith("http") else INPOCK + b["url"]
+            # 인플루언서가 같은 슬롯(블록 ID)을 재사용해 새 공구로 갈아끼우는 경우가 있어서,
+            # 블록 ID만으로 dedup하면 내용이 완전히 바뀐 새 공구를 영원히 놓친다. 제목/가격/
+            # 마감일까지 묶어 fingerprint를 만들어, 완전히 같은 내용일 때만 "이미 수집됨"으로
+            # 보고 건너뛴다 — 내용이 바뀌면 새 후보로 다시 검수 대상에 올라간다(기존 글은 그대로 둠,
+            # 중복이 생겨도 어차피 관리자가 검수 후 올리므로 문제 없음)
             price = price_from_stickers(b.get("stickers"))
             deadline = b.get("open_until") or ""
+            fingerprint = hashlib.md5(f"{b['title'].strip()}|{price}|{deadline}".encode()).hexdigest()[:8]
+            sc = f"inpock_{b['id']}_{fingerprint}"
+            if sc in by_sc:
+                continue  # 완전히 같은 내용으로 이미 수집됨 (검수상태 보존)
+
+            url_abs = b["url"] if b["url"].startswith("http") else INPOCK + b["url"]
             final_url, domain = resolve_link(url_abs)
             purchase_url = final_url or url_abs
 
