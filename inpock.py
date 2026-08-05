@@ -76,6 +76,17 @@ NON_DEAL_KW = (
     "레시피북",
 )
 
+# 가격/마감일을 못 찾았을 때, 구매 링크 도메인이 이런 제휴/추천 링크 계열이면 시간제한
+# 캠페인(공구)이 아니라 개인 추천/제휴 링크일 가능성이 매우 높다 — 실제로 995개 표본 검증
+# 결과 이 도메인들이 61%(610/995)를 차지했고 전부 가격·마감일 정보가 전혀 없었음.
+# form.naver.com은 애초에 구매 페이지가 아니라 신청폼이라 포함.
+AFFILIATE_DOMAINS = {
+    "link.coupang.com", "coupang.com", "influencers.coupang.com",  # 쿠팡파트너스
+    "mkt.shopping.naver.com",  # 네이버 제휴 마켓 링크
+    "ohouse.airbridge.io",     # 오늘의집 제휴 트래킹 링크
+    "form.naver.com",          # 신청/설문폼 — 구매 페이지 아님
+}
+
 # 카테고리 자동 분류 — 순서 중요 (구체적인 것부터)
 _CAT_KEYWORDS: list[tuple[str, tuple[str, ...]]] = [
     ("kids",    ("어린이", "유아", "아기", "키즈", "초등", "영아", "육아", "그림책", "동화책",
@@ -846,7 +857,7 @@ def fetch_naver_market_price(title, price=None):
     return {}
 
 
-def classify_status(title, purchase_url, price, deadline, extraction_confidence=None, sold_out_only=False, block_title=""):
+def classify_status(title, purchase_url, price, deadline, extraction_confidence=None, sold_out_only=False, block_title="", domain=None):
     if not title:
         return "excluded", ["상품명 없음"]
 
@@ -861,6 +872,11 @@ def classify_status(title, purchase_url, price, deadline, extraction_confidence=
     # 그 외엔 전부 사람이 검수하도록 needs_review로 넘긴다(아래 로직에서 처리)
     if any(kw in t or kw in bt for kw in NON_DEAL_KW):
         return "excluded", ["비공구"]
+
+    # 가격도 마감일도 못 찾았는데 구매 링크가 쿠팡파트너스/오늘의집 제휴 등 추천 링크
+    # 도메인이면, 시간제한 공구가 아니라 개인 추천/제휴 링크일 가능성이 매우 높다
+    if not price and not deadline and domain in AFFILIATE_DOMAINS:
+        return "excluded", ["상품 추천 (비공구)"]
 
     # "소진시 마감"은 마감일이 없는 게 추출 실패가 아니라 원래 그런 판매 방식이므로
     # "마감일 미확인"으로 취급하지 않는다
@@ -901,7 +917,7 @@ def block_to_post(b, sc, ig_handle, price, domain, profile_url, purchase_url, de
     # 고정 마감일이 없을 때, 구매 페이지 또는 인포크 제목에 "소진시/품절시" 문구가 있으면
     # 추출 실패가 아니라 원래 마감일이 없는 판매 방식으로 본다
     sold_out_only = bool(pi.get("sold_out_only")) or (not deadline and bool(_SOLD_OUT_PATTERN.search(block_title)))
-    status, review_reason = classify_status(title, purchase_url, price, deadline, confidence, sold_out_only, block_title)
+    status, review_reason = classify_status(title, purchase_url, price, deadline, confidence, sold_out_only, block_title, domain)
     # 신뢰도 낮은 매칭(판매가의 30% 미만)은 fetch_naver_market_price 내부에서 이미 걸러진다
     market = fetch_naver_market_price(title, price) if title else {}
     mp = market.get("market_price")
