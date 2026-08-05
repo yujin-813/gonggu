@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { loadPosts, savePosts } from '@/lib/store'
 import type { Post } from '@/lib/types'
+import { enforcePurchaseLinkRequirement } from '@/lib/postGuards'
 
 type Ctx = { params: { id: string } }
 
@@ -30,6 +31,7 @@ export async function PATCH(request: NextRequest, { params }: Ctx) {
       (posts[idx] as unknown as Record<string, unknown>)[key] = body[key]
     }
   }
+  posts[idx] = enforcePurchaseLinkRequirement(posts[idx])
   savePosts(posts)
   return NextResponse.json({ success: true, post: posts[idx] })
 }
@@ -50,7 +52,7 @@ export async function PUT(request: NextRequest, { params }: Ctx) {
       (patch as Record<string, unknown>)[key] = body[key]
     }
   }
-  posts[idx] = { ...posts[idx], ...patch, id }
+  posts[idx] = enforcePurchaseLinkRequirement({ ...posts[idx], ...patch, id })
   savePosts(posts)
   return NextResponse.json({ success: true, post: posts[idx] })
 }

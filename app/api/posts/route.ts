@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { loadPosts, savePosts } from '@/lib/store'
 import type { Post } from '@/lib/types'
 import { daysLeft, isCustomerVisible } from '@/lib/period'
+import { enforcePurchaseLinkRequirement } from '@/lib/postGuards'
 
 const CAT_EMOJI: Record<string, string> = {
   kids: '👶', life: '🏠', food: '🍽️', health: '💊', beauty: '💄',
@@ -112,8 +113,9 @@ export async function POST(request: NextRequest) {
     partners_visible:      Boolean(data.partners_visible),
   }
 
-  posts.unshift(newPost)
+  const guarded = enforcePurchaseLinkRequirement(newPost)
+  posts.unshift(guarded)
   savePosts(posts)
 
-  return NextResponse.json({ success: true, post: newPost }, { status: 201 })
+  return NextResponse.json({ success: true, post: guarded }, { status: 201 })
 }
