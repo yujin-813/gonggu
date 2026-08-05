@@ -1,11 +1,14 @@
 #!/usr/bin/env python3
 """고객 화면에 노출 중인 공구의 구매 링크가 실제로 살아있는지 매일 점검한다.
 
-- 확실히 죽은 링크(404/410, 또는 "존재하지 않는 페이지"류 문구)만 자동으로
-  비공개 처리한다(status='excluded', published=False).
+- 확실히 죽은 링크(404/410, 또는 "존재하지 않는 페이지"류 문구)는 자동으로
+  비공개 처리한다(status='excluded', published=False) — 재입고 걱정 없이 영구히 내린다.
+- 품절/일시 품절 문구가 감지되면 published만 False로 내리고 status는 건드리지 않는다 —
+  재입고는 흔한 일이라 판단을 되돌릴 수 있게, 다음 점검에서 품절 문구가 사라지면
+  이 스크립트가 붙인 태그(SOLD_OUT_REASON)를 보고 자동으로 다시 공개한다. 관리자가
+  다른 이유로 수동 비공개한 글은 이 태그가 없으므로 절대 건드리지 않는다.
 - 애매한 경우(타임아웃, 5xx, 접속 실패, 리다이렉트 등)는 비공개로 내리지
   않고 review_reason에 "구매링크 확인 필요"만 남겨 관리자가 검토하게 한다.
-  판매종료/품절 같은 문구는 일시적일 수 있어 죽은 링크로 취급하지 않는다.
 
 사용법: python3 check_links.py
 """
@@ -42,9 +45,23 @@ DEAD_TEXT_PATTERNS = (
     "페이지를 찾을 수 없습니다",
     "이 페이지의 링크가 작동하지 않습니다",  # 인스타그램 삭제된 게시물
     "판매가 종료된 상품입니다",
+    "이벤트가 종료되었습니다",
+    "종료된 이벤트입니다",
+)
+
+# "품절임박"/"품절 알림 받기"처럼 아직 구매 가능한데 마케팅 문구로 품절이 섞여 들어가는
+# 경우가 많아서, 확실히 "지금 못 산다"는 뜻일 때만 걸리도록 문구를 좁게 잡는다
+SOLD_OUT_TEXT_PATTERNS = (
+    "품절되었습니다",
+    "현재 품절",
+    "일시 품절",
+    "재고가 없습니다",
+    "재고 소진",
+    "sold out",
 )
 
 BROKEN_REASON = "구매링크 만료됨 (자동 비공개)"
+SOLD_OUT_REASON = "품절 감지 (자동 숨김 · 재입고 시 자동 복구)"
 UNCERTAIN_REASON = "구매링크 확인 필요"
 
 
@@ -63,7 +80,7 @@ def is_customer_visible(p):
 
 
 def check_link(url):
-    """(dead: bool | None, reason: str) — dead=True 확실히 죽음, False 확실히 살아있음, None 애매함"""
+    """('dead'|'sold_out'|'uncertain'|'alive', reason)"""
     try:
         r = requests.get(url, headers={"User-Agent": UA}, timeout=12, allow_redirects=True)
     except requests.exceptions.SSLError:
@@ -72,22 +89,27 @@ def check_link(url):
         try:
             r = requests.get(url, headers={"User-Agent": UA}, timeout=12, allow_redirects=True, verify=False)
         except requests.RequestException as e:
-            return None, f"접속 실패: {e.__class__.__name__}"
+            return "uncertain", f"접속 실패: {e.__class__.__name__}"
     except requests.RequestException as e:
-        return None, f"접속 실패: {e.__class__.__name__}"
+        return "uncertain", f"접속 실패: {e.__class__.__name__}"
 
     if r.status_code in DEAD_STATUS:
-        return True, f"HTTP {r.status_code}"
+        return "dead", f"HTTP {r.status_code}"
 
     if r.status_code >= 500 or r.status_code == 403:
-        return None, f"HTTP {r.status_code}"
+        return "uncertain", f"HTTP {r.status_code}"
 
     text = r.text[:20000]  # 페이지 전체를 다 볼 필요는 없음
     for pat in DEAD_TEXT_PATTERNS:
         if pat in text:
-            return True, f"문구 감지: {pat}"
+            return "dead", f"문구 감지: {pat}"
 
-    return False, "정상"
+    text_lower = text.lower()
+    for pat in SOLD_OUT_TEXT_PATTERNS:
+        if pat.lower() in text_lower:
+            return "sold_out", f"품절 문구 감지: {pat}"
+
+    return "alive", "정상"
 
 
 def main():
@@ -96,35 +118,45 @@ def main():
     print(f"점검 대상: {len(targets)}개")
 
     broken = 0
+    sold_out = 0
+    restocked = 0
     uncertain = 0
     for p in targets:
         link = p.get("purchase_url") or p.get("url")
-        dead, reason = check_link(link)
+        result, reason = check_link(link)
+        existing = p.get("review_reason") or []
 
-        if dead is True:
+        if result == "dead":
             p["status"] = "excluded"
             p["published"] = False
-            existing = p.get("review_reason") or []
             if BROKEN_REASON not in existing:
                 p["review_reason"] = existing + [BROKEN_REASON]
             broken += 1
             print(f"  ❌ 비공개 처리: {p['title'][:40]} ({reason})")
-        elif dead is None:
-            existing = p.get("review_reason") or []
+        elif result == "sold_out":
+            p["published"] = False  # status는 그대로 둬서 재입고되면 자동 복구 가능하게 함
+            if SOLD_OUT_REASON not in existing:
+                p["review_reason"] = existing + [SOLD_OUT_REASON]
+            sold_out += 1
+            print(f"  📦 품절로 숨김: {p['title'][:40]} ({reason})")
+        elif result == "uncertain":
             if UNCERTAIN_REASON not in existing:
                 p["review_reason"] = existing + [UNCERTAIN_REASON]
-                uncertain += 1
-                print(f"  ⚠️  확인 필요: {p['title'][:40]} ({reason})")
-        else:
-            # 정상 확인됨 — 예전에 붙었던 확인 필요 태그는 지운다
-            existing = p.get("review_reason") or []
-            if UNCERTAIN_REASON in existing:
-                p["review_reason"] = [r for r in existing if r != UNCERTAIN_REASON]
+            uncertain += 1
+            print(f"  ⚠️  확인 필요: {p['title'][:40]} ({reason})")
+        else:  # alive
+            # 이 스크립트가 붙인 태그만 정리한다 — 관리자가 다른 이유로 비공개한 건 안 건드림
+            if SOLD_OUT_REASON in existing:
+                p["published"] = True
+                restocked += 1
+                print(f"  ✅ 재입고 감지, 다시 공개: {p['title'][:40]}")
+            if SOLD_OUT_REASON in existing or UNCERTAIN_REASON in existing:
+                p["review_reason"] = [r for r in existing if r not in (SOLD_OUT_REASON, UNCERTAIN_REASON)]
 
         time.sleep(0.3)
 
     save_posts(posts)
-    print(f"\n완료: 비공개 {broken}개, 확인 필요 표시 {uncertain}개")
+    print(f"\n완료: 비공개 {broken}개, 품절 숨김 {sold_out}개, 재입고 복구 {restocked}개, 확인 필요 표시 {uncertain}개")
 
 
 if __name__ == "__main__":
