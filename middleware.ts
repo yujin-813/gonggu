@@ -10,6 +10,10 @@ function isProtected(req: NextRequest): boolean {
   if (pathname === '/api/posts') {
     return method !== 'GET' || searchParams.get('admin') === '1'
   }
+  // 고객 화면에서 쓰는 읽기 전용 조회(지난 공구가, 인플루언서별 상품)는 인증 없이 허용
+  if (pathname === '/api/posts/group-history' || pathname === '/api/posts/by-influencer') {
+    return method !== 'GET'
+  }
   if (pathname.startsWith('/api/posts/')) return true // PATCH/PUT/DELETE
 
   // 컬렉션: 일반 GET(고객 페이지)은 허용, admin=1 조회와 모든 쓰기는 보호
