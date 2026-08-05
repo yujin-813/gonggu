@@ -1,7 +1,7 @@
 'use client'
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
-import { ArrowLeft } from 'lucide-react'
+import { ArrowLeft, Search } from 'lucide-react'
 
 interface InfluencerItem {
   id: number
@@ -25,6 +25,7 @@ export default function InfluencerPage({ params }: { params: { account: string }
   const [items, setItems] = useState<InfluencerItem[]>([])
   const [loading, setLoading] = useState(true)
   const [sortOrder, setSortOrder] = useState<SortOrder>('latest')
+  const [query, setQuery] = useState('')
 
   useEffect(() => {
     fetch(`/api/posts/by-influencer?account=${encodeURIComponent(account)}`)
@@ -34,10 +35,17 @@ export default function InfluencerPage({ params }: { params: { account: string }
       .finally(() => setLoading(false))
   }, [account])
 
-  // API가 이미 최신순으로 내려주므로 'latest'는 원래 순서 그대로 두고, 가격만 따로 정렬
-  const sorted = sortOrder === 'price_low' ? [...items].sort((a, b) => a.price - b.price)
-    : sortOrder === 'price_high' ? [...items].sort((a, b) => b.price - a.price)
+  const filtered = query.trim()
+    ? items.filter(item => {
+        const q = query.trim().toLowerCase()
+        return item.title.toLowerCase().includes(q) || (item.brand || '').toLowerCase().includes(q)
+      })
     : items
+
+  // API가 이미 최신순으로 내려주므로 'latest'는 원래 순서 그대로 두고, 가격만 따로 정렬
+  const sorted = sortOrder === 'price_low' ? [...filtered].sort((a, b) => a.price - b.price)
+    : sortOrder === 'price_high' ? [...filtered].sort((a, b) => b.price - a.price)
+    : filtered
 
   const profileUrl = `https://instagram.com/${account.replace('@', '')}`
 
@@ -63,8 +71,22 @@ export default function InfluencerPage({ params }: { params: { account: string }
       </div>
 
       {!loading && items.length > 0 && (
+        <div className="hero-search-wrap">
+          <div className="hero-search">
+            <Search size={18} />
+            <input
+              type="search"
+              placeholder="이 인플루언서의 상품 검색"
+              value={query}
+              onChange={e => setQuery(e.target.value)}
+            />
+          </div>
+        </div>
+      )}
+
+      {!loading && items.length > 0 && (
         <div className="topbar">
-          <span className="count-text">총 <strong>{items.length}</strong>개</span>
+          <span className="count-text">총 <strong>{sorted.length}</strong>개</span>
           <select
             className="sort-select"
             value={sortOrder}
@@ -82,6 +104,8 @@ export default function InfluencerPage({ params }: { params: { account: string }
           <div className="empty"><p>불러오는 중...</p></div>
         ) : items.length === 0 ? (
           <div className="empty"><p>표시할 수 있는 추천 상품이 없어요</p></div>
+        ) : sorted.length === 0 ? (
+          <div className="empty"><p>검색 결과가 없어요</p></div>
         ) : (
           sorted.map(item => (
             <a
