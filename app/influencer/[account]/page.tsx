@@ -17,11 +17,14 @@ interface InfluencerInfo {
   source_url: string | null
 }
 
+type SortOrder = 'latest' | 'price_low' | 'price_high'
+
 export default function InfluencerPage({ params }: { params: { account: string } }) {
   const account = decodeURIComponent(params.account)
   const [influencer, setInfluencer] = useState<InfluencerInfo | null>(null)
   const [items, setItems] = useState<InfluencerItem[]>([])
   const [loading, setLoading] = useState(true)
+  const [sortOrder, setSortOrder] = useState<SortOrder>('latest')
 
   useEffect(() => {
     fetch(`/api/posts/by-influencer?account=${encodeURIComponent(account)}`)
@@ -30,6 +33,11 @@ export default function InfluencerPage({ params }: { params: { account: string }
       .catch(() => {})
       .finally(() => setLoading(false))
   }, [account])
+
+  // API가 이미 최신순으로 내려주므로 'latest'는 원래 순서 그대로 두고, 가격만 따로 정렬
+  const sorted = sortOrder === 'price_low' ? [...items].sort((a, b) => a.price - b.price)
+    : sortOrder === 'price_high' ? [...items].sort((a, b) => b.price - a.price)
+    : items
 
   const profileUrl = `https://instagram.com/${account.replace('@', '')}`
 
@@ -54,13 +62,28 @@ export default function InfluencerPage({ params }: { params: { account: string }
         </a>
       </div>
 
+      {!loading && items.length > 0 && (
+        <div className="topbar">
+          <span className="count-text">총 <strong>{items.length}</strong>개</span>
+          <select
+            className="sort-select"
+            value={sortOrder}
+            onChange={e => setSortOrder(e.target.value as SortOrder)}
+          >
+            <option value="latest">최신순</option>
+            <option value="price_low">낮은 가격순</option>
+            <option value="price_high">높은 가격순</option>
+          </select>
+        </div>
+      )}
+
       <div className="feed" style={{ paddingBottom: 100, paddingTop: 12 }}>
         {loading ? (
           <div className="empty"><p>불러오는 중...</p></div>
         ) : items.length === 0 ? (
           <div className="empty"><p>표시할 수 있는 추천 상품이 없어요</p></div>
         ) : (
-          items.map(item => (
+          sorted.map(item => (
             <a
               key={item.id}
               href={item.link}
