@@ -1,7 +1,7 @@
 'use client'
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
-import { ArrowLeft } from 'lucide-react'
+import { ArrowLeft, Search } from 'lucide-react'
 import type { Category } from '@/lib/types'
 import { CATEGORY_ICON, CATEGORY_LABEL, categoryIcon } from '@/lib/categoryIcons'
 
@@ -20,6 +20,7 @@ export default function InfluencersPage() {
   const [influencers, setInfluencers] = useState<InfluencerSummary[]>([])
   const [loading, setLoading] = useState(true)
   const [cat, setCat] = useState<Category | 'all'>('all')
+  const [query, setQuery] = useState('')
 
   useEffect(() => {
     fetch('/api/influencers')
@@ -29,7 +30,13 @@ export default function InfluencersPage() {
       .finally(() => setLoading(false))
   }, [])
 
-  const filtered = cat === 'all' ? influencers : influencers.filter(inf => inf.primaryCategory === cat)
+  const filtered = influencers
+    .filter(inf => cat === 'all' || inf.primaryCategory === cat)
+    .filter(inf => {
+      if (!query.trim()) return true
+      const q = query.trim().toLowerCase()
+      return inf.name.toLowerCase().includes(q) || inf.account.toLowerCase().includes(q)
+    })
 
   return (
     <>
@@ -41,6 +48,18 @@ export default function InfluencersPage() {
           </div>
         </div>
       </header>
+
+      <div className="hero-search-wrap">
+        <div className="hero-search">
+          <Search size={18} />
+          <input
+            type="search"
+            placeholder="인플루언서 이름/계정 검색"
+            value={query}
+            onChange={e => setQuery(e.target.value)}
+          />
+        </div>
+      </div>
 
       <div style={{ padding: '16px 16px 4px', textAlign: 'center' }}>
         <p style={{ fontSize: 13, color: '#64748b', margin: 0 }}>
