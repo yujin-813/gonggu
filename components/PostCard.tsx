@@ -1,5 +1,6 @@
 'use client'
 import { useState } from 'react'
+import Link from 'next/link'
 import type { Post } from '@/lib/types'
 import { daysLeft, getPeriodState, badgeFromState, periodTextFromState, isExpired, isNewPost, type BadgeIcon, type PeriodIcon } from '@/lib/period'
 import { CATEGORY_LABEL, categoryIcon } from '@/lib/categoryIcons'
@@ -171,6 +172,14 @@ export default function PostCard({
               <Star size={14} fill={isFollowingAccount ? 'currentColor' : 'none'} />
             </button>
           )}
+          <Link
+            href={`/influencer/${encodeURIComponent(post.account.replace('@', ''))}`}
+            onClick={e => e.stopPropagation()}
+            title="이 인플루언서의 다른 추천 상품 보기"
+            style={{ fontSize: 11, color: '#94a3b8', textDecoration: 'none', flexShrink: 0 }}
+          >
+            🛍️ 더보기
+          </Link>
           <span className="cat-tag">
             {CATEGORY_LABEL[post.cat] || post.cat}
           </span>
