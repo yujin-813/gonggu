@@ -17,6 +17,7 @@ interface AnalyticsData {
   daily: Record<string, DayData>
   visitorFirstSeen?: Record<string, string>  // visitorId -> 최초 방문일(YYYY-MM-DD)
   postViews?: Record<string, number>         // postId -> "공구 보기" 클릭 누적 수
+  postShares?: Record<string, number>        // postId -> 공유 버튼 클릭 누적 수
 }
 
 function load(): AnalyticsData {
@@ -75,6 +76,12 @@ export function recordEvent(type: string, sessionId: string, opts?: { visitorId?
     data.postViews[key] = (data.postViews[key] || 0) + 1
   }
 
+  if (type === 'share' && opts?.postId) {
+    if (!data.postShares) data.postShares = {}
+    const key = String(opts.postId)
+    data.postShares[key] = (data.postShares[key] || 0) + 1
+  }
+
   day.events[type] = (day.events[type] || 0) + 1
   save(data)
 }
@@ -102,6 +109,15 @@ export function getTopPosts(limit = 10): { postId: number; count: number }[] {
   const data = load()
   const views = data.postViews || {}
   return Object.entries(views)
+    .map(([postId, count]) => ({ postId: parseInt(postId), count }))
+    .sort((a, b) => b.count - a.count)
+    .slice(0, limit)
+}
+
+export function getTopSharedPosts(limit = 10): { postId: number; count: number }[] {
+  const data = load()
+  const shares = data.postShares || {}
+  return Object.entries(shares)
     .map(([postId, count]) => ({ postId: parseInt(postId), count }))
     .sort((a, b) => b.count - a.count)
     .slice(0, limit)

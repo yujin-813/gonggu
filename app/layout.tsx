@@ -1,4 +1,5 @@
 import type { Metadata } from 'next'
+import Script from 'next/script'
 import './globals.css'
 
 const SITE_URL = 'https://gonggu.asknuggetdata.com'
@@ -44,7 +45,13 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="ko">
-      <body>{children}</body>
+      <body>
+        {/* 공구/컬렉션 공유 버튼이 어느 페이지에서 눌려도 쓸 수 있도록 전역에서 한 번만 로드 */}
+        {process.env.NEXT_PUBLIC_KAKAO_JS_KEY && (
+          <Script src="https://t1.kakaocdn.net/kakao_js_sdk/2.7.2/kakao.min.js" strategy="afterInteractive" />
+        )}
+        {children}
+      </body>
     </html>
   )
 }

@@ -6,9 +6,12 @@ import { daysLeft, getPeriodState, badgeFromState, periodTextFromState, isExpire
 import { CATEGORY_LABEL, categoryIcon } from '@/lib/categoryIcons'
 import {
   Heart, Star, Wallet, CheckCircle2, Calendar, CalendarClock,
-  Package, Flame, Lock, Timer, Zap, ExternalLink,
+  Package, Flame, Lock, Timer, Zap, ExternalLink, Share2,
 } from 'lucide-react'
 import PriceCompareModal from './PriceCompareModal'
+import { shareContent } from '@/lib/share'
+
+const SITE_URL = 'https://gonggu.asknuggetdata.com'
 
 const BADGE_ICON: Record<BadgeIcon, typeof Calendar> = {
   'calendar-clock': CalendarClock, package: Package, flame: Flame, lock: Lock, timer: Timer,
@@ -71,6 +74,7 @@ interface PostCardProps {
   isBookmarked: boolean
   onToggleBookmark: (id: number) => void
   onJoin?: (id: number) => void
+  onShare?: (id: number, result: 'kakao' | 'native' | 'clipboard') => void
   siblings?: Post[]
   pastPrices?: { id: number; price: number; origPrice: number | null; date: string }[]
   isFollowingAccount?: boolean
@@ -78,7 +82,7 @@ interface PostCardProps {
 }
 
 export default function PostCard({
-  post, isBookmarked, onToggleBookmark, onJoin, siblings = [], pastPrices = [],
+  post, isBookmarked, onToggleBookmark, onJoin, onShare, siblings = [], pastPrices = [],
   isFollowingAccount, onToggleFollowAccount,
 }: PostCardProps) {
   const [imgFailed, setImgFailed] = useState(false)
@@ -115,6 +119,18 @@ export default function PostCard({
     window.open(purchaseLink, '_blank')
   }
 
+  async function handleShare(e: React.MouseEvent) {
+    e.stopPropagation()
+    const result = await shareContent({
+      title: post.title,
+      description: `${post.price.toLocaleString()}원 — 꿀공구에서 확인해보세요`,
+      imageUrl: post.img || undefined,
+      url: `${SITE_URL}/post/${post.id}`,
+      buttonLabel: '공구 보러가기',
+    })
+    if (result !== 'failed') onShare?.(post.id, result)
+  }
+
   const CatIcon = categoryIcon(post.cat)
   const BadgeIconEl = badge ? BADGE_ICON[badge.icon] : null
   const PeriodIconEl = PERIOD_ICON[dt.icon]
@@ -146,6 +162,13 @@ export default function PostCard({
           </div>
         )}
         {isNew && <div className="badge-new">NEW</div>}
+        <button
+          className="btn-share"
+          onClick={handleShare}
+          title="친구에게 공유하기"
+        >
+          <Share2 size={15} />
+        </button>
         <button
           className={`btn-bookmark ${isBookmarked ? 'active' : ''}`}
           onClick={(e) => { e.stopPropagation(); onToggleBookmark(post.id) }}

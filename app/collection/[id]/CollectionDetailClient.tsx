@@ -1,53 +1,15 @@
 'use client'
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
-import Script from 'next/script'
 import type { Post, Collection } from '@/lib/types'
 import { daysLeft } from '@/lib/period'
 import { ArrowLeft, Share2 } from 'lucide-react'
 import PostCard from '@/components/PostCard'
 import Toast from '@/components/Toast'
+import { shareContent } from '@/lib/share'
+import { track } from '@/lib/track'
 
 const SITE_URL = 'https://gonggu.asknuggetdata.com'
-
-function getSession(): string {
-  let id = sessionStorage.getItem('_dj_sid')
-  if (!id) { id = Math.random().toString(36).slice(2, 10); sessionStorage.setItem('_dj_sid', id) }
-  return id
-}
-function getVisitorId(): string {
-  let id = localStorage.getItem('_dj_vid')
-  if (!id) { id = Math.random().toString(36).slice(2, 10) + Date.now().toString(36); localStorage.setItem('_dj_vid', id) }
-  return id
-}
-// 관리자로 로그인된 브라우저(httpOnly 쿠키라 JS로 직접 못 읽어서 서버에 물어봄)는
-// 고객 방문으로 잡히면 통계가 왜곡되니 자동으로 트래킹 대상에서 뺀다 — 세션당 한 번만 확인
-let adminSessionCheck: Promise<boolean> | null = null
-function isAdminSession(): Promise<boolean> {
-  if (!adminSessionCheck) {
-    adminSessionCheck = fetch('/api/auth').then(r => r.json()).then(d => !!d.authed).catch(() => false)
-  }
-  return adminSessionCheck
-}
-
-async function track(type: string, extra?: { postId?: number }) {
-  if (await isAdminSession()) return
-  fetch('/api/analytics', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ type, sessionId: getSession(), visitorId: getVisitorId(), postId: extra?.postId }),
-  }).catch(() => {})
-}
-
-declare global {
-  interface Window {
-    Kakao?: {
-      isInitialized: () => boolean
-      init: (key: string) => void
-      Share: { sendDefault: (opts: Record<string, unknown>) => void }
-    }
-  }
-}
 
 interface Props {
   collection: Collection
@@ -90,39 +52,26 @@ export default function CollectionDetailClient({ collection, posts }: Props) {
   const shareUrl = `${SITE_URL}/collection/${collection.id}`
 
   async function share() {
-    const kakaoKey = process.env.NEXT_PUBLIC_KAKAO_JS_KEY
-    try {
-      if (kakaoKey && window.Kakao) {
-        if (!window.Kakao.isInitialized()) window.Kakao.init(kakaoKey)
-        window.Kakao.Share.sendDefault({
-          objectType: 'feed',
-          content: {
-            title: `${collection.emoji} ${collection.title}`,
-            description: collection.description || `${posts.length}개의 공구를 모아봤어요`,
-            imageUrl: posts.find(p => p.img)?.img || `${SITE_URL}/favicon.ico`,
-            link: { mobileWebUrl: shareUrl, webUrl: shareUrl },
-          },
-          buttons: [{ title: '컬렉션 보러가기', link: { mobileWebUrl: shareUrl, webUrl: shareUrl } }],
-        })
-        return
-      }
-      if (navigator.share) {
-        await navigator.share({ title: collection.title, text: collection.description, url: shareUrl })
-        return
-      }
-      await navigator.clipboard.writeText(shareUrl)
-      showToast('링크가 복사되었어요')
-    } catch {
-      // 사용자가 공유를 취소한 경우 등 — 조용히 무시
-    }
+    const result = await shareContent({
+      title: `${collection.emoji} ${collection.title}`,
+      description: collection.description || `${posts.length}개의 공구를 모아봤어요`,
+      imageUrl: posts.find(p => p.img)?.img || undefined,
+      url: shareUrl,
+      buttonLabel: '컬렉션 보러가기',
+    })
+    if (result === 'clipboard') showToast('링크가 복사되었어요')
+    if (result !== 'failed') track('share', { postId: undefined })
+  }
+
+  // PostCard가 공유 액션(카카오/OS 공유/클립보드) 자체는 알아서 수행하고, 여기선
+  // 결과에 따른 토스트 표시와 통계 기록만 담당한다
+  function handlePostShare(id: number, result: 'kakao' | 'native' | 'clipboard') {
+    if (result === 'clipboard') showToast('링크가 복사되었어요')
+    track('share', { postId: id })
   }
 
   return (
     <>
-      {process.env.NEXT_PUBLIC_KAKAO_JS_KEY && (
-        <Script src="https://t1.kakaocdn.net/kakao_js_sdk/2.7.2/kakao.min.js" strategy="afterInteractive" />
-      )}
-
       <header>
         <div className="header-inner">
           <Link href="/" className="back-btn"><ArrowLeft size={16} /></Link>
@@ -160,6 +109,7 @@ export default function CollectionDetailClient({ collection, posts }: Props) {
               isBookmarked={bookmarks.has(post.id)}
               onToggleBookmark={toggleBookmark}
               onJoin={id => { track('join', { postId: id }); recordRecentlyViewed(id) }}
+              onShare={handlePostShare}
             />
           ))
         )}

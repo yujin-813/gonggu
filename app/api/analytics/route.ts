@@ -1,12 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { recordEvent, getSummary, getTopPosts } from '@/lib/analytics'
+import { recordEvent, getSummary, getTopPosts, getTopSharedPosts } from '@/lib/analytics'
 import { loadPosts } from '@/lib/store'
 
 export async function POST(request: NextRequest) {
   try {
     const { type, sessionId, visitorId, postId } = await request.json()
     if (!type || !sessionId) return NextResponse.json({ error: 'missing' }, { status: 400 })
-    const allowed = new Set(['view', 'bookmark', 'join', 'category', 'search'])
+    const allowed = new Set(['view', 'bookmark', 'join', 'category', 'search', 'share'])
     if (!allowed.has(type)) return NextResponse.json({ error: 'invalid type' }, { status: 400 })
     recordEvent(type, sessionId, { visitorId, postId })
     return NextResponse.json({ ok: true })
@@ -18,13 +18,16 @@ export async function POST(request: NextRequest) {
 export async function GET() {
   const summary = getSummary(14)
   const top = getTopPosts(10)
+  const topShared = getTopSharedPosts(10)
   const posts = loadPosts()
-  const topPosts = top
+  const withPostInfo = (list: { postId: number; count: number }[]) => list
     .map(({ postId, count }) => {
       const post = posts.find(p => p.id === postId)
       if (!post) return null
       return { id: postId, title: post.title, img: post.img || null, price: post.price, count }
     })
     .filter(Boolean)
-  return NextResponse.json({ summary, topPosts })
+  const topPosts = withPostInfo(top)
+  const topSharedPosts = withPostInfo(topShared)
+  return NextResponse.json({ summary, topPosts, topSharedPosts })
 }

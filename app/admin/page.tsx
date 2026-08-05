@@ -97,6 +97,7 @@ export default function AdminPage() {
   const [searchQ, setSearchQ]         = useState('')
   const [analytics, setAnalytics]     = useState<DayStat[]>([])
   const [topPosts, setTopPosts]       = useState<TopPost[]>([])
+  const [topSharedPosts, setTopSharedPosts] = useState<TopPost[]>([])
   const [includeKws, setIncludeKws]   = useState<string[]>([])
   const [excludeKws, setExcludeKws]   = useState<string[]>([])
   const [newInclude, setNewInclude]   = useState('')
@@ -138,6 +139,7 @@ export default function AdminPage() {
       const d = await r.json()
       setAnalytics(d.summary || [])
       setTopPosts(d.topPosts || [])
+      setTopSharedPosts(d.topSharedPosts || [])
     }
   }, [])
 
@@ -467,7 +469,7 @@ export default function AdminPage() {
         </div>
 
         {/* 방문자 분석 */}
-        <AnalyticsSection data={analytics} topPosts={topPosts} />
+        <AnalyticsSection data={analytics} topPosts={topPosts} topSharedPosts={topSharedPosts} />
 
         {/* 탭 메뉴 */}
         <div style={{ display: 'flex', gap: 4, marginBottom: 20, borderBottom: '2px solid #e2e8f0', paddingBottom: 0 }}>
@@ -702,7 +704,7 @@ function StatCard({ label, value, icon, color }: { label: string; value: number;
   )
 }
 
-function AnalyticsSection({ data, topPosts }: { data: DayStat[]; topPosts: TopPost[] }) {
+function AnalyticsSection({ data, topPosts, topSharedPosts }: { data: DayStat[]; topPosts: TopPost[]; topSharedPosts: TopPost[] }) {
   const last7 = data.slice(-7)
   const today = last7[last7.length - 1]
   const total7 = last7.reduce((s, d) => s + d.visitors, 0)
@@ -767,6 +769,7 @@ function AnalyticsSection({ data, topPosts }: { data: DayStat[]; topPosts: TopPo
             { key: 'bookmark', label: '찜', icon: '❤️' },
             { key: 'category', label: '카테고리', icon: '🏷' },
             { key: 'search', label: '검색', icon: '🔍' },
+            { key: 'share', label: '공유', icon: '📤' },
           ].filter(e => today.events[e.key]).map(e => (
             <div key={e.key} style={{ background: '#f1f5f9', borderRadius: 8, padding: '6px 12px', fontSize: 12, color: '#475569' }}>
               {e.icon} {e.label} <strong>{today.events[e.key]}</strong>회
@@ -786,6 +789,23 @@ function AnalyticsSection({ data, topPosts }: { data: DayStat[]; topPosts: TopPo
                 {p.img && <img src={p.img} alt="" style={{ width: 32, height: 32, borderRadius: 6, objectFit: 'cover', flexShrink: 0 }} />}
                 <span style={{ fontSize: 12, color: '#0f172a', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.title}</span>
                 <span style={{ fontSize: 12, fontWeight: 700, color: '#f97316', flexShrink: 0 }}>{p.count}회 클릭</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* 가장 많이 공유된 상품 — 공유 버튼 클릭 누적 기준 (전체 기간) */}
+      {topSharedPosts.length > 0 && (
+        <div style={{ marginTop: 20, paddingTop: 16, borderTop: '1px solid #f1f5f9' }}>
+          <h4 style={{ margin: '0 0 10px', fontSize: 13, fontWeight: 700, color: '#1e293b' }}>📤 가장 많이 공유된 상품 TOP 5</h4>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            {topSharedPosts.slice(0, 5).map((p, i) => (
+              <div key={p.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '6px 8px', background: i === 0 ? '#eff6ff' : '#f8fafc', borderRadius: 8 }}>
+                <span style={{ fontSize: 12, fontWeight: 700, color: '#94a3b8', width: 16, flexShrink: 0 }}>{i + 1}</span>
+                {p.img && <img src={p.img} alt="" style={{ width: 32, height: 32, borderRadius: 6, objectFit: 'cover', flexShrink: 0 }} />}
+                <span style={{ fontSize: 12, color: '#0f172a', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.title}</span>
+                <span style={{ fontSize: 12, fontWeight: 700, color: '#0ea5e9', flexShrink: 0 }}>{p.count}회 공유</span>
               </div>
             ))}
           </div>

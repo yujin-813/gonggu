@@ -9,6 +9,7 @@ import Toast from '@/components/Toast'
 import type { Post, Category, SortOrder, Collection } from '@/lib/types'
 import { categoryIcon } from '@/lib/categoryIcons'
 import { isEvergreen } from '@/lib/period'
+import { getVisitorId, track } from '@/lib/track'
 import { Bell, ArrowLeft, Heart, Star, Clock, Loader2, Search, MessageCircle, X } from 'lucide-react'
 
 function daysLeft(deadline?: string): number {
@@ -18,45 +19,6 @@ function daysLeft(deadline?: string): number {
   const d = new Date(deadline)
   d.setHours(0, 0, 0, 0)
   return Math.ceil((d.getTime() - today.getTime()) / (1000 * 60 * 60 * 24))
-}
-
-function getSession(): string {
-  let id = sessionStorage.getItem('_dj_sid')
-  if (!id) { id = Math.random().toString(36).slice(2, 10); sessionStorage.setItem('_dj_sid', id) }
-  return id
-}
-
-// 세션(탭)과 무관하게 이 브라우저를 계속 식별하는 영구 ID — "재방문자" 판별용
-function getVisitorId(): string {
-  let id = localStorage.getItem('_dj_vid')
-  if (!id) { id = Math.random().toString(36).slice(2, 10) + Date.now().toString(36); localStorage.setItem('_dj_vid', id) }
-  return id
-}
-
-// 방문 URL에 ?notrack=1을 한 번 붙이면 이 브라우저는 이후 계속 통계에서 제외된다
-// (?notrack=0으로 다시 접속하면 해제) — 테스트를 많이 하는 운영자 본인 브라우저용
-function isTrackingDisabled(): boolean {
-  return localStorage.getItem('gonggu_no_track') === '1'
-}
-
-// 관리자로 로그인된 브라우저(httpOnly 쿠키라 JS로 직접 못 읽어서 서버에 물어봄)는
-// 고객 방문으로 잡히면 통계가 왜곡되니 자동으로 트래킹 대상에서 뺀다 — 세션당 한 번만 확인
-let adminSessionCheck: Promise<boolean> | null = null
-function isAdminSession(): Promise<boolean> {
-  if (!adminSessionCheck) {
-    adminSessionCheck = fetch('/api/auth').then(r => r.json()).then(d => !!d.authed).catch(() => false)
-  }
-  return adminSessionCheck
-}
-
-async function track(type: string, extra?: { postId?: number }) {
-  if (isTrackingDisabled()) return
-  if (await isAdminSession()) return
-  fetch('/api/analytics', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ type, sessionId: getSession(), visitorId: getVisitorId(), postId: extra?.postId }),
-  }).catch(() => {})
 }
 
 // VAPID 공개키(base64url) → 브라우저 PushManager가 요구하는 Uint8Array 형식으로 변환
@@ -468,6 +430,10 @@ export default function Home() {
               isBookmarked={bookmarks.has(post.id)}
               onToggleBookmark={toggleBookmark}
               onJoin={id => { track('join', { postId: id }); recordRecentlyViewed(id) }}
+              onShare={(id, result) => {
+                if (result === 'clipboard') showToast('링크가 복사되었어요')
+                track('share', { postId: id })
+              }}
               siblings={post.group_key ? groupMap.get(post.group_key) : undefined}
               pastPrices={post.group_key ? groupHistory[post.group_key]?.filter(h => h.id !== post.id) : undefined}
               isFollowingAccount={followedInfluencers.has(post.account)}
