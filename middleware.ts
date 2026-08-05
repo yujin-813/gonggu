@@ -14,6 +14,11 @@ function isProtected(req: NextRequest): boolean {
   if (pathname === '/api/posts/group-history' || pathname === '/api/posts/by-influencer') {
     return method !== 'GET'
   }
+  // 인플루언서/고객이 직접 공구 등록을 요청하는 공개 제보 창구 — 항상 needs_review로만
+  // 들어가고 절대 published=true로 안 뜨게 서버(app/api/posts/request/route.ts)가 강제한다
+  if (pathname === '/api/posts/request') {
+    return method !== 'POST'
+  }
   if (pathname.startsWith('/api/posts/')) return true // PATCH/PUT/DELETE
 
   // 컬렉션: 일반 GET(고객 페이지)은 허용, admin=1 조회와 모든 쓰기는 보호

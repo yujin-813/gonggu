@@ -870,6 +870,7 @@ function AdminPostRow({ post: p, onToggle, onDelete, onEdit, onToggleAlwaysOn, o
             {p.status === 'ready'        && <span style={{ fontSize: 11, background: '#dcfce7', color: '#15803d',  padding: '2px 6px', borderRadius: 10, fontWeight: 600 }}>🟢 공개 가능</span>}
             {p.status === 'excluded'     && <span style={{ fontSize: 11, background: '#f1f5f9', color: '#64748b',  padding: '2px 6px', borderRadius: 10, fontWeight: 600 }}>🚫 제외</span>}
             {p.status === 'upcoming'     && <span style={{ fontSize: 11, background: '#ede9fe', color: '#7c3aed',  padding: '2px 6px', borderRadius: 10, fontWeight: 600 }}>🗓️ 오픈 예정</span>}
+            {p.source === 'influencer_request' && <span title="인플루언서가 직접 제출한 등록 요청" style={{ fontSize: 11, background: '#e0f2fe', color: '#0369a1', padding: '2px 6px', borderRadius: 10, fontWeight: 600, cursor: 'help' }}>📮 직접 제보</span>}
             {p.review_reason && p.review_reason.length > 0 && p.review_reason.map((r, i) => (
               <span key={i} style={{ fontSize: 10, background: '#fee2e2', color: '#dc2626', padding: '1px 5px', borderRadius: 8 }}>{r}</span>
             ))}

@@ -36,7 +36,7 @@ export interface Post {
   brand?: string | null
   group_key?: string | null
   market_url?: string | null
-  source?: 'manual' | 'scraper' | 'inpock'
+  source?: 'manual' | 'scraper' | 'inpock' | 'influencer_request'
   status?: 'candidate' | 'needs_review' | 'ready' | 'published' | 'excluded' | 'upcoming'
   review_reason?: string[]
   published?: boolean
