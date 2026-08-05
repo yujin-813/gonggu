@@ -86,6 +86,7 @@ export async function POST(request: NextRequest) {
     purchase_url:     data.purchase_url?.trim() || null,
     is_always_on:     Boolean(data.is_always_on),
     is_evergreen_deal: Boolean(data.is_evergreen_deal),
+    is_exclusive_deal: Boolean(data.is_exclusive_deal),
     extraction_debug:  data.extraction_debug || null,
     status:        data.status || 'ready',
     review_reason: data.review_reason || [],

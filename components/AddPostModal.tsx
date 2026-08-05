@@ -65,6 +65,7 @@ export default function AddPostModal({ onClose, onSubmit, editPost, existingGrou
   const [endDate,   setEndDate]   = useState(defaultDate(7))
   const [price,         setPrice]         = useState('')
   const [origPrice,     setOrigPrice]     = useState('')
+  const [isExclusiveDeal, setIsExclusiveDeal] = useState(false)
   const [marketPriceNote, setMarketPriceNote] = useState('')
   const [groupKey,      setGroupKey]      = useState('')
   const [newGroupMode,  setNewGroupMode]  = useState(false)
@@ -107,6 +108,7 @@ export default function AddPostModal({ onClose, onSubmit, editPost, existingGrou
     setOrigPrice(editPost.origPrice ? String(editPost.origPrice) : '')
     setMarketPriceNote(editPost.market_price_note || '')
     setMarketUrl(editPost.market_url || '')
+    setIsExclusiveDeal(editPost.is_exclusive_deal ?? false)
     setCustomVerdict(editPost.custom_verdict || '')
     setCustomVerdictDetail(editPost.custom_verdict_detail || '')
     setCustomVerdictCls(editPost.custom_verdict_cls || 'good')
@@ -233,6 +235,7 @@ export default function AddPostModal({ onClose, onSubmit, editPost, existingGrou
         price:        price ? parseInt(price) : 0,
         origPrice:    origPrice ? parseInt(origPrice) : null,
         market_price_note: marketPriceNote.trim() || null,
+        is_exclusive_deal: !origPrice && isExclusiveDeal,
         start_date:   startDate || '',
         deadline:     endDate,
         img:          uploadedImg || '',
@@ -413,6 +416,22 @@ export default function AddPostModal({ onClose, onSubmit, editPost, existingGrou
               네이버 쇼핑 검색 API가 더 이상 지원되지 않아 자동 검색은 종료됐어요 — 위 버튼으로 화면 옆에 작은 창을 띄워서 이 입력 화면과 나란히 비교하며 가격/링크를 아래에 입력해주세요
             </p>
             <input type="number" value={origPrice} onChange={e => { setOrigPrice(e.target.value); if (!e.target.value) setMarketUrl('') }} placeholder="60000" />
+            {!origPrice && (
+              <label style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 8, fontWeight: 400, fontSize: 13 }}>
+                <input
+                  type="checkbox"
+                  checked={isExclusiveDeal}
+                  onChange={e => setIsExclusiveDeal(e.target.checked)}
+                  style={{ width: 'auto' }}
+                />
+                다른 곳에서는 안 팔아요 (공구 전용 상품)
+              </label>
+            )}
+            {!origPrice && isExclusiveDeal && (
+              <p style={{ fontSize: 11, color: '#94a3b8', margin: '4px 0 0' }}>
+                고객 화면에 "네이버 최저가 정보가 없어요" 대신 "여기서만 만나볼 수 있어요"로 표시돼요 — 실제로 다른 채널에서 안 파는 게 확실할 때만 체크해주세요
+              </p>
+            )}
             {isEdit && editPost?.market_price && !origPrice && (
               <p style={{ fontSize: 11, color: '#6366f1', margin: '4px 0 0' }}>
                 🔍 과거 자동 매칭된 네이버 최저가: {editPost.market_price.toLocaleString()}원 (자동 검색 종료로 더 이상 갱신되지 않는 값이에요 — 직접 입력하면 그 값이 우선 사용돼요)

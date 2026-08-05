@@ -38,9 +38,13 @@ function dealJudgment(post: Post): { verdict: string; detail: string; cls: strin
   // 사람이 직접 확인한 값보다 신뢰도가 낮다. AddPostModal에도 "직접 입력하면 그 값이 우선
   // 사용돼요"라고 안내하고 있으니 계산도 그 안내와 일치해야 한다.
   const mp = post.origPrice || post.market_price
-  // 비교 기준가가 아예 없는 경우 — "여기서만 판매"처럼 확인 안 된 걸 단정하지 않고,
+  // 비교 기준가가 아예 없는 경우 — 관리자가 "다른 곳에서 안 판다"고 직접 확인한 상품(is_exclusive_deal)만
+  // "여기서만 만나볼 수 있어요"로 단정하고, 그냥 검색에 안 걸린 것뿐이면 확인 안 된 걸 단정하지 않고
   // 검색에 안 걸렸다는 사실만 담백하게 알려준다
   if (!mp) {
+    if (post.is_exclusive_deal) {
+      return { verdict: '여기서만 만나볼 수 있어요', detail: '다른 곳에서는 판매하지 않는 공구 전용 상품이에요', cls: 'good' }
+    }
     return { verdict: '네이버 최저가 정보가 없어요', detail: '이 상품은 네이버 쇼핑에서 검색되지 않았어요', cls: 'neutral' }
   }
   const p  = post.price

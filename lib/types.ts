@@ -53,6 +53,10 @@ export interface Post {
   is_always_on?: boolean
   is_evergreen_deal?: boolean
   sale_until_sold_out?: boolean
+  // 관리자가 "이 상품은 다른 곳에서 안 팔아요"라고 직접 확인해 표시하는 값 — 자동 가격
+  // 비교(market_price/origPrice)가 없을 때, "정보 없음"이라는 담백한 안내 대신 "여기서만
+  // 만나볼 수 있어요"라는 긍정적인 문구로 바꿔 보여주는 데 쓴다
+  is_exclusive_deal?: boolean
   extraction_debug?: Record<string, unknown> | null
   market_price?: number | null
   market_source?: string | null
