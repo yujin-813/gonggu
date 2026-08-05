@@ -112,6 +112,24 @@ def check_link(url):
     return "alive", "정상"
 
 
+def hide_from_customers(p):
+    """admin/page.tsx의 togglePublished와 동일한 규칙으로 숨긴다 — status가 'published'인
+    동안은 published 불리언만 바꿔선 안 보여지지 않는다(isCustomerVisible이 status==='published'
+    이면 published 값을 아예 안 본다), 그래서 status도 같이 내려야 실제로 숨겨진다."""
+    if p.get("status") == "upcoming":
+        p["published"] = False
+    else:
+        p["status"] = "ready"
+        p["published"] = False
+
+
+def restore_to_customers(p):
+    """hide_from_customers로 내렸던 걸 원래대로 되돌린다"""
+    if p.get("status") == "ready":
+        p["status"] = "published"
+    p["published"] = True
+
+
 def main():
     posts = load_posts()
     targets = [p for p in posts if is_customer_visible(p) and (p.get("purchase_url") or p.get("url"))]
@@ -134,7 +152,7 @@ def main():
             broken += 1
             print(f"  ❌ 비공개 처리: {p['title'][:40]} ({reason})")
         elif result == "sold_out":
-            p["published"] = False  # status는 그대로 둬서 재입고되면 자동 복구 가능하게 함
+            hide_from_customers(p)  # status도 함께 내려야 실제로 숨겨짐 (재입고 시 자동 복구 가능)
             if SOLD_OUT_REASON not in existing:
                 p["review_reason"] = existing + [SOLD_OUT_REASON]
             sold_out += 1
@@ -147,7 +165,7 @@ def main():
         else:  # alive
             # 이 스크립트가 붙인 태그만 정리한다 — 관리자가 다른 이유로 비공개한 건 안 건드림
             if SOLD_OUT_REASON in existing:
-                p["published"] = True
+                restore_to_customers(p)
                 restocked += 1
                 print(f"  ✅ 재입고 감지, 다시 공개: {p['title'][:40]}")
             if SOLD_OUT_REASON in existing or UNCERTAIN_REASON in existing:
