@@ -3,7 +3,7 @@ import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { ArrowLeft } from 'lucide-react'
 import type { Category } from '@/lib/types'
-import { CATEGORY_ICON, CATEGORY_LABEL } from '@/lib/categoryIcons'
+import { CATEGORY_ICON, CATEGORY_LABEL, categoryIcon } from '@/lib/categoryIcons'
 
 // 인플루언서는 상시딜 여부가 없는 개념이라 'evergreen'은 빼고 실제 카테고리 5개만 사용
 const INFLUENCER_CATS: (Category | 'all')[] = ['all', 'kids', 'life', 'food', 'health', 'beauty']
@@ -86,8 +86,17 @@ export default function InfluencersPage() {
                 style={{ width: 56, height: 56, borderRadius: 10, objectFit: 'cover', flexShrink: 0, background: '#f1f5f9' }}
               />
               <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: 14, fontWeight: 700, color: '#0f172a', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                  {inf.name}
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 2 }}>
+                  <div style={{ fontSize: 14, fontWeight: 700, color: '#0f172a', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {inf.name}
+                  </div>
+                  <span style={{
+                    display: 'inline-flex', alignItems: 'center', gap: 3, flexShrink: 0,
+                    fontSize: 11, color: '#64748b', background: '#f1f5f9', borderRadius: 8, padding: '2px 7px',
+                  }}>
+                    {(() => { const Icon = categoryIcon(inf.primaryCategory); return <Icon size={11} strokeWidth={2.25} /> })()}
+                    {CATEGORY_LABEL[inf.primaryCategory as Category] || inf.primaryCategory}
+                  </span>
                 </div>
                 <div style={{ fontSize: 12, color: '#94a3b8' }}>{inf.account}</div>
               </div>
