@@ -839,6 +839,9 @@ function AdminPostRow({ post: p, onToggle, onDelete, onEdit, onToggleAlwaysOn, o
     onQuickReview(p, 'exclude', reason)
     setShowExcludeReasons(false)
   }
+  // 상시딜/소진시/제외/삭제는 매번 다 보일 필요 없는 부가 액션이라 접어둔다 —
+  // 항상 보이는 건 링크/수정/공개토글 정도로만 줄여서 한 줄에 스캔하기 쉽게 함
+  const [showMore, setShowMore] = useState(false)
 
   return (
     <div style={{
@@ -937,8 +940,9 @@ function AdminPostRow({ post: p, onToggle, onDelete, onEdit, onToggleAlwaysOn, o
           </div>
         )}
 
-        {/* 액션 버튼 */}
-        <div className="admin-row-actions">
+        {/* 액션 버튼 — 자주 쓰는 것만 항상 보이고, 나머지(상시딜/소진시/제외/삭제)는 "⋯더보기"로 접음.
+            상시딜/소진시가 이미 켜져 있으면 접혀 있어도 놓치지 않도록 작은 상태 배지만 표시 */}
+        <div className="admin-row-actions" style={{ alignItems: 'center' }}>
           {p.source_url && (
             <a href={p.source_url} target="_blank" rel="noopener noreferrer" title="인포크/링크트리 원본 보기"
               style={{ padding: '6px 10px', background: '#ede9fe', borderRadius: 6, fontSize: 12, color: '#7c3aed', textDecoration: 'none', whiteSpace: 'nowrap' }}>
@@ -966,30 +970,42 @@ function AdminPostRow({ post: p, onToggle, onDelete, onEdit, onToggleAlwaysOn, o
               background: published ? '#dcfce7' : '#fff7ed', color: published ? '#16a34a' : '#ea580c' }}>
             {published ? '✅ 공개' : '🙈 숨김'}
           </button>
-          <button onClick={() => onToggleAlwaysOn(p)}
-            title="상시딜로 설정하면 마감일 없이도 공개 가능"
-            style={{ padding: '6px 10px', borderRadius: 8, border: 'none', cursor: 'pointer', fontSize: 11, fontWeight: 600, whiteSpace: 'nowrap',
-              background: (p.is_evergreen_deal || p.is_always_on) ? '#fef3c7' : '#f1f5f9', color: (p.is_evergreen_deal || p.is_always_on) ? '#92400e' : '#94a3b8' }}>
-            {(p.is_evergreen_deal || p.is_always_on) ? '⏰ 상시딜' : '상시딜'}
-          </button>
-          <button onClick={() => onToggleSoldOutOnly(p)}
-            title="한정수량으로 재고 소진시 마감되고, 고정된 마감일은 없는 공구"
-            style={{ padding: '6px 10px', borderRadius: 8, border: 'none', cursor: 'pointer', fontSize: 11, fontWeight: 600, whiteSpace: 'nowrap',
-              background: p.sale_until_sold_out ? '#fee2e2' : '#f1f5f9', color: p.sale_until_sold_out ? '#b91c1c' : '#94a3b8' }}>
-            {p.sale_until_sold_out ? '🔥 소진시' : '소진시'}
-          </button>
-          {p.status !== 'excluded' && (
-            <button onClick={() => setShowExcludeReasons(true)}
-              title="이 공구를 제외 처리 (고객 화면에서 숨겨짐)"
-              style={{ padding: '6px 10px', background: '#fee2e2', color: '#dc2626', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 12, fontWeight: 600, whiteSpace: 'nowrap' }}>
-              🚫 제외
-            </button>
-          )}
-          <button onClick={() => onDelete(p.id)}
-            style={{ padding: '6px 10px', background: '#fee2e2', color: '#dc2626', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 12, fontWeight: 600 }}>
-            삭제
+          {(p.is_evergreen_deal || p.is_always_on) && <span title="상시딜로 설정됨" style={{ fontSize: 14, cursor: 'default' }}>⏰</span>}
+          {p.sale_until_sold_out && <span title="소진시 마감으로 설정됨" style={{ fontSize: 14, cursor: 'default' }}>🔥</span>}
+          <button onClick={() => setShowMore(v => !v)}
+            title="더 많은 작업"
+            style={{ padding: '6px 10px', background: showMore ? '#e2e8f0' : '#f1f5f9', color: '#475569', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 12, fontWeight: 700 }}>
+            ⋯
           </button>
         </div>
+
+        {showMore && (
+          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 8, paddingTop: 8, borderTop: '1px solid #e2e8f0' }}>
+            <button onClick={() => onToggleAlwaysOn(p)}
+              title="상시딜로 설정하면 마감일 없이도 공개 가능"
+              style={{ padding: '6px 10px', borderRadius: 8, border: 'none', cursor: 'pointer', fontSize: 11, fontWeight: 600, whiteSpace: 'nowrap',
+                background: (p.is_evergreen_deal || p.is_always_on) ? '#fef3c7' : '#f1f5f9', color: (p.is_evergreen_deal || p.is_always_on) ? '#92400e' : '#94a3b8' }}>
+              {(p.is_evergreen_deal || p.is_always_on) ? '⏰ 상시딜 해제' : '상시딜로 설정'}
+            </button>
+            <button onClick={() => onToggleSoldOutOnly(p)}
+              title="한정수량으로 재고 소진시 마감되고, 고정된 마감일은 없는 공구"
+              style={{ padding: '6px 10px', borderRadius: 8, border: 'none', cursor: 'pointer', fontSize: 11, fontWeight: 600, whiteSpace: 'nowrap',
+                background: p.sale_until_sold_out ? '#fee2e2' : '#f1f5f9', color: p.sale_until_sold_out ? '#b91c1c' : '#94a3b8' }}>
+              {p.sale_until_sold_out ? '🔥 소진시 해제' : '소진시로 설정'}
+            </button>
+            {p.status !== 'excluded' && (
+              <button onClick={() => setShowExcludeReasons(true)}
+                title="이 공구를 제외 처리 (고객 화면에서 숨겨짐)"
+                style={{ padding: '6px 10px', background: '#fee2e2', color: '#dc2626', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 12, fontWeight: 600, whiteSpace: 'nowrap' }}>
+                🚫 제외
+              </button>
+            )}
+            <button onClick={() => onDelete(p.id)}
+              style={{ padding: '6px 10px', background: '#fee2e2', color: '#dc2626', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 12, fontWeight: 600 }}>
+              삭제
+            </button>
+          </div>
+        )}
       </div>
     </div>
   )
