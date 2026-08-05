@@ -20,12 +20,10 @@ type PeriodInput = Pick<Post, 'status' | 'start_date' | 'deadline' | 'is_evergre
 
 export type PeriodState =
   | { kind: 'upcoming'; startDate: string; daysToOpen: number | null }
-  | { kind: 'evergreen' }
-  | { kind: 'sold_out_only' }
+  | { kind: 'evergreen'; startDate?: string }
+  | { kind: 'sold_out_only'; startDate?: string }
   | { kind: 'range'; startDate: string; deadline: string; daysLeft: number }
   | { kind: 'deadline_only'; deadline: string; daysLeft: number }
-  | { kind: 'start_only'; startDate: string }
-  | { kind: 'unknown' }
 
 /** 공구의 기간 상태를 하나의 값으로 정리한다 — 이후 표시 로직은 전부 이 결과만 보고 분기한다. */
 export function getPeriodState(post: PeriodInput): PeriodState {
@@ -33,7 +31,7 @@ export function getPeriodState(post: PeriodInput): PeriodState {
     const startDate = post.start_date || ''
     return { kind: 'upcoming', startDate, daysToOpen: startDate ? daysLeft(startDate) : null }
   }
-  if (post.is_evergreen_deal || post.is_always_on) return { kind: 'evergreen' }
+  if (post.is_evergreen_deal || post.is_always_on) return { kind: 'evergreen', startDate: post.start_date || undefined }
   if (post.deadline) {
     return post.start_date
       ? { kind: 'range', startDate: post.start_date, deadline: post.deadline, daysLeft: daysLeft(post.deadline) }
@@ -41,9 +39,11 @@ export function getPeriodState(post: PeriodInput): PeriodState {
   }
   // 마감일이 없을 때: "소진시 마감"으로 명시된 경우만 예외로 두고, 그 외(시작일만 있거나
   // 기간 정보가 아예 없는 경우)는 전부 "상시딜"로 취급한다 — 마감일이 없다는 건 특정 시점에
-  // 끝나지 않고 계속 판매된다는 뜻이라, "마감일 미확인"보다 상시딜이 더 정확한 표현이다
-  if (post.sale_until_sold_out) return { kind: 'sold_out_only' }
-  return { kind: 'evergreen' }
+  // 끝나지 않고 계속 판매된다는 뜻이라, "마감일 미확인"보다 상시딜이 더 정확한 표현이다.
+  // 다만 시작일은 알고 있는 경우가 있으니(오픈일만 확인되고 마감일은 못 찾은 경우) 그 값은
+  // 버리지 않고 evergreen/sold_out_only에 실어 보내 화면에 "OO부터 진행 중"으로 보여준다
+  if (post.sale_until_sold_out) return { kind: 'sold_out_only', startDate: post.start_date || undefined }
+  return { kind: 'evergreen', startDate: post.start_date || undefined }
 }
 
 /** 이 공구가 "상시딜" 탭에 노출돼야 하는지 (명시적 상시딜 플래그 + 마감일 없는 공구 전부 포함) */
@@ -56,12 +56,10 @@ export function periodLabel(post: PeriodInput): string {
   const s = getPeriodState(post)
   switch (s.kind) {
     case 'upcoming':     return s.startDate ? `${fmtDate(s.startDate)} 오픈 예정` : '오픈 예정'
-    case 'evergreen':    return '상시딜'
-    case 'sold_out_only': return '한정수량 · 소진시 마감'
+    case 'evergreen':    return s.startDate ? `${fmtDate(s.startDate)}~ 상시딜` : '상시딜'
+    case 'sold_out_only': return s.startDate ? `${fmtDate(s.startDate)}~ · 소진시 마감` : '한정수량 · 소진시 마감'
     case 'range':         return `${fmtDate(s.startDate)} ~ ${fmtDate(s.deadline)}`
     case 'deadline_only': return `~ ${fmtDate(s.deadline)}`
-    case 'start_only':    return `${fmtDate(s.startDate)} 시작 · 마감일 미확인`
-    case 'unknown':       return '마감일 미확인'
   }
 }
 
@@ -95,7 +93,8 @@ export function isNewPost(scrapedAt?: string): boolean {
 export type BadgeIcon = 'calendar-clock' | 'package' | 'flame' | 'lock' | 'timer'
 export type PeriodIcon = 'calendar' | 'zap'
 
-/** 카드 왼쪽 위 D-day 배지. 정보가 없으면(start_only/unknown) 거짓 정보를 주느니 배지를 숨긴다 */
+/** 카드 왼쪽 위 D-day 배지 — 상시딜/소진시는 배지엔 짧게, 시작일 같은 세부 정보는
+ * periodTextFromState(하단 기간 텍스트 줄)에서 보여준다 */
 export function badgeFromState(state: PeriodState): { cls: string; icon: BadgeIcon; txt: string } | null {
   switch (state.kind) {
     case 'upcoming':
@@ -113,9 +112,6 @@ export function badgeFromState(state: PeriodState): { cls: string; icon: BadgeIc
       if (d <= 3) return { cls: 'soon', icon: 'timer', txt: `D-${d}` }
       return { cls: 'ok', icon: 'timer', txt: `D-${d}` }
     }
-    case 'start_only':
-    case 'unknown':
-      return null
   }
 }
 
@@ -123,8 +119,8 @@ export function badgeFromState(state: PeriodState): { cls: string; icon: BadgeIc
 export function periodTextFromState(state: PeriodState): { cls: string; icon: PeriodIcon; txt: string } {
   switch (state.kind) {
     case 'upcoming':      return { cls: '', icon: 'calendar', txt: `${fmtDate(state.startDate)} 오픈 예정` }
-    case 'evergreen':     return { cls: '', icon: 'calendar', txt: '상시딜' }
-    case 'sold_out_only': return { cls: '', icon: 'calendar', txt: '한정수량 · 소진시 마감' }
+    case 'evergreen':     return { cls: '', icon: 'calendar', txt: state.startDate ? `${fmtDate(state.startDate)}부터 진행 중` : '상시딜' }
+    case 'sold_out_only': return { cls: '', icon: 'calendar', txt: state.startDate ? `${fmtDate(state.startDate)}부터 · 한정수량 소진시 마감` : '한정수량 · 소진시 마감' }
     case 'range':
       if (state.daysLeft < 0) return { cls: 'urgent', icon: 'calendar', txt: '마감됨' }
       if (state.daysLeft === 0) return { cls: 'urgent', icon: 'zap', txt: '오늘 마감!' }
@@ -135,7 +131,5 @@ export function periodTextFromState(state: PeriodState): { cls: string; icon: Pe
       if (state.daysLeft === 0) return { cls: 'urgent', icon: 'zap', txt: '오늘 마감!' }
       if (state.daysLeft === 1) return { cls: 'urgent', icon: 'zap', txt: '내일 마감!' }
       return { cls: '', icon: 'calendar', txt: `~ ${fmtDate(state.deadline)} 마감` }
-    case 'start_only':    return { cls: '', icon: 'calendar', txt: `${fmtDate(state.startDate)} 시작 · 마감일 미확인` }
-    case 'unknown':       return { cls: '', icon: 'calendar', txt: '' }
   }
 }
