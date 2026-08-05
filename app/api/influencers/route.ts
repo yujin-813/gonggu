@@ -16,12 +16,16 @@ export async function GET() {
     !(p.review_reason || []).includes('이미지 다운로드 실패')
   )
 
-  const byAccount = new Map<string, { account: string; name: string; count: number; thumbnail: string; latest: string }>()
+  const byAccount = new Map<string, {
+    account: string; name: string; count: number; thumbnail: string; latest: string
+    catCounts: Record<string, number>
+  }>()
   for (const p of posts) {
     const account = p.account!
     const existing = byAccount.get(account)
     if (existing) {
       existing.count += 1
+      existing.catCounts[p.cat] = (existing.catCounts[p.cat] || 0) + 1
       if ((p.scraped_at || '') > existing.latest) {
         existing.latest = p.scraped_at || ''
         existing.thumbnail = p.img!
@@ -33,13 +37,18 @@ export async function GET() {
         count: 1,
         thumbnail: p.img!,
         latest: p.scraped_at || '',
+        catCounts: { [p.cat]: 1 },
       })
     }
   }
 
   const influencers = [...byAccount.values()]
     .sort((a, b) => b.latest.localeCompare(a.latest))
-    .map(({ account, name, count, thumbnail }) => ({ account, name, count, thumbnail }))
+    .map(({ account, name, count, thumbnail, catCounts }) => ({
+      account, name, count, thumbnail,
+      // 가장 많이 올리는 카테고리를 그 인플루언서의 대표 카테고리로 — 필터용
+      primaryCategory: Object.entries(catCounts).sort((a, b) => b[1] - a[1])[0][0],
+    }))
 
   return NextResponse.json({ influencers })
 }

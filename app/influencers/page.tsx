@@ -2,17 +2,24 @@
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { ArrowLeft } from 'lucide-react'
+import type { Category } from '@/lib/types'
+import { CATEGORY_ICON, CATEGORY_LABEL } from '@/lib/categoryIcons'
+
+// 인플루언서는 상시딜 여부가 없는 개념이라 'evergreen'은 빼고 실제 카테고리 5개만 사용
+const INFLUENCER_CATS: (Category | 'all')[] = ['all', 'kids', 'life', 'food', 'health', 'beauty']
 
 interface InfluencerSummary {
   account: string
   name: string
   count: number
   thumbnail: string
+  primaryCategory: string
 }
 
 export default function InfluencersPage() {
   const [influencers, setInfluencers] = useState<InfluencerSummary[]>([])
   const [loading, setLoading] = useState(true)
+  const [cat, setCat] = useState<Category | 'all'>('all')
 
   useEffect(() => {
     fetch('/api/influencers')
@@ -21,6 +28,8 @@ export default function InfluencersPage() {
       .catch(() => {})
       .finally(() => setLoading(false))
   }, [])
+
+  const filtered = cat === 'all' ? influencers : influencers.filter(inf => inf.primaryCategory === cat)
 
   return (
     <>
@@ -39,13 +48,29 @@ export default function InfluencersPage() {
         </p>
       </div>
 
+      <div className="category-wrap">
+        {INFLUENCER_CATS.map(id => {
+          const Icon = CATEGORY_ICON[id]
+          return (
+            <button
+              key={id}
+              className={`cat-btn ${cat === id ? 'active' : ''}`}
+              onClick={() => setCat(id)}
+            >
+              <Icon size={14} strokeWidth={2.25} />
+              {CATEGORY_LABEL[id]}
+            </button>
+          )
+        })}
+      </div>
+
       <div style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 10, paddingBottom: 100 }}>
         {loading ? (
           <div className="empty"><p>불러오는 중...</p></div>
-        ) : influencers.length === 0 ? (
+        ) : filtered.length === 0 ? (
           <div className="empty"><p>표시할 수 있는 인플루언서가 없어요</p></div>
         ) : (
-          influencers.map(inf => (
+          filtered.map(inf => (
             <Link
               key={inf.account}
               href={`/influencer/${encodeURIComponent(inf.account.replace('@', ''))}`}
