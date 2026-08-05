@@ -76,23 +76,6 @@ NON_DEAL_KW = (
     "레시피북",
 )
 
-# 공구 신호 — 하나라도 있으면 공구 가능성 높음
-DEAL_KW = (
-    "공구", "공동구매",
-    "특가", "단독특가", "단독구매", "타임특가", "런칭특가", "오늘특가", "특가전",
-    "오픈", "오픈예정", "open",  # 영문 대문자 OPEN도 title.lower()로 소문자 비교되므로 소문자로 등록
-    "마감", "마감임박",
-    "선착순",
-    "최저가", "역대최저",
-    "할인", "할인가",
-    "사은품", "증정",
-    "주문받", "신청받",
-    "기간한정", "한정수량",
-    "공구가", "공구특가",
-    "핫딜", "진행중", "진행 중",  # "핫딜 문자알림"/"진행중 ○○" 같은 문구가 DEAL_KW에 없어 실제
-    # 진행 중인 딜까지 "상품 추천(비공구)"로 잘못 제외되는 경우가 있어 추가
-)
-
 # 카테고리 자동 분류 — 순서 중요 (구체적인 것부터)
 _CAT_KEYWORDS: list[tuple[str, tuple[str, ...]]] = [
     ("kids",    ("어린이", "유아", "아기", "키즈", "초등", "영아", "육아", "그림책", "동화책",
@@ -872,14 +855,12 @@ def classify_status(title, purchase_url, price, deadline, extraction_confidence=
     # block_title을 덮어써서 "네이버톡톡"/"고객센터" 같은 원래 라벨이 사라지는 경우를 방지
     bt = (block_title or "").lower()
 
-    # 비공구 신호 즉시 제외
+    # 비공구 신호 즉시 제외 — 포함 판단은 공구 신호 키워드(DEAL_KW)로 하지 않는다. 표현이
+    # 워낙 다양해서(핫딜/진행중/OPEN 등) 키워드를 아무리 늘려도 실제 공구를 놓치는 게
+    # 계속 나오니, "명백히 비공구"라는 확실한 신호(NON_DEAL_KW)가 있을 때만 걸러내고
+    # 그 외엔 전부 사람이 검수하도록 needs_review로 넘긴다(아래 로직에서 처리)
     if any(kw in t or kw in bt for kw in NON_DEAL_KW):
         return "excluded", ["비공구"]
-
-    # 가격·마감일·공구 키워드 모두 없으면 상품 추천 링크로 판단
-    has_deal_signal = any(kw in t for kw in DEAL_KW)
-    if not price and not deadline and not has_deal_signal:
-        return "excluded", ["상품 추천 (비공구)"]
 
     # "소진시 마감"은 마감일이 없는 게 추출 실패가 아니라 원래 그런 판매 방식이므로
     # "마감일 미확인"으로 취급하지 않는다

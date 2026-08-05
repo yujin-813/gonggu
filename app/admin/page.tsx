@@ -815,6 +815,18 @@ function AnalyticsSection({ data, topPosts, topSharedPosts }: { data: DayStat[];
   )
 }
 
+// 검수 대기 중 오래전에 수집된 게 섞여 있으면 눈에 안 띄어서 계속 밀리기 쉬우니,
+// 수집일을 "M.D · N일 전"으로 보여줘 오래된 것부터 처리하도록 유도한다
+function scrapedAgo(scrapedAt?: string): string | null {
+  if (!scrapedAt) return null
+  const d = new Date(scrapedAt)
+  if (Number.isNaN(d.getTime())) return null
+  const days = Math.floor((Date.now() - d.getTime()) / 86400000)
+  const dateLabel = `${d.getMonth() + 1}.${d.getDate()}`
+  if (days <= 0) return `${dateLabel} · 오늘 수집`
+  return `${dateLabel} · ${days}일 전 수집`
+}
+
 function AdminPostRow({ post: p, onToggle, onDelete, onEdit, onToggleAlwaysOn, onToggleSoldOutOnly, onQuickReview, periodLabel }: {
   post: Post
   onToggle: (p: Post) => void
@@ -868,6 +880,20 @@ function AdminPostRow({ post: p, onToggle, onDelete, onEdit, onToggleAlwaysOn, o
           </div>
           <div style={{ fontSize: 12, color: '#64748b', display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
             <span>{p.account}</span>
+            {(() => {
+              const ago = scrapedAgo(p.scraped_at)
+              if (!ago) return null
+              const days = p.scraped_at ? Math.floor((Date.now() - new Date(p.scraped_at).getTime()) / 86400000) : 0
+              const stale = days > 7
+              return (
+                <span title="이 공구가 수집된 날짜" style={{
+                  fontSize: 11, padding: '2px 6px', borderRadius: 10, fontWeight: 600, cursor: 'help',
+                  background: stale ? '#fee2e2' : '#f1f5f9', color: stale ? '#dc2626' : '#94a3b8',
+                }}>
+                  🕐 {ago}
+                </span>
+              )
+            })()}
             {p.status === 'candidate'    && <span style={{ fontSize: 11, background: '#fef9c3', color: '#a16207',  padding: '2px 6px', borderRadius: 10, fontWeight: 600 }}>📝 공구 후보</span>}
             {p.status === 'needs_review' && <span style={{ fontSize: 11, background: '#fff7ed', color: '#c2410c',  padding: '2px 6px', borderRadius: 10, fontWeight: 600 }}>⚠️ 검수 필요</span>}
             {p.status === 'ready'        && <span style={{ fontSize: 11, background: '#dcfce7', color: '#15803d',  padding: '2px 6px', borderRadius: 10, fontWeight: 600 }}>🟢 공개 가능</span>}
