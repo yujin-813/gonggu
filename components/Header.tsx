@@ -1,4 +1,5 @@
-import { Bell, BellOff, Star, House, Heart } from 'lucide-react'
+import Link from 'next/link'
+import { Bell, BellOff, Star, House, Heart, Users } from 'lucide-react'
 
 interface HeaderProps {
   onBookmarkView: () => void
@@ -23,6 +24,9 @@ export default function Header({
           <span className="logo-tagline">| 꿀 같은 공구만 모아드려요</span>
         </div>
         <div style={{ flex: 1 }} />
+        <Link href="/influencers" className="btn-icon" title="인플루언서 목록">
+          <Users size={18} />
+        </Link>
         <button
           className={`btn-icon ${pushSubscribed ? 'active' : ''}`}
           onClick={onPushToggle}
