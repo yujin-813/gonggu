@@ -39,8 +39,19 @@ function isTrackingDisabled(): boolean {
   return localStorage.getItem('gonggu_no_track') === '1'
 }
 
-function track(type: string, extra?: { postId?: number }) {
+// 관리자로 로그인된 브라우저(httpOnly 쿠키라 JS로 직접 못 읽어서 서버에 물어봄)는
+// 고객 방문으로 잡히면 통계가 왜곡되니 자동으로 트래킹 대상에서 뺀다 — 세션당 한 번만 확인
+let adminSessionCheck: Promise<boolean> | null = null
+function isAdminSession(): Promise<boolean> {
+  if (!adminSessionCheck) {
+    adminSessionCheck = fetch('/api/auth').then(r => r.json()).then(d => !!d.authed).catch(() => false)
+  }
+  return adminSessionCheck
+}
+
+async function track(type: string, extra?: { postId?: number }) {
   if (isTrackingDisabled()) return
+  if (await isAdminSession()) return
   fetch('/api/analytics', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
