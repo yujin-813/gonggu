@@ -18,7 +18,9 @@ import json
 import os
 import re
 import sys
-from datetime import datetime, date, timezone
+import unicodedata
+from datetime import datetime, date, timedelta, timezone
+from difflib import SequenceMatcher
 from pathlib import Path
 
 import requests
@@ -46,6 +48,8 @@ IMG_DIR.mkdir(parents=True, exist_ok=True)
 INPOCK        = "https://link.inpock.co.kr"
 IMG_CDN       = "https://d13k46lqgoj3d6.cloudfront.net/"   # 상대 image 경로의 베이스
 PRODUCT_TYPES = {"link", "collection", "smart_store"}
+# 서버가 UTC로 도는데 공구 일정은 전부 한국 시간 기준이라, 날짜 비교는 KST로 한다
+KST           = timezone(timedelta(hours=9))
 UA            = "Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X) AppleWebKit/605.1.15"
 
 # 비커머스 도메인 — 최종 리다이렉트 기준으로 이 도메인이면 공구가 아니므로 제외
@@ -191,6 +195,126 @@ def _is_closed_or_excluded(p):
 
 def _normalize_title(t):
     return re.sub(r"\s+", "", (t or "")).strip().lower()
+
+
+# ── 공구 일정(calendar 블록) ──────────────────────────────────────────────────
+# 인포크에는 인플루언서가 직접 작성하는 "공구 일정" 블록이 있고, 여기에 오픈/마감
+# 일시가 정확한 ISO(+09:00)로 들어 있다. 링크 블록의 open_until은 대부분 비어 있고
+# 구매 페이지 추출은 실패가 잦아서, 일정 블록이 가장 신뢰할 수 있는 날짜 출처다.
+_MATCH_TOKEN = re.compile(r"[가-힣A-Za-z0-9]{2,}")
+_MATCH_THRESHOLD = 0.45
+
+
+def _norm_for_match(t):
+    """이모지·공백·기호를 걷어내고 글자와 숫자만 남긴다"""
+    return "".join(c for c in (t or "") if unicodedata.category(c)[0] in "LN").lower()
+
+
+def _match_score(block_title, schedule_title):
+    """링크 블록 제목과 일정 제목이 같은 공구를 가리키는지 0~1로 점수화.
+
+    같은 공구라도 어순과 이모지가 달라서("또비앙또 미아방지가방" vs "미아방지 또비앙또
+    가방🤍") 문자 유사도만으로는 약하다. 공통 단어가 하나도 없으면 아예 후보에서 빼고,
+    있을 때만 문자 유사도로 점수를 준다.
+    """
+    na, nb = _norm_for_match(block_title), _norm_for_match(schedule_title)
+    if not na or not nb:
+        return 0.0
+    if not (set(_MATCH_TOKEN.findall(block_title or "")) & set(_MATCH_TOKEN.findall(schedule_title or ""))):
+        return 0.0
+    return SequenceMatcher(None, na, nb).ratio()
+
+
+def extract_schedules(blocks):
+    """calendar 블록에서 일정 목록을 뽑는다. url은 항상 비어 있어 제목/날짜만 쓴다."""
+    out = []
+    for b in blocks:
+        if b.get("block_type") != "calendar":
+            continue
+        for s in b.get("schedule_list") or []:
+            title = (s.get("title") or "").strip()
+            if not title or not s.get("id"):
+                continue
+            out.append({
+                "id":    s["id"],
+                "title": title,
+                "start": (s.get("start_at") or "")[:10],
+                "end":   (s.get("end_at") or "")[:10],
+            })
+    return out
+
+
+def match_schedules(schedules, blocks):
+    """일정 ↔ 링크 블록을 1:1로 매칭. {block_id: schedule} 과 매칭된 일정 id 집합을 돌려준다.
+
+    점수가 높은 조합부터 확정한다. 같은 브랜드의 C/S 링크처럼 곁다리로 걸리는 블록이
+    있어도, 진짜 상품 블록이 더 높은 점수를 받아 먼저 짝지어지므로 밀려난다.
+    """
+    pairs = []
+    for s in schedules:
+        for b in blocks:
+            score = _match_score(b.get("title"), s["title"])
+            if score >= _MATCH_THRESHOLD:
+                pairs.append((score, s, b))
+    pairs.sort(key=lambda x: -x[0])
+
+    by_block, used_schedules = {}, set()
+    for _, s, b in pairs:
+        if s["id"] in used_schedules or b["id"] in by_block:
+            continue
+        used_schedules.add(s["id"])
+        by_block[b["id"]] = s
+    return by_block, used_schedules
+
+
+def schedule_to_post(s, sc, ig_handle, profile_url, source_obj=None):
+    """아직 구매 링크가 안 올라온 일정을 '오픈 예정' 공구로 미리 등록한다.
+
+    구매 링크와 가격이 없는 게 정상인 단계이므로 검수 사유로 잡지 않는다 —
+    실제 링크가 올라오면 그때 정식 공구로 수집되고 이 자리표시자는 정리된다.
+    """
+    title = re.sub(r"\s*(구매하기|바로가기|구매링크|신청하기|주문하기|보러가기)\s*$", "", s["title"]).strip()
+    return {
+        "id":              abs(hash(sc)) % (10 ** 9),
+        "shortcode":       sc,
+        "title":           title,
+        "account":         f"@{ig_handle}",
+        "cat":             classify_category(title),
+        "price":           None,
+        "origPrice":       None,
+        "start_date":      s["start"],
+        "deadline":        s["end"],
+        "brand":           _guess_brand_from_title(title),
+        "img":             "",
+        "url":             profile_url,
+        "store_url":       "",
+        "purchase_url":    "",
+        "store_domain":    "",
+        "participants":    0,
+        "avatar":          "🗓️",
+        "caption":         "",
+        "scraped_at":      datetime.now(timezone.utc).isoformat(),
+        "source":          "inpock",
+        "is_always_on":    False,
+        "is_evergreen_deal": False,
+        "sale_until_sold_out": False,
+        "extraction_debug": {"source": "inpock_calendar", "schedule_id": s["id"]},
+        "status":          "upcoming",
+        "review_reason":   [],
+        "published":       False,
+        "is_open":         True,
+        "source_type":     source_obj.get("source_type", "inpock") if source_obj else "inpock",
+        "source_url":      source_obj.get("url") if source_obj else None,
+        "influencer_name": source_obj.get("influencer_name") if source_obj else ig_handle,
+        "influencer_handle": source_obj.get("handle") if source_obj else ig_handle,
+        "original_link":   None,
+        "extracted_link":  None,
+        "collection_status": "collected",
+        "collection_error": None,
+        "influencer_id":   source_obj.get("id") if source_obj else None,
+        "market_price":    None,
+        "market_source":   None,
+    }
 
 
 def resolve_link(url):
@@ -898,7 +1022,7 @@ def classify_status(title, purchase_url, price, deadline, extraction_confidence=
     return "needs_review", reasons
 
 
-def block_to_post(b, sc, ig_handle, price, domain, profile_url, purchase_url, deadline, product_info=None, debug_info=None, source_obj=None):
+def block_to_post(b, sc, ig_handle, price, domain, profile_url, purchase_url, deadline, product_info=None, debug_info=None, source_obj=None, start_date=""):
     pi = product_info or {}
     block_title = (b.get("title") or "").strip()
     page_title  = (pi.get("title") or "").strip()
@@ -939,7 +1063,7 @@ def block_to_post(b, sc, ig_handle, price, domain, profile_url, purchase_url, de
         "cat":             classify_category(title, b.get("caption", "") or ""),
         "price":           price,
         "origPrice":       None,
-        "start_date":      "",
+        "start_date":      start_date,
         "deadline":        deadline,
         "brand":           brand,
         "img":             img,
@@ -1001,6 +1125,15 @@ def collect(handles, source_obj=None, write_result=True):
         ig_handle = extract_instagram(pp, fallback_handle)
         profile_url = f"https://instagram.com/{ig_handle}"
 
+        # 공구 일정 블록을 먼저 읽어 링크 블록과 짝지어 둔다 — 아래 루프에서 각 블록의
+        # 오픈일/마감일로 쓴다
+        schedules = extract_schedules(blocks)
+        link_blocks = [b for b in blocks
+                       if b.get("block_type") in PRODUCT_TYPES and b.get("title") and b.get("url")]
+        sched_by_block, matched_sched_ids = match_schedules(schedules, link_blocks)
+        if schedules:
+            print(f"  📅 공구 일정 {len(schedules)}건 중 {len(matched_sched_ids)}건이 링크 블록과 매칭됨")
+
         for b in blocks:
             if b.get("block_type") not in PRODUCT_TYPES:
                 continue
@@ -1019,7 +1152,15 @@ def collect(handles, source_obj=None, write_result=True):
             # 중복이 생겨도 어차피 관리자가 검수 후 올리므로 문제 없음)
             price = price_from_stickers(b.get("stickers"))
             deadline = b.get("open_until") or ""
-            fingerprint = hashlib.md5(f"{b['title'].strip()}|{price}|{deadline}".encode()).hexdigest()[:8]
+            # 인플루언서가 직접 적은 일정이라 스티커/구매페이지 추출값보다 정확하다 —
+            # 일정이 바뀌면 fingerprint도 바뀌어 새 내용으로 다시 검수에 올라간다
+            start_date = ""
+            sched = sched_by_block.get(b["id"])
+            if sched:
+                start_date = sched["start"]
+                if sched["end"]:
+                    deadline = sched["end"]
+            fingerprint = hashlib.md5(f"{b['title'].strip()}|{price}|{start_date}|{deadline}".encode()).hexdigest()[:8]
             sc = f"inpock_{b['id']}_{fingerprint}"
             if sc in by_sc:
                 continue  # 완전히 같은 내용으로 이미 수집됨 (검수상태 보존)
@@ -1039,7 +1180,7 @@ def collect(handles, source_obj=None, write_result=True):
                 print(f"  - (제외) {b.get('title', '')[:34]} [{domain}]")
                 continue
 
-            new_post = block_to_post(b, sc, ig_handle, price, domain, profile_url, purchase_url, deadline, product_info, debug_info, source_obj)
+            new_post = block_to_post(b, sc, ig_handle, price, domain, profile_url, purchase_url, deadline, product_info, debug_info, source_obj, start_date)
 
             # 같은 슬롯(블록 ID)에서 나온 글 중 이미 제외됐거나 마감된 채로 남아있는 글과
             # 제목이 같으면(=관리자가 이미 판단 끝낸 것과 사실상 동일 내용) 다시 검수 목록에
@@ -1059,6 +1200,37 @@ def collect(handles, source_obj=None, write_result=True):
             by_sc[sc] = posts[0]
             new_count += 1
             print(f"  + {b['title'][:34]} [{domain}]")
+
+        # 링크 블록이 아직 안 올라온 일정은 '오픈 예정'으로 미리 등록해 둔다.
+        # 실제 링크가 생기면 위 루프에서 정식 공구로 수집되므로, 그때 자리표시자는 정리한다.
+        today = datetime.now(KST).date()
+        for s in schedules:
+            if s["id"] in matched_sched_ids:
+                continue
+            if s["end"]:
+                try:
+                    if date.fromisoformat(s["end"]) < today:
+                        continue  # 이미 끝난 일정은 등록하지 않음
+                except ValueError:
+                    pass
+            fingerprint = hashlib.md5("|".join([s["title"], s["start"], s["end"]]).encode()).hexdigest()[:8]
+            sc = f"inpock_cal_{s['id']}_{fingerprint}"
+            if sc in by_sc:
+                continue
+            new_post = schedule_to_post(s, sc, ig_handle, profile_url, source_obj)
+            posts.insert(0, new_post)
+            by_sc[sc] = posts[0]
+            new_count += 1
+            print(f"  + (오픈예정) {s['title'][:30]} {s['start']}~{s['end']}")
+
+        # 정식 공구로 수집된 일정의 자리표시자는 중복이므로 목록에서 내린다
+        for s_id in matched_sched_ids:
+            prefix = f"inpock_cal_{s_id}_"
+            for p in posts:
+                if ((p.get("shortcode") or "").startswith(prefix)
+                        and p.get("status") == "upcoming" and not p.get("published")):
+                    p["status"] = "excluded"
+                    p["review_reason"] = ["실제 공구로 등록됨"]
 
     save_posts(posts)
     if write_result:
