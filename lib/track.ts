@@ -20,11 +20,21 @@ function isTrackingDisabled(): boolean {
 }
 
 // 관리자로 로그인된 브라우저(httpOnly 쿠키라 JS로 직접 못 읽어서 서버에 물어봄)는
-// 고객 방문으로 잡히면 통계가 왜곡되니 자동으로 트래킹 대상에서 뺀다 — 모듈 로드당 한 번만 확인
+// 고객 방문으로 잡히면 통계가 왜곡되니 자동으로 트래킹 대상에서 뺀다 — 모듈 로드당 한 번만 확인.
+// 한 번이라도 관리자로 확인되면 notrack 플래그를 남겨서, 로그인 세션이 만료된 뒤에도
+// 이 브라우저는 계속 제외된다 (관리자 세션은 12시간이라 그 뒤 방문이 고객으로 잡히던 문제).
+// 해제는 기존과 동일하게 ?notrack=0.
 let adminSessionCheck: Promise<boolean> | null = null
 function isAdminSession(): Promise<boolean> {
   if (!adminSessionCheck) {
-    adminSessionCheck = fetch('/api/auth').then(r => r.json()).then(d => !!d.authed).catch(() => false)
+    adminSessionCheck = fetch('/api/auth')
+      .then(r => r.json())
+      .then(d => {
+        const authed = !!d.authed
+        if (authed) localStorage.setItem('gonggu_no_track', '1')
+        return authed
+      })
+      .catch(() => false)
   }
   return adminSessionCheck
 }
