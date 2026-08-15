@@ -4,6 +4,7 @@ import type { Post } from '@/lib/types'
 import { getPeriodState, badgeFromState } from '@/lib/period'
 import { categoryIcon } from '@/lib/categoryIcons'
 import { track } from '@/lib/track'
+import { getDealVerdict } from '@/lib/dealGrade'
 
 // 홈에서 "제목 + 더보기 + 작은 카드 가로줄"로 훑어보는 영역.
 // 전체 크기 PostCard는 정보가 많아 한 화면에 두세 개밖에 안 들어가는데, 홈은 "무엇이 있는지"
@@ -31,6 +32,7 @@ export default function DealStrip({ title, emoji, moreHref, posts }: Props) {
       <div className="strip-scroll">
         {posts.map(p => {
           const badge = badgeFromState(getPeriodState(p))
+          const grade = getDealVerdict(p).grade
           const CatIcon = categoryIcon(p.cat)
           return (
             <Link
@@ -44,6 +46,8 @@ export default function DealStrip({ title, emoji, moreHref, posts }: Props) {
                   ? <img src={p.img} alt={p.title} loading="lazy" />
                   : <div className="strip-thumb-empty"><CatIcon size={22} strokeWidth={1.5} /></div>}
                 {badge && <span className={`strip-badge ${badge.cls}`}>{badge.txt}</span>}
+                {/* 작은 카드에서도 싼지 아닌지 바로 보이게 — 홈에서 훑을 때 이게 판단 기준이 된다 */}
+                {grade && <span className={`strip-grade grade-${grade.key}`}>{grade.emoji} {grade.label}</span>}
               </div>
               <p className="strip-name">{p.title}</p>
               {p.price > 0 && <p className="strip-price">{p.price.toLocaleString()}원</p>}

@@ -462,22 +462,6 @@ header {
   margin-bottom: 8px;
 }
 .period-row.urgent { color: #D02B1F; }
-.deal-judgment {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 6px 10px;
-  border-radius: 8px;
-  margin-bottom: 8px;
-  font-size: 12px;
-  line-height: 1.4;
-}
-.judgment-verdict { font-weight: 700; white-space: nowrap; }
-.judgment-detail  { opacity: 0.85; }
-.deal-judgment-great    { background: var(--brand-light); color: var(--brand); }
-.deal-judgment-good    { background: #dcfce7; color: #15803d; }
-.deal-judgment-neutral { background: #fef9c3; color: #854d0e; }
-.deal-judgment-check   { background: #fff7ed; color: #c2410c; }
 
 .participants {
   font-size: 12px;
@@ -1268,3 +1252,66 @@ header {
 }
 .strip-avatar img { width: 100%; height: 100%; object-fit: cover; }
 .strip-card-influencer .strip-name { -webkit-line-clamp: 1; }
+
+/* ── 꿀공구 판정 ────────────────────────────────────────────────────────── */
+/* "이 공구 진짜 싼가"에 답하는 블록. 숫자를 먼저 보여주고 판정을 뒤에 두는데,
+   판정만 있으면 "그래서 왜?"가 남고 숫자만 있으면 직접 계산해야 하기 때문이다. */
+.grade-badge {
+  display: inline-flex; align-items: center;
+  font-weight: 800; white-space: nowrap;
+  border-radius: 999px;
+}
+.grade-md { font-size: 13px; padding: 4px 12px; }
+.grade-sm { font-size: 11px; padding: 2px 8px; }
+
+.grade-honey { background: #FFF3D6; color: #B45309; }
+.grade-good  { background: #DCFCE7; color: #15803D; }
+.grade-hmm   { background: #FEF9C3; color: #854D0E; }
+.grade-meh   { background: #FFF1F2; color: #BE123C; }
+
+.verdict-box {
+  border: 1px solid var(--gray-2);
+  border-radius: 12px;
+  padding: 12px 14px;
+  margin-bottom: 8px;
+  background: var(--gray-1);
+}
+.verdict-honey { background: #FFFBF0; border-color: #FCE4B0; }
+.verdict-good  { background: #F5FDF8; border-color: #C9EED8; }
+.verdict-meh   { background: #FFF8F9; border-color: #FBD5DC; }
+
+.verdict-head-row {
+  display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  margin-bottom: 10px;
+}
+.verdict-label { font-size: 11.5px; font-weight: 800; color: var(--gray-3); letter-spacing: .04em; }
+.verdict-head { font-size: 13.5px; font-weight: 800; margin-bottom: 4px; }
+
+.verdict-table { width: 100%; border-collapse: collapse; }
+.verdict-table th {
+  text-align: left; font-size: 12.5px; font-weight: 600;
+  color: var(--gray-4); padding: 3px 0;
+}
+.verdict-table td {
+  text-align: right; font-size: 13px; font-weight: 700;
+  color: var(--gray-4); padding: 3px 0;
+  font-variant-numeric: tabular-nums;
+}
+.verdict-row-main th { color: var(--text); font-weight: 800; }
+.verdict-row-main td { color: var(--text); font-size: 15px; font-weight: 900; }
+
+.verdict-rate {
+  font-size: 13px; color: var(--gray-4);
+  margin-top: 8px; padding-top: 8px;
+  border-top: 1px dashed var(--gray-2);
+}
+.verdict-rate strong { color: var(--text); font-weight: 800; }
+.verdict-line { font-size: 12.5px; color: var(--gray-4); line-height: 1.55; margin-top: 6px; }
+.verdict-note { font-size: 10.5px; color: var(--gray-3); line-height: 1.5; margin-top: 6px; }
+
+/* 작은 카드용 등급 배지 — 썸네일 좌하단 */
+.strip-grade {
+  position: absolute; bottom: 6px; left: 6px;
+  font-size: 10.5px; font-weight: 800;
+  padding: 2px 7px; border-radius: 999px;
+}
