@@ -1,17 +1,22 @@
 'use client'
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
-import type { Post } from '@/lib/types'
+import type { Post, PurchaseLink } from '@/lib/types'
 import { ArrowLeft } from 'lucide-react'
 import PostCard from '@/components/PostCard'
 import Toast from '@/components/Toast'
+import EndedDealNotice from '@/components/EndedDealNotice'
 import { track } from '@/lib/track'
 
 interface Props {
   post: Post
+  /** 마감이 지난 공구 — 페이지는 유지하되 화면을 종료 상태로 바꾼다 */
+  ended?: boolean
+  purchaseLinks?: PurchaseLink[]
+  related?: Post[]
 }
 
-export default function PostDetailClient({ post }: Props) {
+export default function PostDetailClient({ post, ended = false, purchaseLinks = [], related = [] }: Props) {
   const [bookmarks, setBookmarks] = useState<Set<number>>(new Set())
   const [toast, setToast] = useState({ message: '', visible: false })
 
@@ -19,7 +24,9 @@ export default function PostDetailClient({ post }: Props) {
     const saved = JSON.parse(localStorage.getItem('gonggu_bookmarks') || '[]')
     setBookmarks(new Set(saved))
     track('view')
-  }, [])
+    // 종료된 공구에도 상세 조회가 계속 잡히는지 봐야 "아직 수요가 있는 상품"을 가려낼 수 있다
+    track('click', { postId: post.id, clickType: 'detail' })
+  }, [post.id])
 
   function showToast(message: string) {
     setToast({ message, visible: true })
@@ -57,13 +64,15 @@ export default function PostDetailClient({ post }: Props) {
           post={post}
           isBookmarked={bookmarks.has(post.id)}
           onToggleBookmark={toggleBookmark}
-          onJoin={id => { track('join', { postId: id }); recordRecentlyViewed(id) }}
+          onJoin={id => { track('join', { postId: id, clickType: 'groupbuy' }); recordRecentlyViewed(id) }}
           onShare={(id, result) => {
             if (result === 'clipboard') showToast('링크가 복사되었어요')
             track('share', { postId: id })
           }}
         />
       </div>
+
+      {ended && <EndedDealNotice post={post} purchaseLinks={purchaseLinks} related={related} />}
 
       <div style={{ padding: '0 16px 24px', textAlign: 'center' }}>
         <Link href="/" style={{ fontSize: 13, color: '#6366f1', fontWeight: 600, textDecoration: 'none' }}>

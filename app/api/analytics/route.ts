@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { recordEvent, getSummary, getTopPosts, getTopSharedPosts } from '@/lib/analytics'
+import { recordEvent, getSummary, getTopPosts, getTopSharedPosts, CLICK_TYPES } from '@/lib/analytics'
 import { loadPosts } from '@/lib/store'
 import { AUTH_COOKIE, computeToken, safeEqual } from '@/lib/auth'
 
@@ -14,14 +14,15 @@ async function isAdminRequest(request: NextRequest): Promise<boolean> {
 
 export async function POST(request: NextRequest) {
   try {
-    const { type, sessionId, visitorId, postId } = await request.json()
+    const { type, sessionId, visitorId, postId, clickType } = await request.json()
     if (!type || !sessionId) return NextResponse.json({ error: 'missing' }, { status: 400 })
-    const allowed = new Set(['view', 'bookmark', 'join', 'category', 'search', 'share'])
+    const allowed = new Set(['view', 'bookmark', 'join', 'category', 'search', 'share', 'click'])
     if (!allowed.has(type)) return NextResponse.json({ error: 'invalid type' }, { status: 400 })
+    const safeClickType = CLICK_TYPES.includes(clickType) ? clickType : undefined
     // 관리자 브라우저의 이벤트는 조용히 버린다 — 클라이언트에는 성공으로 응답해서
     // 통계 제외 여부가 화면 동작에 영향을 주지 않도록 한다
     if (await isAdminRequest(request)) return NextResponse.json({ ok: true, skipped: 'admin' })
-    recordEvent(type, sessionId, { visitorId, postId })
+    recordEvent(type, sessionId, { visitorId, postId, clickType: safeClickType })
     return NextResponse.json({ ok: true })
   } catch {
     return NextResponse.json({ error: 'server error' }, { status: 500 })

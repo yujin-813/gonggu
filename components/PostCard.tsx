@@ -10,6 +10,8 @@ import {
 } from 'lucide-react'
 import PriceCompareModal from './PriceCompareModal'
 import { shareContent } from '@/lib/share'
+import { track } from '@/lib/track'
+import { visiblePurchaseLinks, PLATFORM_LABEL, PLATFORM_DISCLOSURE } from '@/lib/purchaseLinks'
 
 const SITE_URL = 'https://gonggu.asknuggetdata.com'
 
@@ -17,14 +19,6 @@ const BADGE_ICON: Record<BadgeIcon, typeof Calendar> = {
   'calendar-clock': CalendarClock, package: Package, flame: Flame, lock: Lock, timer: Timer,
 }
 const PERIOD_ICON: Record<PeriodIcon, typeof Calendar> = { calendar: Calendar, zap: Zap }
-const PARTNERS_LABEL: Record<'naver' | 'coupang', string> = { naver: '네이버', coupang: '쿠팡' }
-// 공정거래위원회 지침상 추천인(당사)이 경제적 대가를 받는 관계는 반드시 고지해야 함 —
-// 쿠팡 파트너스는 운영정책에 명시된 지정 문구를 그대로 사용
-const PARTNERS_DISCLOSURE: Record<'naver' | 'coupang', string> = {
-  coupang: '이 포스팅은 쿠팡 파트너스 활동의 일환으로, 이에 따른 일정액의 수수료를 제공받습니다.',
-  naver: '이 포스팅은 네이버 파트너스 활동의 일환으로, 이에 따른 일정액의 수수료를 제공받을 수 있습니다.',
-}
-
 function dealJudgment(post: Post): { verdict: string; detail: string; cls: string } | null {
   if (!post.price || post.status === 'upcoming') return null
   // 관리자가 직접 입력한 판단 문구가 있으면 자동 계산보다 우선한다 — 자동 계산이 데이터
@@ -115,6 +109,9 @@ export default function PostCard({
     ? `https://instagram.com/${post.account.replace('@', '')}`
     : '#'
 
+  // 마감된 공구는 상세 페이지의 종료 안내(EndedDealNotice)가 대체 구매처를 "당시 공구가"와
+  // 구분해 더 정확하게 보여주므로, 카드에서는 중복 노출하지 않는다
+  const altLinks = closed ? [] : visiblePurchaseLinks(post)
   const purchaseLink = post.purchase_url || post.url
   const canOpenPurchase = !closed && !isUpcoming && !!purchaseLink
   const openPurchaseLink = () => {
@@ -259,34 +256,39 @@ export default function PostCard({
           </div>
         )}
 
-        {/* 파트너스(제휴) 대체 구매 링크 — dealJudgment(공구 가격 판단)와는 별개로, 참고용 대체
-            구매처만 담백하게 안내한다. 관리자가 platform/price/url을 모두 채우고 노출을 켰을 때만 표시.
-            쿠팡 파트너스는 공정위 지침에 따라 경제적 대가 관계를 고지하는 문구를 반드시 함께 노출해야 함
-            (쿠팡 파트너스 운영정책에 명시된 지정 문구) — 네이버도 같은 취지로 동일 원칙 적용 */}
-        {post.partners_visible && post.partners_platform && post.partners_price && post.partners_url && (
+        {/* 대체 구매 링크 — 공구 가격 판단(dealJudgment)과는 완전히 별개인 참고 정보.
+            여러 판매처를 가질 수 있어 배열로 읽는다. 공정위 지침상 경제적 대가 관계는
+            반드시 고지해야 하므로 플랫폼별 지정 문구를 함께 노출한다. */}
+        {altLinks.length > 0 && (
           <div style={{ marginBottom: 8 }}>
-            <a
-              href={post.partners_url}
-              target="_blank"
-              rel="noopener noreferrer sponsored"
-              onClick={e => e.stopPropagation()}
-              style={{
-                display: 'flex', alignItems: 'center', gap: 4,
-                fontSize: 11, color: '#0369a1', background: '#f0f9ff',
-                border: '1px solid #bae6fd', borderRadius: '8px 8px 0 0',
-                padding: '5px 8px', textDecoration: 'none',
-              }}
-            >
-              <ExternalLink size={11} />
-              {PARTNERS_LABEL[post.partners_platform]}에서도 {post.partners_price.toLocaleString()}원에 구매 가능
-              {post.partners_option_note && <span style={{ color: '#64748b' }}>· {post.partners_option_note}</span>}
-            </a>
+            {altLinks.map((link, i) => (
+              <a
+                key={`${link.platform}-${i}`}
+                href={link.url}
+                target="_blank"
+                rel="noopener noreferrer sponsored"
+                onClick={e => { e.stopPropagation(); track('click', { postId: post.id, clickType: link.platform }) }}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 4,
+                  fontSize: 11, color: '#0369a1', background: '#f0f9ff',
+                  border: '1px solid #bae6fd',
+                  borderRadius: i === 0 ? '8px 8px 0 0' : 0,
+                  borderTop: i === 0 ? undefined : 'none',
+                  padding: '5px 8px', textDecoration: 'none',
+                }}
+              >
+                <ExternalLink size={11} />
+                {PLATFORM_LABEL[link.platform]}에서
+                {link.price ? ` ${link.price.toLocaleString()}원에 구매 가능` : ' 가격 확인'}
+                {link.note && <span style={{ color: '#64748b' }}>· {link.note}</span>}
+              </a>
+            ))}
             <div style={{
               fontSize: 10, color: '#64748b', background: '#f8fafc',
               border: '1px solid #e2e8f0', borderTop: 'none', borderRadius: '0 0 8px 8px',
               padding: '4px 8px',
             }}>
-              {PARTNERS_DISCLOSURE[post.partners_platform]}
+              {[...new Set(altLinks.map(l => PLATFORM_DISCLOSURE[l.platform]))].join(' ')}
             </div>
           </div>
         )}

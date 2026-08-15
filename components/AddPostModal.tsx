@@ -1,6 +1,7 @@
 'use client'
 import { useState, useEffect, useRef } from 'react'
-import type { Post, Category } from '@/lib/types'
+import type { Post, Category, PurchaseLink } from '@/lib/types'
+import { normalizePurchaseLinks } from '@/lib/purchaseLinks'
 
 const CATEGORIES = [
   { value: 'kids',   label: '👶 유아동' },
@@ -77,11 +78,9 @@ export default function AddPostModal({ onClose, onSubmit, editPost, existingGrou
   const [customVerdictDetail, setCustomVerdictDetail] = useState('')
   const [customVerdictCls,    setCustomVerdictCls]    = useState<'great' | 'good' | 'neutral' | 'check'>('good')
 
-  const [partnersPlatform,   setPartnersPlatform]   = useState<'' | 'naver' | 'coupang'>('')
-  const [partnersPrice,      setPartnersPrice]      = useState('')
-  const [partnersUrl,        setPartnersUrl]        = useState('')
-  const [partnersOptionNote, setPartnersOptionNote] = useState('')
-  const [partnersVisible,    setPartnersVisible]    = useState(false)
+  // 대체 구매 링크는 여러 판매처를 가질 수 있어서 배열로 관리한다.
+  // 예전 단일 필드(partners_*)로 저장된 값도 normalizePurchaseLinks가 함께 읽어준다.
+  const [purchaseLinks, setPurchaseLinks] = useState<PurchaseLink[]>([])
 
   const [imgFile,    setImgFile]    = useState<File | null>(null)
   const [imgPreview, setImgPreview] = useState('')   // blob URL or existing img URL
@@ -112,11 +111,7 @@ export default function AddPostModal({ onClose, onSubmit, editPost, existingGrou
     setCustomVerdict(editPost.custom_verdict || '')
     setCustomVerdictDetail(editPost.custom_verdict_detail || '')
     setCustomVerdictCls(editPost.custom_verdict_cls || 'good')
-    setPartnersPlatform(editPost.partners_platform || '')
-    setPartnersPrice(editPost.partners_price ? String(editPost.partners_price) : '')
-    setPartnersUrl(editPost.partners_url || '')
-    setPartnersOptionNote(editPost.partners_option_note || '')
-    setPartnersVisible(editPost.partners_visible ?? false)
+    setPurchaseLinks(normalizePurchaseLinks(editPost))
     const gk = editPost.group_key || ''
     setGroupKey(gk)
     setNewGroupMode(false)
@@ -225,7 +220,15 @@ export default function AddPostModal({ onClose, onSubmit, editPost, existingGrou
         !(r === '가격 미입력' && hasPrice) && !(r === '마감일 미확인' && hasDeadline)
       )
       // 플랫폼/가격/링크가 다 채워져야 파트너스 정보로 인정 — 하나라도 비면 고객 노출도 강제로 끈다
-      const partnersComplete = !!(partnersPlatform && partnersPrice && partnersUrl.trim())
+      // URL 없는 줄은 버리고, 확인 시각을 채워 넣는다 (가격 표기 옆에 언제 확인했는지 쓰기 위함)
+      const cleanedLinks: PurchaseLink[] = purchaseLinks
+        .filter(l => l.url.trim())
+        .map(l => ({
+          ...l,
+          url: l.url.trim(),
+          note: (l.note || '').trim() || null,
+          checked_at: l.checked_at || new Date().toISOString(),
+        }))
       await onSubmit({
         shortcode:    editPost?.shortcode ?? null,
         title:        title.trim(),
@@ -252,12 +255,15 @@ export default function AddPostModal({ onClose, onSubmit, editPost, existingGrou
         custom_verdict:        customVerdict.trim() || null,
         custom_verdict_detail: customVerdict.trim() ? (customVerdictDetail.trim() || null) : null,
         custom_verdict_cls:    customVerdict.trim() ? customVerdictCls : null,
-        partners_platform:     partnersPlatform || null,
-        partners_price:        partnersPrice ? parseInt(partnersPrice) : null,
-        partners_url:          partnersUrl.trim() || null,
-        partners_option_note:  partnersOptionNote.trim() || null,
-        partners_checked_at:   partnersComplete ? new Date().toISOString() : null,
-        partners_visible:      partnersComplete && partnersVisible,
+        purchase_links: cleanedLinks,
+        // 예전 단일 필드는 비워 둔다 — 위 배열이 이미 그 값을 흡수했고, 남겨두면
+        // 관리자가 지운 링크가 normalizePurchaseLinks를 통해 되살아난다
+        partners_platform:     null,
+        partners_price:        null,
+        partners_url:          null,
+        partners_option_note:  null,
+        partners_checked_at:   null,
+        partners_visible:      false,
       })
     } catch (err) {
       console.error(err)
@@ -545,64 +551,91 @@ export default function AddPostModal({ onClose, onSubmit, editPost, existingGrou
           </div>
         )}
 
-        {/* 파트너스(제휴) 대체 구매 링크 — 구매 판단 문구와는 완전히 별개 정보 */}
+        {/* 대체 구매 링크 — 공구가 끝난 뒤 "지금 바로 사고 싶은" 사용자를 보낼 곳.
+            여러 판매처를 가질 수 있어서 줄 단위로 추가·삭제한다. */}
         <label>
-          파트너스(제휴) 대체 구매 링크
+          대체 구매 링크
           <span style={{ fontSize: 12, color: '#94a3b8', fontWeight: 400, marginLeft: 6 }}>
-            (선택 — 같은 상품을 네이버/쿠팡 파트너스로도 구매할 수 있을 때만)
+            (선택 — 공구 종료 후 이 링크로 안내합니다)
           </span>
         </label>
-        <div className="modal-row">
-          <div>
-            <select value={partnersPlatform} onChange={e => setPartnersPlatform(e.target.value as typeof partnersPlatform)}>
-              <option value="">연결 안 함</option>
-              <option value="naver">네이버 파트너스</option>
-              <option value="coupang">쿠팡 파트너스</option>
-            </select>
-          </div>
-          <div>
-            <input
-              type="number"
-              value={partnersPrice}
-              onChange={e => setPartnersPrice(e.target.value)}
-              placeholder="가격 (원)"
-              disabled={!partnersPlatform}
-            />
-          </div>
-        </div>
-        {partnersPlatform && (
-          <>
-            <input
-              type="url"
-              value={partnersUrl}
-              onChange={e => setPartnersUrl(e.target.value)}
-              placeholder="https://..."
-              style={{ marginTop: 6 }}
-            />
-            <input
-              type="text"
-              value={partnersOptionNote}
-              onChange={e => setPartnersOptionNote(e.target.value)}
-              placeholder="옵션/구성 참고사항 (선택 — 예: 2개입 기준)"
-              style={{ marginTop: 6 }}
-            />
-            <label style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 8, fontWeight: 400, fontSize: 13 }}>
-              <input
-                type="checkbox"
-                checked={partnersVisible}
-                onChange={e => setPartnersVisible(e.target.checked)}
-                disabled={!(partnersPlatform && partnersPrice && partnersUrl.trim())}
-                style={{ width: 'auto' }}
-              />
-              고객 화면에 노출
-            </label>
-            {!(partnersPlatform && partnersPrice && partnersUrl.trim()) && (
-              <p style={{ fontSize: 11, color: '#94a3b8', margin: '4px 0 0' }}>
-                가격과 링크를 모두 입력해야 노출할 수 있어요
-              </p>
-            )}
-          </>
+
+        {purchaseLinks.length === 0 && (
+          <p style={{ fontSize: 12, color: '#94a3b8', margin: '2px 0 6px' }}>
+            등록된 링크가 없어요. 공구가 끝나면 상세 페이지에 안내할 구매처가 없습니다.
+          </p>
         )}
+
+        {purchaseLinks.map((link, i) => {
+          const update = (patch: Partial<PurchaseLink>) =>
+            setPurchaseLinks(prev => prev.map((l, idx) => idx === i ? { ...l, ...patch } : l))
+          const complete = !!link.url.trim()
+          return (
+            <div key={i} style={{ border: '1px solid #e2e8f0', borderRadius: 10, padding: 10, marginBottom: 8 }}>
+              <div className="modal-row">
+                <div>
+                  <select value={link.platform} onChange={e => update({ platform: e.target.value as PurchaseLink['platform'] })}>
+                    <option value="naver">네이버</option>
+                    <option value="coupang">쿠팡</option>
+                    <option value="other">기타 판매처</option>
+                  </select>
+                </div>
+                <div>
+                  <input
+                    type="number"
+                    value={link.price ?? ''}
+                    onChange={e => update({ price: e.target.value ? parseInt(e.target.value) : null })}
+                    placeholder="가격 (선택)"
+                  />
+                </div>
+              </div>
+              <input
+                type="url"
+                value={link.url}
+                onChange={e => update({ url: e.target.value })}
+                placeholder="https://..."
+                style={{ marginTop: 6 }}
+              />
+              <input
+                type="text"
+                value={link.note ?? ''}
+                onChange={e => update({ note: e.target.value })}
+                placeholder="옵션/구성 참고사항 (선택 — 예: 2개입 기준)"
+                style={{ marginTop: 6 }}
+              />
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 8 }}>
+                <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontWeight: 400, fontSize: 13 }}>
+                  <input
+                    type="checkbox"
+                    checked={link.visible !== false}
+                    onChange={e => update({ visible: e.target.checked })}
+                    disabled={!complete}
+                    style={{ width: 'auto' }}
+                  />
+                  고객 화면에 노출
+                </label>
+                <button
+                  type="button"
+                  onClick={() => setPurchaseLinks(prev => prev.filter((_, idx) => idx !== i))}
+                  style={{ padding: '4px 10px', background: '#fee2e2', color: '#dc2626', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 12, fontWeight: 600 }}>
+                  삭제
+                </button>
+              </div>
+              {!complete && (
+                <p style={{ fontSize: 11, color: '#94a3b8', margin: '4px 0 0' }}>
+                  링크를 입력해야 노출할 수 있어요
+                </p>
+              )}
+            </div>
+          )
+        })}
+
+        <button
+          type="button"
+          onClick={() => setPurchaseLinks(prev => [...prev, { platform: 'coupang', url: '', price: null, note: null, visible: true }])}
+          style={{ padding: '7px 12px', background: '#f1f5f9', color: '#475569', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 12, fontWeight: 600, marginBottom: 4 }}>
+          + 구매 링크 추가
+        </button>
 
         {/* 이미지 업로드 */}
         <label>상품 이미지</label>

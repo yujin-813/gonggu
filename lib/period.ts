@@ -69,6 +69,19 @@ export function isExpired(post: PeriodInput): boolean {
   return (s.kind === 'range' || s.kind === 'deadline_only') && s.daysLeft < 0
 }
 
+/**
+ * 상세 페이지 URL을 계속 열어둬도 되는 상품인지 — 마감 여부는 보지 않는다.
+ *
+ * 목록에서는 마감 공구를 숨기지만(isCustomerVisible), 상세 URL까지 404로 만들면 검색에
+ * 색인된 페이지가 통째로 죽는다. 공구가 끝나도 "지금 바로 살 수 있는 곳"과 "비슷한 공구"를
+ * 찾는 유입은 계속되므로 페이지는 살려두고 화면만 종료 상태로 바꾼다.
+ * 단, 검수 중이거나 제외된 글은 애초에 공개된 적이 없으므로 계속 404여야 한다.
+ */
+export function isPagePublic(post: Pick<Post, 'status' | 'published'>): boolean {
+  if (post.status === 'upcoming') return post.published !== false
+  return post.status === 'published' || (!post.status && post.published !== false)
+}
+
 /** 고객 화면에 노출해도 되는 상품인지 — api/posts, api/collections/[id] 등에서 공통으로 쓴다 */
 export function isCustomerVisible(post: Pick<Post, 'status' | 'published' | 'is_evergreen_deal' | 'is_always_on' | 'deadline'>): boolean {
   if (post.status === 'upcoming') return post.published !== false

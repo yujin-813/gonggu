@@ -38,7 +38,9 @@ function pushSupported(): boolean {
 // 카카오톡 채널 추가 링크 — 별도 SDK 없이도 앱/웹 어디서나 동작하는 공식 딥링크 형식
 const KAKAO_CHANNEL_URL = 'http://pf.kakao.com/_WVxgfX/friend'
 
-export default function HomeClient() {
+// 큐레이션 섹션은 서버에서 계산해 넘겨받는다 — 여기서 fetch하면 첫 HTML이 비어서
+// 검색엔진이 상품을 못 읽는다
+export default function HomeClient({ sections }: { sections?: React.ReactNode }) {
   const [posts, setPosts] = useState<Post[]>([])
   const [bookmarks, setBookmarks] = useState<Set<number>>(new Set())
   const [currentCat, setCurrentCat] = useState<Category | 'all' | 'evergreen'>('all')
@@ -401,6 +403,11 @@ export default function HomeClient() {
             <Link href="/monthly" className="landing-link">이달의 공구</Link>
             <Link href="/influencers" className="landing-link">인플루언서별</Link>
           </nav>
+
+          {/* 큐레이션은 기본 상태에서만 보여준다 — 검색하거나 카테고리를 고른 사용자는
+              그 조건에 맞는 목록을 보러 온 것이므로 섹션이 끼어들면 방해가 된다 */}
+          {sections && currentCat === 'all' && !searchQuery && sections}
+
           <div className="topbar">
             <span className="count-text">총 <strong>{sorted.length}</strong>개의 공구</span>
             <select

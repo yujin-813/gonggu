@@ -2,6 +2,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import type { Post, ScraperStatus, InfluencerSource, Collection } from '@/lib/types'
 import { daysLeft, periodLabel, isExpired } from '@/lib/period'
+import { hasPurchaseLink } from '@/lib/purchaseLinks'
 import AddPostModal from '@/components/AddPostModal'
 
 interface DayStat { date: string; visitors: number; events: Record<string, number>; newVisitors: number; returningVisitors: number }
@@ -93,7 +94,7 @@ export default function AdminPage() {
   const [showAddModal, setShowAddModal] = useState(false)
   const [editingPost, setEditingPost]   = useState<Post | null>(null)
   const [loading, setLoading]         = useState(true)
-  const [filter, setFilter]           = useState<'all' | 'candidate' | 'needs_review' | 'ready' | 'published' | 'expired' | 'excluded' | 'upcoming'>('all')
+  const [filter, setFilter]           = useState<'all' | 'candidate' | 'needs_review' | 'ready' | 'published' | 'expired' | 'excluded' | 'upcoming' | 'featured' | 'no_link'>('all')
   const [searchQ, setSearchQ]         = useState('')
   const [analytics, setAnalytics]     = useState<DayStat[]>([])
   const [topPosts, setTopPosts]       = useState<TopPost[]>([])
@@ -313,6 +314,30 @@ export default function AdminPage() {
     })
   }
 
+  // 홈 "이번 주 우리가 고른 공구"에 넣고 뺀다. 날짜 규칙과 무관하게 운영자가 직접 고르는
+  // 유일한 영역이라, 목록에서 바로 켜고 끌 수 있어야 한다.
+  async function toggleFeatured(p: Post) {
+    const next = !p.is_featured
+    // 켤 때는 기존 추천들 뒤에 붙인다 — 순서를 따로 안 정해도 켠 차례대로 노출된다
+    const maxOrder = posts.reduce((m, x) => (x.is_featured && typeof x.featured_order === 'number' ? Math.max(m, x.featured_order) : m), 0)
+    const nextOrder = next ? maxOrder + 1 : null
+    setPosts(prev => prev.map(x => x.id === p.id ? { ...x, is_featured: next, featured_order: nextOrder } : x))
+    await fetch(`/api/posts/${p.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ is_featured: next, featured_order: nextOrder }),
+    })
+  }
+
+  async function setFeaturedOrder(p: Post, order: number) {
+    setPosts(prev => prev.map(x => x.id === p.id ? { ...x, featured_order: order } : x))
+    await fetch(`/api/posts/${p.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ featured_order: order }),
+    })
+  }
+
   async function toggleEvergreenDeal(p: Post) {
     const next = !(p.is_evergreen_deal || p.is_always_on)
     const onlyDeadlineMissing =
@@ -415,6 +440,10 @@ export default function AdminPage() {
       filter === 'all'       ? true :
       filter === 'published' ? isPublishedLive(p) :
       filter === 'expired'   ? isPublishedExpired(p) :
+      filter === 'featured'  ? !!p.is_featured :
+      // 종료 페이지에 검색 유입은 계속 들어오는데 대체 구매 링크가 없으면 보낼 곳이 없다 —
+      // 그런 상품을 찾아 링크를 채우기 위한 필터
+      filter === 'no_link'   ? isPublishedExpired(p) && !hasPurchaseLink(p) :
       st === filter
     const q = searchQ.toLowerCase()
     const matchQ = !q || p.title.toLowerCase().includes(q) || p.account.toLowerCase().includes(q)
@@ -429,6 +458,8 @@ export default function AdminPage() {
   const expiredCount     = posts.filter(isPublishedExpired).length
   const excludedCount    = countBy('excluded')
   const upcomingCount    = countBy('upcoming')
+  const featuredCount    = posts.filter(p => p.is_featured).length
+  const noLinkCount      = posts.filter(p => isPublishedExpired(p) && !hasPurchaseLink(p)).length
 
   // 인증 확인 중 (hydration 전)
   if (authed === null) return null
@@ -585,6 +616,8 @@ export default function AdminPage() {
                   { key: 'expired',      label: `마감됨 ${expiredCount}`,        color: '#94a3b8' },
                   { key: 'excluded',     label: `제외 ${excludedCount}`,         color: '#94a3b8' },
                   { key: 'upcoming',     label: `오픈예정 ${upcomingCount}`,      color: '#7c3aed' },
+                  { key: 'featured',     label: `🍯 추천 ${featuredCount}`,       color: '#f59e0b' },
+                  { key: 'no_link',      label: `종료·링크없음 ${noLinkCount}`,   color: '#dc2626' },
                 ] as const).map(({ key, label, color }) => (
                   <button key={key} onClick={() => setFilter(key)}
                     style={{
@@ -611,7 +644,7 @@ export default function AdminPage() {
               </div>
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                {visible.map(p => <AdminPostRow key={p.id} post={p} onToggle={togglePublished} onDelete={deletePost} onEdit={setEditingPost} onToggleAlwaysOn={toggleEvergreenDeal} onToggleSoldOutOnly={toggleSoldOutOnly} onQuickReview={quickReview} periodLabel={periodLabel(p)} />)}
+                {visible.map(p => <AdminPostRow key={p.id} post={p} onToggle={togglePublished} onDelete={deletePost} onEdit={setEditingPost} onToggleAlwaysOn={toggleEvergreenDeal} onToggleSoldOutOnly={toggleSoldOutOnly} onQuickReview={quickReview} onToggleFeatured={toggleFeatured} onSetFeaturedOrder={setFeaturedOrder} periodLabel={periodLabel(p)} />)}
               </div>
             )}
           </>
@@ -827,7 +860,7 @@ function scrapedAgo(scrapedAt?: string): string | null {
   return `${dateLabel} · ${days}일 전 수집`
 }
 
-function AdminPostRow({ post: p, onToggle, onDelete, onEdit, onToggleAlwaysOn, onToggleSoldOutOnly, onQuickReview, periodLabel }: {
+function AdminPostRow({ post: p, onToggle, onDelete, onEdit, onToggleAlwaysOn, onToggleSoldOutOnly, onQuickReview, onToggleFeatured, onSetFeaturedOrder, periodLabel }: {
   post: Post
   onToggle: (p: Post) => void
   onDelete: (id: number) => void
@@ -835,6 +868,8 @@ function AdminPostRow({ post: p, onToggle, onDelete, onEdit, onToggleAlwaysOn, o
   onToggleAlwaysOn: (p: Post) => void
   onToggleSoldOutOnly: (p: Post) => void
   onQuickReview: (p: Post, action: 'approve' | 'always_on' | 'exclude', reason?: string) => void
+  onToggleFeatured: (p: Post) => void
+  onSetFeaturedOrder: (p: Post, order: number) => void
   periodLabel: string
 }) {
   // upcoming 공구는 status가 'upcoming' 그대로 유지된 채 published 필드만으로 공개 여부를 결정한다
@@ -1007,6 +1042,25 @@ function AdminPostRow({ post: p, onToggle, onDelete, onEdit, onToggleAlwaysOn, o
 
         {showMore && (
           <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 8, paddingTop: 8, borderTop: '1px solid #e2e8f0' }}>
+            {/* 홈 "이번 주 우리가 고른 공구" — 운영자가 직접 고르는 유일한 영역 */}
+            <button onClick={() => onToggleFeatured(p)}
+              title="켜면 홈 상단 '이번 주 우리가 고른 공구'에 노출됩니다"
+              style={{ padding: '6px 10px', borderRadius: 8, border: 'none', cursor: 'pointer', fontSize: 11, fontWeight: 600, whiteSpace: 'nowrap',
+                background: p.is_featured ? '#fef3c7' : '#f1f5f9', color: p.is_featured ? '#b45309' : '#94a3b8' }}>
+              {p.is_featured ? '🍯 추천 해제' : '이번 주 추천'}
+            </button>
+            {p.is_featured && (
+              <label title="숫자가 작을수록 홈에서 먼저 보입니다"
+                style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 11, fontWeight: 600, color: '#b45309' }}>
+                순서
+                <input
+                  type="number" min={1}
+                  value={p.featured_order ?? ''}
+                  onChange={e => onSetFeaturedOrder(p, parseInt(e.target.value, 10) || 1)}
+                  style={{ width: 52, padding: '5px 6px', borderRadius: 6, border: '1px solid #fcd34d', fontSize: 11 }}
+                />
+              </label>
+            )}
             <button onClick={() => onToggleAlwaysOn(p)}
               title="상시딜로 설정하면 마감일 없이도 공개 가능"
               style={{ padding: '6px 10px', borderRadius: 8, border: 'none', cursor: 'pointer', fontSize: 11, fontWeight: 600, whiteSpace: 'nowrap',

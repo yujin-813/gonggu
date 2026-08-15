@@ -1,5 +1,5 @@
 import type { Post, Category } from './types'
-import { getPeriodState, isCustomerVisible, daysLeft } from './period'
+import { getPeriodState, isCustomerVisible, isPagePublic, daysLeft } from './period'
 import { loadPosts } from './store'
 import { CATEGORY_LABEL } from './categoryIcons'
 
@@ -42,6 +42,16 @@ export function kstMonthLabel(): string {
 
 export function visiblePosts(): Post[] {
   return loadPosts().filter(isCustomerVisible)
+}
+
+/**
+ * 상세 URL이 살아 있는 모든 상품 — 마감된 것도 포함한다.
+ * 목록에는 안 띄우지만 사이트맵에는 남겨야 한다. 마감됐다고 사이트맵에서 빼면 검색엔진이
+ * 페이지가 사라진 것으로 보고 색인을 내려버리는데, 이 페이지들은 종료 후에도 대체 구매처와
+ * 비슷한 공구를 안내하는 역할로 계속 쓰인다.
+ */
+export function routablePosts(): Post[] {
+  return loadPosts().filter(isPagePublic)
 }
 
 /** 오늘 오픈했거나 오늘 마감하는 공구 — "오늘의 공구" */
@@ -126,4 +136,49 @@ export function categoryCopy(cat: Category, count: number): LandingCopy {
 
 export function categoryPosts(posts: Post[], cat: Category): Post[] {
   return posts.filter(p => p.cat === cat)
+}
+
+// ── 홈 섹션 ────────────────────────────────────────────────────────────────
+// 홈을 단일 피드에서 섹션 구조로 바꾸면서, "어떤 상품이 어느 영역에 들어가는가"를 여기
+// 한 곳에서만 정한다. 운영자가 고르는 건 추천(is_featured) 하나뿐이고 나머지는 전부 규칙이다.
+
+/** 곧 끝나는 공구 — 48시간 이내 마감 */
+export function endingSoonPosts(posts: Post[], hours = 48): Post[] {
+  const limitDays = hours / 24
+  return posts
+    .filter(p => {
+      const s = getPeriodState(p)
+      if (s.kind !== 'range' && s.kind !== 'deadline_only') return false
+      return s.daysLeft >= 0 && s.daysLeft <= limitDays
+    })
+    .sort((a, b) => daysLeft(a.deadline) - daysLeft(b.deadline))
+}
+
+/** 이번 주 우리가 고른 공구 — 관리자가 켠 것만, 지정한 순서대로 */
+export function featuredPosts(posts: Post[]): Post[] {
+  return posts
+    .filter(p => p.is_featured)
+    .sort((a, b) => {
+      const oa = a.featured_order ?? Number.MAX_SAFE_INTEGER
+      const ob = b.featured_order ?? Number.MAX_SAFE_INTEGER
+      if (oa !== ob) return oa - ob
+      return (b.scraped_at || '').localeCompare(a.scraped_at || '')
+    })
+}
+
+/**
+ * 지금 많이 보는 공구 — 최근 N일 클릭 순.
+ * 클릭 데이터는 postClicks 도입 이후부터 쌓이므로 초기에는 결과가 적거나 비어 있다.
+ * 그 경우 섹션을 비워두는 대신 호출하는 쪽에서 아예 감춘다(빈 영역을 보여주지 않기 위함).
+ */
+export function popularPosts(posts: Post[], rankedIds: number[]): Post[] {
+  const byId = new Map(posts.map(p => [p.id, p]))
+  return rankedIds.map(id => byId.get(id)).filter((p): p is Post => !!p)
+}
+
+/** 카테고리별 홈 영역 — 상품이 있는 카테고리만 */
+export function categorySections(posts: Post[], perCategory = 6) {
+  return CATEGORY_KEYS
+    .map(cat => ({ cat, posts: posts.filter(p => p.cat === cat).slice(0, perCategory) }))
+    .filter(s => s.posts.length > 0)
 }

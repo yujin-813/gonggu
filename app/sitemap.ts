@@ -1,6 +1,6 @@
 import type { MetadataRoute } from 'next'
 import { loadCollections } from '@/lib/store'
-import { SITE_URL, visiblePosts, LANDING_KEYS, CATEGORY_KEYS, landingCopy } from '@/lib/landing'
+import { SITE_URL, visiblePosts, routablePosts, LANDING_KEYS, CATEGORY_KEYS, landingCopy } from '@/lib/landing'
 
 // 컬렉션·공구는 재배포 없이 관리자가 수시로 바꾸므로 빌드 시점에 고정되지 않게 요청마다 새로 계산한다
 export const dynamic = 'force-dynamic'
@@ -46,7 +46,9 @@ export default function sitemap(): MetadataRoute.Sitemap {
     },
     // 개별 공구 상세 — "브랜드명 공구"로 들어오는 롱테일 검색이 실제로 착지하는 페이지다.
     // (이전에는 "공구는 상세 페이지가 없다"는 낡은 전제로 통째로 빠져 있었다)
-    ...posts.map(p => ({
+    // 마감된 공구도 넣는다 — 페이지가 종료 안내와 대체 구매처로 계속 쓰이므로, 사이트맵에서
+    // 빼면 검색엔진이 사라진 페이지로 보고 색인을 내린다.
+    ...routablePosts().map(p => ({
       url: `${SITE_URL}/post/${p.id}`,
       lastModified: p.scraped_at ? new Date(p.scraped_at) : new Date(),
       changeFrequency: 'daily' as const,

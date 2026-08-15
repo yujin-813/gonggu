@@ -39,12 +39,22 @@ function isAdminSession(): Promise<boolean> {
   return adminSessionCheck
 }
 
-export async function track(type: string, extra?: { postId?: number }) {
+// 어떤 버튼을 눌렀는지 — 공구 링크와 대체 구매처(쿠팡/네이버) 클릭을 구분해야
+// "공구는 끝났는데 구매 수요는 남아 있다"를 데이터로 확인할 수 있다
+export type ClickType = 'groupbuy' | 'coupang' | 'naver' | 'other' | 'detail'
+
+export async function track(type: string, extra?: { postId?: number; clickType?: ClickType }) {
   if (isTrackingDisabled()) return
   if (await isAdminSession()) return
   fetch('/api/analytics', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ type, sessionId: getSession(), visitorId: getVisitorId(), postId: extra?.postId }),
+    body: JSON.stringify({
+      type,
+      sessionId: getSession(),
+      visitorId: getVisitorId(),
+      postId: extra?.postId,
+      clickType: extra?.clickType,
+    }),
   }).catch(() => {})
 }

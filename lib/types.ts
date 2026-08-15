@@ -81,6 +81,29 @@ export interface Post {
   partners_option_note?: string | null
   partners_checked_at?: string | null
   partners_visible?: boolean
+  // 위 partners_* 는 플랫폼을 하나만 담을 수 있어서 "쿠팡과 네이버 둘 다"를 표현하지 못한다.
+  // 공구가 끝난 뒤 대체 구매처를 여러 곳 제시하려면 배열이어야 하므로 아래로 확장했다.
+  // 기존 데이터는 lib/purchaseLinks.ts의 normalizePurchaseLinks()가 읽을 때 자동으로
+  // 합쳐주므로 일괄 마이그레이션 없이 그대로 둔다.
+  purchase_links?: PurchaseLink[]
+  // 관리자가 직접 고른 "이번 주 추천" — 날짜 규칙과 무관하게 홈 상단에 노출된다
+  is_featured?: boolean
+  featured_order?: number | null
+}
+
+export type PurchasePlatform = 'naver' | 'coupang' | 'other'
+
+/** 공구가 아닌 일반 판매처 링크. 공구 종료 후 "지금 바로 사고 싶은" 사용자를 위한 대체 경로. */
+export interface PurchaseLink {
+  platform: PurchasePlatform
+  url: string
+  /** 확인 당시 가격. 실시간 조회가 아니므로 화면에는 "확인 시점"과 함께 조심스럽게 쓴다 */
+  price?: number | null
+  /** 옵션이 공구와 달라 가격을 단순 비교하면 안 될 때 관리자가 남기는 참고 문구 */
+  note?: string | null
+  checked_at?: string | null
+  /** 고객 화면 노출 여부 — 확인이 끝난 링크만 켠다 */
+  visible?: boolean
 }
 
 export interface Collection {
