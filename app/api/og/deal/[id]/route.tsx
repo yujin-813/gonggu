@@ -61,7 +61,7 @@ export async function GET(_req: Request, { params }: { params: { id: string } })
         {/* 머리 — 브랜드와 판정 등급 */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 22, fontWeight: 800, color: '#F0A500' }}>
-            🍯 꿀공구 판정
+            꿀공구 판정
           </div>
           {v.grade && (
             <div style={{
@@ -70,7 +70,7 @@ export async function GET(_req: Request, { params }: { params: { id: string } })
               fontSize: 28, fontWeight: 800,
               padding: '8px 20px', borderRadius: 999,
             }}>
-              {v.grade.emoji} {v.grade.label}
+              {v.grade.label}
             </div>
           )}
         </div>

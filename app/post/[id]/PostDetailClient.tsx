@@ -54,7 +54,8 @@ export default function PostDetailClient({ post, ended = false, purchaseLinks = 
         <div className="header-inner">
           <Link href="/" className="back-btn"><ArrowLeft size={16} /></Link>
           <div className="logo">
-            <span className="logo-text">🍯 꿀공구</span>
+            <img src="/logo-symbol.png" alt="" className="logo-symbol" width={20} height={20} />
+            <span className="logo-text">꿀공구</span>
           </div>
         </div>
       </header>

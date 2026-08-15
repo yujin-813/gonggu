@@ -262,7 +262,6 @@ export default function HomeClient({ sections }: { sections?: React.ReactNode })
     return 0
   })
 
-  const urgentCount = posts.filter(p => { const d = daysLeft(p.deadline); return d >= 0 && d <= 1 }).length
 
   // group_key가 있는 게시글끼리 묶음 (published 된 것들만)
   const groupMap = new Map<string, typeof posts>()
@@ -335,24 +334,6 @@ export default function HomeClient({ sections }: { sections?: React.ReactNode })
               onClick={() => { localStorage.setItem('gonggu_kakao_dismissed', '1'); setKakaoBannerDismissed(true) }}
             >
               <X size={14} />
-            </button>
-          </div>
-        </div>
-      )}
-
-      {showingMainFeed && urgentCount > 0 && (
-        <div className="notify-banner">
-          <div className="notify-inner">
-            <div className="notify-icon"><Bell size={18} /></div>
-            <div className="notify-text">
-              <p>마감 임박 공구가 {urgentCount}개 있어요!</p>
-              <p>오늘 자정까지 마감되는 공구를 확인하세요</p>
-            </div>
-            <button
-              className="notify-btn"
-              onClick={() => { setSortOrder('deadline'); setCurrentCat('all') }}
-            >
-              바로 보기
             </button>
           </div>
         </div>

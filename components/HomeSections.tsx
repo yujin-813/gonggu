@@ -2,11 +2,12 @@
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import type { Post, Category } from '@/lib/types'
-import { CATEGORY_LABEL } from '@/lib/categoryIcons'
+import { CATEGORY_LABEL, categoryIcon } from '@/lib/categoryIcons'
 import PostCard from '@/components/PostCard'
 import Toast from '@/components/Toast'
 import DealStrip, { InfluencerStrip } from '@/components/DealStrip'
 import { track } from '@/lib/track'
+import { Flame, Award, CalendarDays, AlarmClock, CalendarRange } from 'lucide-react'
 
 // 홈 큐레이션. 두 종류의 영역이 있다.
 //
@@ -35,9 +36,9 @@ interface Props {
 }
 
 function BigSection({
-  emoji, title, subtitle, posts, bookmarks, onToggleBookmark, onJoin,
+  icon, title, subtitle, posts, bookmarks, onToggleBookmark, onJoin,
 }: {
-  emoji: string
+  icon: React.ReactNode
   title: string
   subtitle?: string
   posts: Post[]
@@ -49,7 +50,7 @@ function BigSection({
   return (
     <section className="home-section">
       <div className="home-section-head">
-        <h2 className="home-section-title">{emoji} {title}</h2>
+        <h2 className="home-section-title">{icon}{title}</h2>
         {subtitle && <p className="home-section-sub">{subtitle}</p>}
       </div>
       <div className="home-section-feed">
@@ -94,23 +95,24 @@ export default function HomeSections({
     <div className="home-sections">
       {/* 클릭 데이터가 쌓이기 전에는 popular가 비는데, 그때는 영역이 통째로 감춰진다 */}
       <BigSection
-        emoji="🔥" title="지금 많이 보는 공구"
+        icon={<Flame size={18} strokeWidth={2.5} />} title="지금 많이 보는 공구"
         subtitle="최근 일주일 동안 가장 많이 눌러본 공구예요"
         posts={popular} {...big}
       />
       <BigSection
-        emoji="🍯" title="이번 주 우리가 고른 공구"
+        icon={<Award size={18} strokeWidth={2.5} />} title="이번 주 우리가 고른 공구"
         subtitle="꿀공구가 직접 확인하고 골랐어요"
         posts={featured} {...big}
       />
 
-      <DealStrip emoji="📅" title="오늘의 공구"   moreHref="/today"    posts={today} />
-      <DealStrip emoji="⏰" title="마감 임박 공구" moreHref="/deadline" posts={endingSoon} />
-      <DealStrip emoji="🗓️" title="이달의 공구"   moreHref="/monthly"  posts={monthly} />
+      <DealStrip icon={<CalendarDays size={17} strokeWidth={2.5} />} title="오늘의 공구"   moreHref="/today"    posts={today} />
+      <DealStrip icon={<AlarmClock size={17} strokeWidth={2.5} />} title="마감 임박 공구" moreHref="/deadline" posts={endingSoon} />
+      <DealStrip icon={<CalendarRange size={17} strokeWidth={2.5} />} title="이달의 공구"   moreHref="/monthly"  posts={monthly} />
 
       {categories.map(({ cat, posts }) => (
         <DealStrip
           key={cat}
+          icon={(() => { const I = categoryIcon(cat); return <I size={17} strokeWidth={2.5} /> })()}
           title={`${CATEGORY_LABEL[cat]} 공구`}
           moreHref={`/category/${cat}`}
           posts={posts}

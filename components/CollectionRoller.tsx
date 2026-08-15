@@ -3,6 +3,10 @@ import { useState, useEffect, useRef, type ReactNode } from 'react'
 import Link from 'next/link'
 import type { Collection, Post } from '@/lib/types'
 import { track } from '@/lib/track'
+import { ShoppingBag } from 'lucide-react'
+
+// 관리자가 소개를 비워둬도 홈이 허전하지 않게 — 관리자에서 언제든 바꿀 수 있다
+const DEFAULT_COLLECTION_DESC = '꿀공구가 추천하는 꿀템'
 
 // "지금 뜨는 컬렉션"에 담긴 상품들을 한 장씩 자동으로 넘겨 보여준다.
 // 컬렉션에 3개를 담으면 상품 카드 3장이, 5개면 5장이 순서대로 돈다.
@@ -64,7 +68,7 @@ export default function CollectionRoller({ collection, posts, renderCard }: Prop
     >
       <div className="roller-head">
         <h2 className="roller-title">
-          <span className="roller-badge" style={{ background: collection.color }}>{collection.emoji}</span>
+          <span className="roller-badge" style={{ background: collection.color }}><ShoppingBag size={15} strokeWidth={2.5} /></span>
           {collection.title}
           <span className="roller-count">{count}</span>
         </h2>
@@ -77,7 +81,7 @@ export default function CollectionRoller({ collection, posts, renderCard }: Prop
         </Link>
       </div>
 
-      {collection.description && <p className="roller-desc">{collection.description}</p>}
+      <p className="roller-desc">{collection.description || DEFAULT_COLLECTION_DESC}</p>
 
       <div className="roller-viewport">
         <div className="roller-track" style={{ transform: `translateX(-${index * 100}%)` }}>

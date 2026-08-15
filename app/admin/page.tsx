@@ -1329,10 +1329,13 @@ function InfluencerManager({
   )
 }
 
+// 컬렉션 소개는 홈 롤링 영역과 상세 상단에 함께 나온다 — 비워두면 홈이 허전해서 기본값을 넣는다
+const DEFAULT_COLLECTION_DESC = '꿀공구가 추천하는 꿀템'
+
 const COLLECTION_COLORS = ['#F0A500', '#6366f1', '#0ea5e9', '#22c55e', '#f97316', '#a855f7', '#eab308', '#14b8a6']
 
 const emptyCollectionForm = {
-  title: '', description: '', emoji: '🛍️', color: COLLECTION_COLORS[0], expiresAt: '', productIds: [] as number[],
+  title: '', description: DEFAULT_COLLECTION_DESC, emoji: '', color: COLLECTION_COLORS[0], expiresAt: '', productIds: [] as number[],
 }
 
 function CollectionManager({
@@ -1435,7 +1438,7 @@ function CollectionManager({
           <div style={{ marginBottom: 10 }}>
             <label style={{ fontSize: 12, fontWeight: 600, color: '#475569', display: 'block', marginBottom: 4 }}>설명</label>
             <textarea value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))}
-              rows={2} placeholder="컬렉션 상세 페이지 상단에 표시될 설명" style={{ ...inputStyle, resize: 'vertical' }} />
+              rows={2} placeholder="홈 롤링 영역과 컬렉션 상세 상단에 함께 표시되는 소개 문구" style={{ ...inputStyle, resize: 'vertical' }} />
           </div>
           <div style={{ display: 'flex', gap: 10, marginBottom: 14, alignItems: 'flex-end' }}>
             <div>

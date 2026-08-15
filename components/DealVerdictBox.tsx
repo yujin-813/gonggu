@@ -1,15 +1,17 @@
 'use client'
 import type { Post } from '@/lib/types'
 import { getDealVerdict, rateText, type DealGradeKey } from '@/lib/dealGrade'
+import GradeIcon from './GradeIcon'
 
 // "이 공구 진짜 싼가?"에 답하는 블록. 공구가와 다른 판매처 가격을 나란히 놓고 등급을 붙인다.
 // 숫자를 먼저 보여주고 판정을 뒤에 두는 순서인데, 판정만 있으면 "그래서 왜?"가 남고
 // 숫자만 있으면 직접 계산해야 하기 때문이다.
 
-export function GradeBadge({ grade, size = 'md' }: { grade: { emoji: string; label: string; key: DealGradeKey }; size?: 'sm' | 'md' }) {
+export function GradeBadge({ grade, size = 'md' }: { grade: { label: string; key: DealGradeKey }; size?: 'sm' | 'md' }) {
   return (
     <span className={`grade-badge grade-${grade.key} grade-${size}`}>
-      {grade.emoji} {grade.label}
+      <GradeIcon grade={grade.key} size={size === 'sm' ? 11 : 13} />
+      {grade.label}
     </span>
   )
 }

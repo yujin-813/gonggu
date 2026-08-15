@@ -12,7 +12,6 @@ export type DealGradeKey = 'honey' | 'good' | 'hmm' | 'meh'
 
 export interface DealGrade {
   key: DealGradeKey
-  emoji: string
   /** 배지에 쓰는 짧은 이름 */
   label: string
   /** 판정 한 줄 설명 */
@@ -20,10 +19,10 @@ export interface DealGrade {
 }
 
 export const GRADES: Record<DealGradeKey, Omit<DealGrade, 'key'>> = {
-  honey: { emoji: '🍯', label: '꿀딜',   line: '가격 메리트가 확실해요. 지금 사도 좋은 딜이에요.' },
-  good:  { emoji: '👍', label: '괜찮딜', line: '조금 더 저렴해요. 구매할 만한 가격이에요.' },
-  hmm:   { emoji: '👀', label: '고민딜', line: '가격 차이가 크지 않아요. 배송비·사은품까지 비교해보세요.' },
-  meh:   { emoji: '⚠️', label: '아쉽딜', line: '공구 가격 메리트가 적어요. 다른 곳이 더 나을 수 있어요.' },
+  honey: { label: '꿀딜',   line: '가격 메리트가 확실해요. 지금 사도 좋은 딜이에요.' },
+  good:  { label: '괜찮딜', line: '조금 더 저렴해요. 구매할 만한 가격이에요.' },
+  hmm:   { label: '고민딜', line: '가격 차이가 크지 않아요. 배송비·사은품까지 비교해보세요.' },
+  meh:   { label: '아쉽딜', line: '공구 가격 메리트가 적어요. 다른 곳이 더 나을 수 있어요.' },
 }
 
 /** 관리자가 직접 입력한 판단 문구의 색상 구분을 등급으로 옮길 때 쓰는 대응표 */

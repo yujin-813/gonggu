@@ -82,7 +82,7 @@ export default function PostCard({
     const compareLine = verdict.referencePrice
       ? ` · ${verdict.referenceLabel} ${verdict.referencePrice.toLocaleString()}원`
       : ''
-    const gradeLine = verdict.grade ? `${verdict.grade.emoji} ${verdict.grade.label} — ` : ''
+    const gradeLine = verdict.grade ? `[${verdict.grade.label}] ` : ''
     const result = await shareContent({
       title: `${gradeLine}${post.title}`,
       description: `${priceLine}${compareLine}`,
@@ -164,7 +164,7 @@ export default function PostCard({
             title="이 인플루언서의 다른 추천 상품 보기"
             style={{ fontSize: 11, color: '#94a3b8', textDecoration: 'none', flexShrink: 0 }}
           >
-            🛍️ 더보기
+            더보기
           </Link>
           <span className="cat-tag">
             {CATEGORY_LABEL[post.cat] || post.cat}

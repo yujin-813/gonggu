@@ -5,6 +5,8 @@ import { getPeriodState, badgeFromState } from '@/lib/period'
 import { categoryIcon } from '@/lib/categoryIcons'
 import { track } from '@/lib/track'
 import { getDealVerdict } from '@/lib/dealGrade'
+import GradeIcon from './GradeIcon'
+import { Users } from 'lucide-react'
 
 // 홈에서 "제목 + 더보기 + 작은 카드 가로줄"로 훑어보는 영역.
 // 전체 크기 PostCard는 정보가 많아 한 화면에 두세 개밖에 안 들어가는데, 홈은 "무엇이 있는지"
@@ -13,19 +15,20 @@ import { getDealVerdict } from '@/lib/dealGrade'
 
 interface Props {
   title: string
-  emoji?: string
+  /** 제목 왼쪽 아이콘 — 이모지는 기기마다 모양이 달라 쓰지 않는다 */
+  icon?: React.ReactNode
   /** 우측 "더보기"가 향하는 곳 — 없으면 버튼을 숨긴다 */
   moreHref?: string
   posts: Post[]
 }
 
-export default function DealStrip({ title, emoji, moreHref, posts }: Props) {
+export default function DealStrip({ title, icon, moreHref, posts }: Props) {
   if (posts.length === 0) return null
 
   return (
     <section className="strip">
       <div className="strip-head">
-        <h2 className="strip-title">{emoji && <span>{emoji} </span>}{title}</h2>
+        <h2 className="strip-title">{icon}{title}</h2>
         {moreHref && <Link href={moreHref} className="strip-more">더보기 →</Link>}
       </div>
 
@@ -47,7 +50,7 @@ export default function DealStrip({ title, emoji, moreHref, posts }: Props) {
                   : <div className="strip-thumb-empty"><CatIcon size={22} strokeWidth={1.5} /></div>}
                 {badge && <span className={`strip-badge ${badge.cls}`}>{badge.txt}</span>}
                 {/* 작은 카드에서도 싼지 아닌지 바로 보이게 — 홈에서 훑을 때 이게 판단 기준이 된다 */}
-                {grade && <span className={`strip-grade grade-${grade.key}`}>{grade.emoji} {grade.label}</span>}
+                {grade && <span className={`strip-grade grade-${grade.key}`}><GradeIcon grade={grade.key} size={10} />{grade.label}</span>}
               </div>
               <p className="strip-name">{p.title}</p>
               {p.price > 0 && <p className="strip-price">{p.price.toLocaleString()}원</p>}
@@ -69,7 +72,7 @@ export function InfluencerStrip({
   return (
     <section className="strip">
       <div className="strip-head">
-        <h2 className="strip-title">🙋 인플루언서별 공구</h2>
+        <h2 className="strip-title"><Users size={17} strokeWidth={2.5} />인플루언서별 공구</h2>
         <Link href="/influencers" className="strip-more">더보기 →</Link>
       </div>
       <div className="strip-scroll">
