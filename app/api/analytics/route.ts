@@ -2,10 +2,17 @@ import { NextRequest, NextResponse } from 'next/server'
 import { recordEvent, getSummary, getTopPosts, getTopSharedPosts, CLICK_TYPES } from '@/lib/analytics'
 import { loadPosts } from '@/lib/store'
 import { AUTH_COOKIE, computeToken, safeEqual } from '@/lib/auth'
+import { ADMIN_SEEN_COOKIE, isAdminIp, clientIp } from '@/lib/adminTrace'
 
-// 관리자 로그인 쿠키가 붙어 있는 요청인지 — 클라이언트의 track()도 같은 판정을 하지만
-// 그쪽은 건너뛸 수 있으므로(스크립트 차단, 캐시된 옛 번들, 직접 호출) 서버에서 한 번 더 막는다
+// 운영자 본인의 방문인지 — 세 겹으로 본다. 자세한 이유는 lib/adminTrace.ts 참고.
+// 클라이언트의 track()도 비슷한 판정을 하지만 그쪽은 건너뛸 수 있으므로(스크립트 차단,
+// 캐시된 옛 번들, 직접 호출) 서버에서 최종 판정한다.
 async function isAdminRequest(request: NextRequest): Promise<boolean> {
+  // (2) 한 번이라도 관리자로 로그인한 브라우저 — 세션이 만료돼도 남는다
+  if (request.cookies.get(ADMIN_SEEN_COOKIE)?.value === '1') return true
+  // (3) 최근 관리자 로그인에 쓰인 회선 — 다른 브라우저·시크릿창·다른 기기까지 걸러진다
+  if (isAdminIp(clientIp(request))) return true
+  // (1) 지금 로그인 중인 브라우저
   const secret = process.env.ADMIN_PASSWORD
   const token = request.cookies.get(AUTH_COOKIE)?.value
   if (!secret || !token) return false

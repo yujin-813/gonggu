@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { AUTH_COOKIE, computeToken, safeEqual } from '@/lib/auth'
+import { ADMIN_SEEN_COOKIE, ADMIN_SEEN_MAX_AGE, rememberAdminIp, clientIp } from '@/lib/adminTrace'
 
 const COOKIE_MAX_AGE = 60 * 60 * 12 // 12시간
 
@@ -24,6 +25,17 @@ export async function POST(request: NextRequest) {
     path: '/',
     maxAge: COOKIE_MAX_AGE,
   })
+  // 로그인 세션(12시간)과 별개로, "이 브라우저는 관리자 것"이라는 흔적을 1년간 남긴다.
+  // 세션이 만료된 뒤 고객 화면을 둘러봐도 통계에 안 잡히게 하기 위함이다.
+  res.cookies.set(ADMIN_SEEN_COOKIE, '1', {
+    httpOnly: true,
+    sameSite: 'lax',
+    secure: process.env.NODE_ENV === 'production',
+    path: '/',
+    maxAge: ADMIN_SEEN_MAX_AGE,
+  })
+  // 같은 회선의 다른 브라우저·시크릿창·다른 기기까지 거르기 위해 IP도 기록해 둔다
+  rememberAdminIp(clientIp(request))
   return res
 }
 

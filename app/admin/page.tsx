@@ -111,7 +111,7 @@ export default function AdminPage() {
   const [instPostUrl, setInstPostUrl] = useState('')
   const [instPostBusy, setInstPostBusy] = useState(false)
   const [instPostMsg, setInstPostMsg] = useState('')
-  const [adminTab, setAdminTab] = useState<'posts' | 'influencers' | 'collections'>('posts')
+  const [adminTab, setAdminTab] = useState<'posts' | 'influencers' | 'collections' | 'settings'>('posts')
   const [collections, setCollections] = useState<Collection[]>([])
   const [editingInfluencer, setEditingInfluencer] = useState<string | null>(null)
   const [editInfluencerDraft, setEditInfluencerDraft] = useState<Partial<InfluencerSource>>({})
@@ -119,6 +119,9 @@ export default function AdminPage() {
 
   // 세션 확인 (httpOnly 쿠키는 JS로 읽을 수 없으므로 서버에 확인)
   useEffect(() => {
+    // 관리자 페이지를 연 브라우저는 로그인 전이라도 통계에서 뺀다 — 여기까지 들어온 사람은
+    // 고객이 아니고, 로그인에 실패하거나 그냥 둘러보다 나가도 고객 화면 방문이 잡히면 안 된다
+    localStorage.setItem('gonggu_no_track', '1')
     fetch('/api/auth')
       .then(r => r.json())
       .then(d => setAuthed(!!d.authed))
@@ -508,6 +511,7 @@ export default function AdminPage() {
             { key: 'posts',       label: '공구 관리' },
             { key: 'influencers', label: '인플루언서 관리' },
             { key: 'collections', label: '컬렉션 관리' },
+            { key: 'settings',    label: '통계 설정' },
           ] as const).map(({ key, label }) => (
             <button key={key} onClick={() => setAdminTab(key)}
               style={{
@@ -688,6 +692,9 @@ export default function AdminPage() {
             }}
           />
         )}
+
+        {/* 통계 설정 탭 — 관리자 방문이 고객 통계에 섞이지 않게 관리 */}
+        {adminTab === 'settings' && <AdminIpManager />}
 
         {/* 컬렉션 관리 탭 */}
         {adminTab === 'collections' && (
@@ -1564,6 +1571,87 @@ function CollectionManager({
             </div>
           ))}
         </div>
+      )}
+    </div>
+  )
+}
+
+// 관리자 IP 관리 — 운영자 방문을 통계에서 빼는 세 겹 중 가장 넓게 걸리는 장치라,
+// 무엇이 걸려 있는지 눈으로 보고 직접 뺄 수 있어야 한다.
+function AdminIpManager() {
+  const [data, setData] = useState<{ ips: { ip: string; lastSeen: string; hits: number }[]; ttlDays: number; currentIp: string | null } | null>(null)
+  const [loading, setLoading] = useState(true)
+
+  const load = useCallback(async () => {
+    setLoading(true)
+    try {
+      const r = await fetch('/api/admin-ips')
+      setData(await r.json())
+    } catch { setData(null) }
+    finally { setLoading(false) }
+  }, [])
+
+  useEffect(() => { load() }, [load])
+
+  async function remove(ip: string) {
+    if (!confirm(`${ip} 를 관리자 IP에서 뺄까요?\n이 회선의 방문이 다시 고객 통계에 잡히게 됩니다.`)) return
+    await fetch('/api/admin-ips', {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ip }),
+    })
+    load()
+  }
+
+  return (
+    <div style={{ background: '#fff', borderRadius: 12, padding: 20, border: '1px solid #e2e8f0' }}>
+      <h2 style={{ fontSize: 17, fontWeight: 800, marginBottom: 6 }}>관리자 방문 제외</h2>
+      <p style={{ fontSize: 13, color: '#64748b', lineHeight: 1.7, marginBottom: 18 }}>
+        운영자 본인의 방문이 고객 통계에 섞이지 않도록 세 가지로 막고 있어요.
+        <br />① 로그인 중인 브라우저 ② 한 번이라도 로그인한 브라우저(1년) ③ 최근 로그인에 쓰인 IP({data?.ttlDays ?? 14}일)
+        <br />관리자 페이지를 열기만 해도 그 브라우저는 통계에서 빠집니다.
+      </p>
+
+      <div style={{ background: '#fffbeb', border: '1px solid #fde68a', borderRadius: 8, padding: '10px 12px', fontSize: 12.5, color: '#92400e', lineHeight: 1.6, marginBottom: 16 }}>
+        IP 제외는 회선 전체에 걸려요. 카페·회사처럼 여러 사람이 쓰는 곳에서 로그인했다면
+        그 회선의 실제 고객 방문까지 통계에서 빠지니, 아래 목록에서 빼주세요.
+      </div>
+
+      {loading ? (
+        <p style={{ fontSize: 13, color: '#94a3b8' }}>불러오는 중…</p>
+      ) : !data || data.ips.length === 0 ? (
+        <p style={{ fontSize: 13, color: '#94a3b8' }}>등록된 관리자 IP가 없어요</p>
+      ) : (
+        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+          <thead>
+            <tr style={{ borderBottom: '1px solid #e2e8f0' }}>
+              <th style={{ textAlign: 'left', padding: '8px 0', color: '#64748b', fontWeight: 700 }}>IP</th>
+              <th style={{ textAlign: 'left', padding: '8px 0', color: '#64748b', fontWeight: 700 }}>마지막 로그인</th>
+              <th style={{ textAlign: 'right', padding: '8px 0', color: '#64748b', fontWeight: 700 }}>로그인 수</th>
+              <th />
+            </tr>
+          </thead>
+          <tbody>
+            {data.ips.map(r => (
+              <tr key={r.ip} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                <td style={{ padding: '9px 0', fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>
+                  {r.ip}
+                  {r.ip === data.currentIp && (
+                    <span style={{ marginLeft: 6, fontSize: 11, background: '#dbeafe', color: '#1d4ed8', padding: '1px 6px', borderRadius: 8 }}>지금 접속 중</span>
+                  )}
+                </td>
+                <td style={{ padding: '9px 0', color: '#64748b' }}>{r.lastSeen.slice(0, 16).replace('T', ' ')}</td>
+                <td style={{ padding: '9px 0', textAlign: 'right', color: '#64748b', fontVariantNumeric: 'tabular-nums' }}>{r.hits}</td>
+                <td style={{ padding: '9px 0', textAlign: 'right' }}>
+                  <button onClick={() => remove(r.ip)}
+                    style={{ padding: '4px 10px', background: '#fee2e2', color: '#dc2626', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 12, fontWeight: 600 }}>
+                    제외 해제
+                  </button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
       )}
     </div>
   )

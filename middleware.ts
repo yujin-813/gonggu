@@ -47,6 +47,9 @@ function isProtected(req: NextRequest): boolean {
   // 통계 조회만 보호 (POST는 고객 이벤트 수집이라 허용)
   if (pathname === '/api/analytics') return method === 'GET'
 
+  // 관리자 IP 목록 (관리자 전용)
+  if (pathname === '/api/admin-ips') return true
+
   return false
 }
 
@@ -87,5 +90,6 @@ export const config = {
     '/api/ingest',
     '/api/upload',
     '/api/analytics',
+    '/api/admin-ips',
   ],
 }
