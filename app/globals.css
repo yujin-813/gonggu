@@ -1133,44 +1133,56 @@ header {
 .app-header .hero-search { padding: 10px 14px; }
 .app-header .category-wrap { padding: 10px 20px 12px; }
 
-/* ── 컬렉션 롤링 배너 ───────────────────────────────────────────────────── */
-/* 가로 스크롤은 옆에 더 있다는 걸 모르면 첫 장만 보고 지나쳐서, 자동으로 넘어가게 했다 */
-.roller-wrap { max-width: 680px; margin: 0 auto; padding: 16px 20px 0; }
-.roller-title { font-size: 13px; font-weight: 700; color: var(--gray-4); margin: 0 0 8px; }
+/* ── 컬렉션 상품 롤링 ───────────────────────────────────────────────────── */
+/* 컬렉션에 담긴 상품 카드가 한 장씩 넘어간다. 가로 스크롤은 옆에 더 있다는 걸 모르면
+   첫 장만 보고 지나쳐서, 자동으로 넘겨 전부 훑게 했다. */
+.roller { max-width: 680px; margin: 0 auto; padding: 18px 0 4px; }
 
-.roller-viewport { overflow: hidden; border-radius: 14px; }
+.roller-head {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  padding: 0 20px 2px;
+}
+.roller-title {
+  display: flex; align-items: center; gap: 7px;
+  font-size: 16px; font-weight: 800; letter-spacing: -0.3px;
+}
+.roller-badge {
+  width: 26px; height: 26px; flex: none;
+  border-radius: 8px;
+  display: inline-flex; align-items: center; justify-content: center;
+  font-size: 14px;
+}
+.roller-count {
+  font-size: 12px; font-weight: 700;
+  color: var(--gray-3);
+  background: var(--gray-1);
+  padding: 1px 7px; border-radius: 999px;
+}
+.roller-more {
+  flex: none;
+  font-size: 12.5px; font-weight: 700;
+  color: #D98E00; text-decoration: none;
+}
+.roller-more:hover { text-decoration: underline; }
+
+.roller-desc {
+  font-size: 12.5px; color: var(--gray-3);
+  padding: 0 20px; margin-bottom: 10px;
+}
+
+.roller-viewport { overflow: hidden; padding: 8px 0; }
 .roller-track {
   display: flex;
   transition: transform .45s cubic-bezier(.22, 1, .36, 1);
 }
-.roller-slide {
-  flex: 0 0 100%;
-  min-width: 100%;
-  display: flex;
-  align-items: center;
-  gap: 14px;
-  padding: 18px 18px;
-  min-height: 104px;
-  text-decoration: none;
-  color: #fff;
-}
-.roller-emoji { font-size: 34px; line-height: 1; flex: none; }
-.roller-body { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
-.roller-name { font-size: 16px; font-weight: 800; line-height: 1.3; }
-.roller-desc {
-  font-size: 12.5px;
-  line-height: 1.45;
-  color: rgba(255, 255, 255, .88);
-  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
-}
-.roller-count { font-size: 12px; font-weight: 700; color: rgba(255, 255, 255, .95); margin-top: 2px; }
+/* 카드 좌우 여백은 슬라이드가 갖는다 — 트랙을 100%씩 밀어야 해서 카드에 margin을 주면 어긋난다 */
+.roller-slide { flex: 0 0 100%; min-width: 100%; padding: 0 20px; }
 
-.roller-dots { display: flex; justify-content: center; gap: 6px; margin-top: 10px; }
+.roller-dots { display: flex; justify-content: center; gap: 6px; margin-top: 10px; flex-wrap: wrap; }
 .roller-dot {
   width: 6px; height: 6px;
   border-radius: 50%;
-  border: none;
-  padding: 0;
+  border: none; padding: 0;
   background: var(--gray-2);
   cursor: pointer;
   transition: width .2s, background .2s;

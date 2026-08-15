@@ -390,7 +390,36 @@ export default function HomeClient({ sections }: { sections?: React.ReactNode })
               </div>
             </div>
           )}
-          <CollectionRoller collections={collections} />
+          {/* 컬렉션에 담긴 상품 카드가 한 장씩 자동으로 넘어간다 — 3개 담으면 3장,
+              5개 담으면 5장. 카드는 홈 피드와 똑같은 PostCard를 그대로 쓴다. */}
+          {collections.map(c => {
+            const items = c.productIds
+              .map(id => posts.find(p => p.id === id))
+              .filter((p): p is Post => !!p)
+            return (
+              <CollectionRoller
+                key={c.id}
+                collection={c}
+                posts={items}
+                renderCard={post => (
+                  <PostCard
+                    post={post}
+                    isBookmarked={bookmarks.has(post.id)}
+                    onToggleBookmark={toggleBookmark}
+                    onJoin={id => { track('join', { postId: id, clickType: 'groupbuy' }); recordRecentlyViewed(id) }}
+                    onShare={(id, result) => {
+                      if (result === 'clipboard') showToast('링크가 복사되었어요')
+                      track('share', { postId: id })
+                    }}
+                    siblings={post.group_key ? groupMap.get(post.group_key) : undefined}
+                    pastPrices={post.group_key ? groupHistory[post.group_key]?.filter(h => h.id !== post.id) : undefined}
+                    isFollowingAccount={followedInfluencers.has(post.account)}
+                    onToggleFollowAccount={toggleFollowInfluencer}
+                  />
+                )}
+              />
+            )
+          })}
 
           {/* 큐레이션은 기본 상태에서만 보여준다 — 검색하거나 카테고리를 고른 사용자는
               그 조건에 맞는 목록을 보러 온 것이므로 섹션이 끼어들면 방해가 된다 */}
