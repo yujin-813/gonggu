@@ -1,140 +1,81 @@
-'use client'
-import { useState, useEffect } from 'react'
-import Link from 'next/link'
-import { ArrowLeft, Search } from 'lucide-react'
+import type { Metadata } from 'next'
+import { loadPosts } from '@/lib/store'
+import { SITE_URL } from '@/lib/landing'
+import { isCustomerVisible } from '@/lib/period'
+import JsonLd, { itemListSchema, breadcrumbSchema } from '@/components/JsonLd'
+import InfluencerPageClient from './InfluencerPageClient'
 
-interface InfluencerItem {
-  id: number
-  title: string
-  brand: string | null
-  price: number
-  img: string
-  link: string
-}
-interface InfluencerInfo {
-  account: string
-  name: string
-  source_url: string | null
+export const dynamic = 'force-dynamic'
+
+// "도현맘 공구", "쑥쑥맘 공동구매"처럼 인플루언서 이름으로 찾는 검색이 실제로 많은데,
+// 이 페이지가 'use client'라 제목이 홈과 똑같이 나오고 있었다. 서버 컴포넌트로 감싸
+// 이름이 들어간 제목·설명을 붙이고 목록을 구조화 데이터로도 내보낸다.
+
+function getInfluencer(rawAccount: string) {
+  const account = decodeURIComponent(rawAccount)
+  const normalized = account.startsWith('@') ? account : `@${account}`
+  const posts = loadPosts().filter(
+    p => (p.account || '').toLowerCase() === normalized.toLowerCase()
+  )
+  if (posts.length === 0) return null
+  const name = posts[0].influencer_name || normalized.replace('@', '')
+  return { account: normalized, name, posts, visible: posts.filter(isCustomerVisible) }
 }
 
-type SortOrder = 'latest' | 'price_low' | 'price_high'
+export function generateMetadata({ params }: { params: { account: string } }): Metadata {
+  const data = getInfluencer(params.account)
+  const handle = decodeURIComponent(params.account).replace('@', '')
+  if (!data) {
+    return { title: `${handle} 공구`, description: `${handle}님의 공동구매 정보를 꿀공구에서 확인하세요.` }
+  }
+  const { name, visible } = data
+  const count = visible.length
+  const pageTitle = `${name} 공구`
+  const shareTitle = `${pageTitle} | 꿀공구`
+  const description = count > 0
+    ? `${name}님이 진행 중인 공동구매 ${count}건을 모았어요. 상품별 가격과 마감일, 최저가 비교까지 한눈에 확인하세요.`
+    : `${name}님의 공동구매 정보를 꿀공구에서 모아보세요.`
+  const url = `${SITE_URL}/influencer/${encodeURIComponent(params.account)}`
+  const image = visible.find(p => p.img)?.img
+
+  return {
+    title: pageTitle,
+    description,
+    alternates: { canonical: url },
+    openGraph: {
+      type: 'profile',
+      locale: 'ko_KR',
+      url,
+      siteName: '꿀공구',
+      title: shareTitle,
+      description,
+      images: image ? [{ url: image }] : undefined,
+    },
+    twitter: {
+      card: image ? 'summary_large_image' : 'summary',
+      title: shareTitle,
+      description,
+      images: image ? [image] : undefined,
+    },
+  }
+}
 
 export default function InfluencerPage({ params }: { params: { account: string } }) {
-  const account = decodeURIComponent(params.account)
-  const [influencer, setInfluencer] = useState<InfluencerInfo | null>(null)
-  const [items, setItems] = useState<InfluencerItem[]>([])
-  const [loading, setLoading] = useState(true)
-  const [sortOrder, setSortOrder] = useState<SortOrder>('latest')
-  const [query, setQuery] = useState('')
-
-  useEffect(() => {
-    fetch(`/api/posts/by-influencer?account=${encodeURIComponent(account)}`)
-      .then(r => r.json())
-      .then(d => { setInfluencer(d.influencer); setItems(d.items ?? []) })
-      .catch(() => {})
-      .finally(() => setLoading(false))
-  }, [account])
-
-  const filtered = query.trim()
-    ? items.filter(item => {
-        const q = query.trim().toLowerCase()
-        return item.title.toLowerCase().includes(q) || (item.brand || '').toLowerCase().includes(q)
-      })
-    : items
-
-  // API가 이미 최신순으로 내려주므로 'latest'는 원래 순서 그대로 두고, 가격만 따로 정렬
-  const sorted = sortOrder === 'price_low' ? [...filtered].sort((a, b) => a.price - b.price)
-    : sortOrder === 'price_high' ? [...filtered].sort((a, b) => b.price - a.price)
-    : filtered
-
-  const profileUrl = `https://instagram.com/${account.replace('@', '')}`
-
+  const data = getInfluencer(params.account)
+  const path = `/influencer/${encodeURIComponent(params.account)}`
   return (
     <>
-      <header>
-        <div className="header-inner">
-          <Link href="/" className="back-btn"><ArrowLeft size={16} /></Link>
-          <div className="logo">
-            <span className="logo-text">🛍️ {influencer?.name || account.replace('@', '')}의 추천템</span>
-          </div>
-        </div>
-      </header>
-
-      <div style={{ padding: '16px 16px 4px', textAlign: 'center' }}>
-        <p style={{ fontSize: 13, color: '#64748b', margin: '0 0 8px' }}>
-          공구 여부와 상관없이 이 인플루언서가 올린 상품들이에요 — 가격 비교/할인 판단은 따로 하지 않아요
-        </p>
-        <a href={profileUrl} target="_blank" rel="noopener noreferrer"
-          style={{ fontSize: 13, color: '#6366f1', fontWeight: 600, textDecoration: 'none' }}>
-          인스타그램 {account} 보기 →
-        </a>
-      </div>
-
-      {!loading && items.length > 0 && (
-        <div className="hero-search-wrap">
-          <div className="hero-search">
-            <Search size={18} />
-            <input
-              type="search"
-              placeholder="이 인플루언서의 상품 검색"
-              value={query}
-              onChange={e => setQuery(e.target.value)}
-            />
-          </div>
-        </div>
+      {data && (
+        <JsonLd data={[
+          itemListSchema(data.visible, `${data.name} 공구`, `${SITE_URL}${path}`),
+          breadcrumbSchema([
+            { name: '꿀공구', path: '/' },
+            { name: '인플루언서', path: '/influencers' },
+            { name: `${data.name} 공구`, path },
+          ]),
+        ]} />
       )}
-
-      {!loading && items.length > 0 && (
-        <div className="topbar">
-          <span className="count-text">총 <strong>{sorted.length}</strong>개</span>
-          <select
-            className="sort-select"
-            value={sortOrder}
-            onChange={e => setSortOrder(e.target.value as SortOrder)}
-          >
-            <option value="latest">최신순</option>
-            <option value="price_low">낮은 가격순</option>
-            <option value="price_high">높은 가격순</option>
-          </select>
-        </div>
-      )}
-
-      <div className="feed" style={{ paddingBottom: 100, paddingTop: 12 }}>
-        {loading ? (
-          <div className="empty"><p>불러오는 중...</p></div>
-        ) : items.length === 0 ? (
-          <div className="empty"><p>표시할 수 있는 추천 상품이 없어요</p></div>
-        ) : sorted.length === 0 ? (
-          <div className="empty"><p>검색 결과가 없어요</p></div>
-        ) : (
-          sorted.map(item => (
-            <a
-              key={item.id}
-              href={item.link}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="card"
-              style={{ textDecoration: 'none', color: 'inherit', display: 'block' }}
-            >
-              <div className="card-img-wrap">
-                <img className="card-img-bg" src={item.img} alt="" aria-hidden="true" />
-                <img className="card-img-fg" src={item.img} alt={item.title} loading="lazy" />
-              </div>
-              <div className="card-body">
-                {item.brand && (
-                  <div style={{ fontSize: 11, fontWeight: 700, color: '#6366f1', letterSpacing: '0.04em', marginBottom: 2 }}>
-                    {item.brand.toUpperCase()}
-                  </div>
-                )}
-                <div className="card-title">{item.title}</div>
-                <div className="price-block">
-                  <span className="price-sale-big">{item.price.toLocaleString()}원</span>
-                </div>
-              </div>
-            </a>
-          ))
-        )}
-      </div>
+      <InfluencerPageClient params={params} />
     </>
   )
 }
