@@ -182,3 +182,24 @@ export function categorySections(posts: Post[], perCategory = 6) {
     .map(cat => ({ cat, posts: posts.filter(p => p.cat === cat).slice(0, perCategory) }))
     .filter(s => s.posts.length > 0)
 }
+
+/** 인플루언서별 홈 영역 — 진행 중인 공구가 많은 순 */
+export function influencerSummaries(posts: Post[], limit = 12) {
+  const byAccount = new Map<string, { account: string; name: string; count: number; img: string | null }>()
+  for (const p of posts) {
+    if (!p.account) continue
+    const cur = byAccount.get(p.account)
+    if (cur) {
+      cur.count += 1
+      if (!cur.img && p.img) cur.img = p.img
+    } else {
+      byAccount.set(p.account, {
+        account: p.account,
+        name: p.influencer_name || p.account.replace('@', ''),
+        count: 1,
+        img: p.img || null,
+      })
+    }
+  }
+  return [...byAccount.values()].sort((a, b) => b.count - a.count).slice(0, limit)
+}

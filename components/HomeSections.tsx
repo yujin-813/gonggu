@@ -5,36 +5,45 @@ import type { Post, Category } from '@/lib/types'
 import { CATEGORY_LABEL } from '@/lib/categoryIcons'
 import PostCard from '@/components/PostCard'
 import Toast from '@/components/Toast'
+import DealStrip, { InfluencerStrip } from '@/components/DealStrip'
 import { track } from '@/lib/track'
 
-// 홈 상단 큐레이션 영역. 운영자가 고르는 건 "이번 주 추천" 하나뿐이고 나머지 세 영역은
-// 규칙(클릭수·마감시각·카테고리)으로 자동 배치된다. 서버에서 계산해 props로 받으므로
-// 첫 응답 HTML에 상품명과 가격이 그대로 들어간다.
+// 홈 큐레이션. 두 종류의 영역이 있다.
+//
+// 1) 크게 보여주는 곳 — "지금 많이 보는", "이번 주 우리가 고른". 오늘 무엇을 살지 결정하게
+//    돕는 자리라 가격 판단까지 담은 전체 카드를 쓴다.
+// 2) 훑어보는 곳 — 오늘의 공구 / 마감 임박 / 이달의 공구 / 카테고리별 / 인플루언서별.
+//    "무엇이 있는지" 보고 관심 있는 쪽으로 들어가는 자리라 작은 카드 가로줄 + 더보기로 둔다.
+//
+// 운영자가 직접 고르는 건 (1)의 추천 하나뿐이고 나머지는 전부 규칙으로 채워진다.
 
-export interface HomeSectionData {
+export interface InfluencerSummary {
+  account: string
+  name: string
+  count: number
+  img: string | null
+}
+
+interface Props {
   featured: Post[]
   popular: Post[]
+  today: Post[]
   endingSoon: Post[]
+  monthly: Post[]
   categories: { cat: Category; posts: Post[] }[]
+  influencers: InfluencerSummary[]
 }
 
-interface Props extends HomeSectionData {
-  /** 카드 클릭 동작은 홈 피드와 동일하게 맞춘다 */
-  onJoin?: (id: number) => void
-}
-
-function Section({
-  emoji, title, subtitle, moreHref, moreLabel, posts, bookmarks, onToggleBookmark, onJoin,
+function BigSection({
+  emoji, title, subtitle, posts, bookmarks, onToggleBookmark, onJoin,
 }: {
   emoji: string
   title: string
   subtitle?: string
-  moreHref?: string
-  moreLabel?: string
   posts: Post[]
   bookmarks: Set<number>
   onToggleBookmark: (id: number) => void
-  onJoin?: (id: number) => void
+  onJoin: (id: number) => void
 }) {
   if (posts.length === 0) return null
   return (
@@ -54,14 +63,13 @@ function Section({
           />
         ))}
       </div>
-      {moreHref && (
-        <Link href={moreHref} className="home-section-more">{moreLabel} →</Link>
-      )}
     </section>
   )
 }
 
-export default function HomeSections({ featured, popular, endingSoon, categories }: Props) {
+export default function HomeSections({
+  featured, popular, today, endingSoon, monthly, categories, influencers,
+}: Props) {
   const [bookmarks, setBookmarks] = useState<Set<number>>(new Set())
   const [toast, setToast] = useState({ message: '', visible: false })
 
@@ -80,35 +88,36 @@ export default function HomeSections({ featured, popular, endingSoon, categories
   }
 
   const onJoin = (id: number) => track('join', { postId: id, clickType: 'groupbuy' })
-  const common = { bookmarks, onToggleBookmark: toggleBookmark, onJoin }
+  const big = { bookmarks, onToggleBookmark: toggleBookmark, onJoin }
 
   return (
     <div className="home-sections">
-      {/* 클릭 데이터가 쌓이기 전에는 popular가 비는데, 그때는 Section이 알아서 감춰진다 */}
-      <Section
+      {/* 클릭 데이터가 쌓이기 전에는 popular가 비는데, 그때는 영역이 통째로 감춰진다 */}
+      <BigSection
         emoji="🔥" title="지금 많이 보는 공구"
         subtitle="최근 일주일 동안 가장 많이 눌러본 공구예요"
-        posts={popular} {...common}
+        posts={popular} {...big}
       />
-      <Section
+      <BigSection
         emoji="🍯" title="이번 주 우리가 고른 공구"
         subtitle="꿀공구가 직접 확인하고 골랐어요"
-        posts={featured} {...common}
+        posts={featured} {...big}
       />
-      <Section
-        emoji="⏰" title="곧 끝나는 공구"
-        subtitle="48시간 안에 마감돼요"
-        moreHref="/deadline" moreLabel="마감 임박 공구 전체보기"
-        posts={endingSoon} {...common}
-      />
+
+      <DealStrip emoji="📅" title="오늘의 공구"   moreHref="/today"    posts={today} />
+      <DealStrip emoji="⏰" title="마감 임박 공구" moreHref="/deadline" posts={endingSoon} />
+      <DealStrip emoji="🗓️" title="이달의 공구"   moreHref="/monthly"  posts={monthly} />
+
       {categories.map(({ cat, posts }) => (
-        <Section
+        <DealStrip
           key={cat}
-          emoji="" title={`${CATEGORY_LABEL[cat]} 공구`}
-          moreHref={`/category/${cat}`} moreLabel={`${CATEGORY_LABEL[cat]} 공구 전체보기`}
-          posts={posts} {...common}
+          title={`${CATEGORY_LABEL[cat]} 공구`}
+          moreHref={`/category/${cat}`}
+          posts={posts}
         />
       ))}
+
+      <InfluencerStrip influencers={influencers} />
 
       <Toast
         message={toast.message}

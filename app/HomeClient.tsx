@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from 'react'
 import Link from 'next/link'
 import Header from '@/components/Header'
 import CategoryFilter from '@/components/CategoryFilter'
+import CollectionRoller from '@/components/CollectionRoller'
 import PostCard from '@/components/PostCard'
 import Toast from '@/components/Toast'
 import type { Post, Category, SortOrder, Collection } from '@/lib/types'
@@ -275,25 +276,40 @@ export default function HomeClient({ sections }: { sections?: React.ReactNode })
   return (
     <>
       <h1 className="sr-only">꿀공구 — 인스타그램 공동구매(공구) 모아보기</h1>
-      <Header
-        onBookmarkView={() => { setViewingBookmarks(v => !v); setViewingFollowed(false) }}
-        viewingBookmarks={viewingBookmarks}
-        onFollowView={() => { setViewingFollowed(v => !v); setViewingBookmarks(false) }}
-        viewingFollowed={viewingFollowed}
-        onPushToggle={togglePush}
-        pushSubscribed={pushSubscribed}
-      />
 
-      <div className="hero-search-wrap">
-        <div className="hero-search">
-          <Search size={18} />
-          <input
-            type="search"
-            placeholder="찾고 싶은 상품을 검색해보세요"
-            value={searchQuery}
-            onChange={e => setSearchQuery(e.target.value)}
-          />
+      {/* 로고 · 검색 · 카테고리를 하나의 헤더 면으로 묶는다 — 셋 다 "무엇을 볼지 고르는"
+          도구라 붙어 있어야 손이 덜 간다. 아래 콘텐츠와는 그림자 한 겹으로 구분한다. */}
+      <div className="app-header">
+        <Header
+          onBookmarkView={() => { setViewingBookmarks(v => !v); setViewingFollowed(false) }}
+          viewingBookmarks={viewingBookmarks}
+          onFollowView={() => { setViewingFollowed(v => !v); setViewingBookmarks(false) }}
+          viewingFollowed={viewingFollowed}
+          onPushToggle={togglePush}
+          pushSubscribed={pushSubscribed}
+        />
+
+        <div className="hero-search-wrap">
+          <div className="hero-search">
+            <Search size={18} />
+            <input
+              type="search"
+              placeholder="찾고 싶은 상품을 검색해보세요"
+              value={searchQuery}
+              onChange={e => setSearchQuery(e.target.value)}
+            />
+          </div>
         </div>
+
+        <CategoryFilter
+          current={currentCat}
+          onSelect={cat => {
+            setCurrentCat(cat)
+            setViewingBookmarks(false)
+            setViewingFollowed(false)
+            if (cat !== 'all') track('category')
+          }}
+        />
       </div>
 
       {showingMainFeed && !kakaoBannerDismissed && (
@@ -374,35 +390,7 @@ export default function HomeClient({ sections }: { sections?: React.ReactNode })
               </div>
             </div>
           )}
-          {collections.length > 0 && (
-            <div className="collection-wrap">
-              <p className="collection-title">지금 뜨는 컬렉션</p>
-              <div className="collection-scroll">
-                {collections.map(c => (
-                  <Link
-                    key={c.id}
-                    href={`/collection/${c.id}`}
-                    className="collection-card"
-                    style={{ background: `linear-gradient(135deg, ${c.color}, ${c.color}cc)` }}
-                    onClick={() => track('collection_click')}
-                  >
-                    <span className="collection-card-emoji">{c.emoji}</span>
-                    <span className="collection-card-title">{c.title}</span>
-                    <span className="collection-card-count">{c.productIds.length}개 상품</span>
-                  </Link>
-                ))}
-              </div>
-            </div>
-          )}
-          <CategoryFilter current={currentCat} onSelect={cat => { setCurrentCat(cat); setViewingBookmarks(false); setViewingFollowed(false); if (cat !== 'all') track('category') }} />
-          {/* 검색 착지 페이지로 가는 내부 링크 — 사이트맵만으로는 크롤러가 잘 안 들어와서
-              홈에서 한 번은 링크로 연결해 준다 */}
-          <nav className="landing-links" aria-label="공구 모아보기">
-            <Link href="/today" className="landing-link">오늘의 공구</Link>
-            <Link href="/deadline" className="landing-link">마감 임박</Link>
-            <Link href="/monthly" className="landing-link">이달의 공구</Link>
-            <Link href="/influencers" className="landing-link">인플루언서별</Link>
-          </nav>
+          <CollectionRoller collections={collections} />
 
           {/* 큐레이션은 기본 상태에서만 보여준다 — 검색하거나 카테고리를 고른 사용자는
               그 조건에 맞는 목록을 보러 온 것이므로 섹션이 끼어들면 방해가 된다 */}

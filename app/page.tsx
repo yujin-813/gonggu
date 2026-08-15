@@ -1,5 +1,6 @@
 import {
-  visiblePosts, featuredPosts, endingSoonPosts, popularPosts, categorySections, SITE_URL,
+  visiblePosts, featuredPosts, endingSoonPosts, popularPosts, categorySections,
+  todayPosts, monthlyPosts, influencerSummaries, SITE_URL,
 } from '@/lib/landing'
 import { getPopularPostIds } from '@/lib/analytics'
 import JsonLd, { websiteSchema, itemListSchema } from '@/components/JsonLd'
@@ -12,19 +13,17 @@ import HomeClient from './HomeClient'
 export const dynamic = 'force-dynamic'
 
 const POPULAR_DAYS = 7
-const POPULAR_LIMIT = 8
-const FEATURED_LIMIT = 8
-const ENDING_SOON_LIMIT = 8
+// 크게 보여주는 영역은 스크롤이 길어지지 않게 적게, 가로로 훑는 영역은 넉넉히 담는다
+const BIG_LIMIT = 6
+const STRIP_LIMIT = 12
 
 export default function Home() {
   const posts = visiblePosts()
 
-  // 인기 순위는 클릭 로그에서 뽑고, 실제 노출은 지금 진행 중인 공구로만 좁힌다 —
-  // 마감된 공구가 클릭수만 높다고 홈 상단에 남아 있으면 안 되기 때문이다
-  const popular = popularPosts(posts, getPopularPostIds(POPULAR_DAYS, POPULAR_LIMIT))
-  const featured = featuredPosts(posts).slice(0, FEATURED_LIMIT)
-  const endingSoon = endingSoonPosts(posts).slice(0, ENDING_SOON_LIMIT)
-  const categories = categorySections(posts)
+  // 인기 순위는 클릭 로그에서 뽑되 노출은 진행 중인 공구로만 좁힌다 — 마감된 공구가
+  // 클릭수만 높다고 홈 상단에 남아 있으면 안 되기 때문이다
+  const popular = popularPosts(posts, getPopularPostIds(POPULAR_DAYS, BIG_LIMIT))
+  const featured = featuredPosts(posts).slice(0, BIG_LIMIT)
 
   return (
     <>
@@ -36,8 +35,11 @@ export default function Home() {
         sections={<HomeSections
           popular={popular}
           featured={featured}
-          endingSoon={endingSoon}
-          categories={categories}
+          today={todayPosts(posts).slice(0, STRIP_LIMIT)}
+          endingSoon={endingSoonPosts(posts).slice(0, STRIP_LIMIT)}
+          monthly={monthlyPosts(posts).slice(0, STRIP_LIMIT)}
+          categories={categorySections(posts, STRIP_LIMIT)}
+          influencers={influencerSummaries(posts)}
         />}
       />
     </>
