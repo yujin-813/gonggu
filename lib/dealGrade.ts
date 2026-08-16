@@ -1,5 +1,6 @@
 import type { Post } from './types'
 import { normalizePurchaseLinks } from './purchaseLinks'
+import { getPeriodState } from './period'
 
 // 꿀공구의 핵심은 "공구를 모아주는 것"이 아니라 "이 공구가 진짜 싼지 판정해주는 것"이다.
 // 판정 기준은 반드시 한 곳에서만 계산한다 — 카드·상세·공유 이미지가 서로 다른 등급을
@@ -114,7 +115,7 @@ export function getDealVerdict(post: Post): DealVerdict {
   const exclusive = !!post.is_exclusive_deal
 
   // 오픈 예정이거나 가격이 없으면 판정 대상이 아니다
-  if (!post.price || post.status === 'upcoming') {
+  if (!post.price || getPeriodState(post).kind === 'upcoming') {
     return {
       display: { key: 'pending', ...NON_GRADE_STATES.pending },
       grade: null, referencePrice: null, referenceLabel: '', discountRate: null,

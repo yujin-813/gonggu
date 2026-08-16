@@ -1,6 +1,6 @@
 import type { Post } from '@/lib/types'
 import { SITE_URL } from '@/lib/landing'
-import { isExpired } from '@/lib/period'
+import { isExpired, getPeriodState } from '@/lib/period'
 
 // 네이버·구글 모두 JSON-LD를 읽는다. 서버 컴포넌트에서 렌더해 첫 응답 HTML에 들어가게 한다.
 // (next/script는 클라이언트에서 주입돼 크롤러가 놓칠 수 있으므로 쓰지 않는다)
@@ -40,7 +40,7 @@ export function productSchema(post: Post) {
     url: `${SITE_URL}/post/${post.id}`,
     // 마감된 공구를 InStock으로 두면 검색결과에 "판매 중"으로 잘못 노출된다.
     // 페이지는 유지하되 이 공구 자체는 더 못 산다는 사실을 정확히 알린다.
-    availability: post.status === 'upcoming'
+    availability: getPeriodState(post).kind === 'upcoming'
       ? 'https://schema.org/PreOrder'
       : isExpired(post)
       ? 'https://schema.org/SoldOut'

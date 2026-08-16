@@ -105,7 +105,7 @@ export default function HomeSections({
         posts={featured} {...big}
       />
 
-      <DealStrip icon={<CalendarDays size={17} strokeWidth={2.5} />} title="오늘의 공구"   moreHref="/today"    posts={today} />
+      <DealStrip icon={<CalendarDays size={17} strokeWidth={2.5} />} title="오늘 새로 올라온 공구" moreHref="/today"    posts={today} />
       <DealStrip icon={<AlarmClock size={17} strokeWidth={2.5} />} title="마감 임박 공구" moreHref="/deadline" posts={endingSoon} />
       <DealStrip icon={<CalendarRange size={17} strokeWidth={2.5} />} title="이달의 공구"   moreHref="/monthly"  posts={monthly} />
 

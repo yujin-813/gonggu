@@ -54,13 +54,20 @@ export function routablePosts(): Post[] {
   return loadPosts().filter(isPagePublic)
 }
 
-/** 오늘 오픈했거나 오늘 마감하는 공구 — "오늘의 공구" */
+/**
+ * 오늘 새로 올라온 공구 — "오늘의 공구"
+ *
+ * 처음에는 "오늘 마감"도 여기 넣었는데, 그러면 마감 임박 영역과 완전히 겹친다.
+ * 실제로 확인해 보니 오늘의 공구 8건이 전부 마감 임박에도 들어 있었다(겹침 100%).
+ * 두 영역이 답하는 질문을 갈라놓는다 — 여기는 "오늘 뭐 새로 나왔나",
+ * 마감 임박은 "뭐가 곧 끝나나".
+ */
 export function todayPosts(posts: Post[]): Post[] {
   const today = kstToday()
   return posts.filter(p => {
     if (p.start_date === today) return true
-    if (p.deadline === today) return true
-    // 오픈 예정이 오늘 열리는 경우도 오늘의 공구다
+    // 수집기가 오늘 새로 물어온 공구 — 오픈일이 없어도 "오늘 올라온 것"은 맞다
+    if ((p.scraped_at || '').slice(0, 10) === today) return true
     const state = getPeriodState(p)
     return state.kind === 'upcoming' && state.startDate === today
   })
@@ -96,9 +103,9 @@ export function landingCopy(key: LandingKey, count: number): LandingCopy {
       return {
         path: '/today',
         h1: `오늘의 공구 (${kstTodayLabel()})`,
-        title: `오늘의 공구 — ${kstTodayLabel()} 오픈·마감 공구 모아보기`,
-        description: `${kstTodayLabel()} 기준 오늘 오픈하거나 오늘 마감하는 인스타 공동구매 ${count}건을 모았어요. 인플루언서 공구를 놓치지 않고 확인하세요.`,
-        empty: '오늘 오픈하거나 마감하는 공구가 아직 없어요',
+        title: `오늘의 공구 — ${kstTodayLabel()} 새로 올라온 공구 모아보기`,
+        description: `${kstTodayLabel()}에 새로 오픈했거나 새로 올라온 인스타 공동구매 ${count}건을 모았어요. 오늘 나온 인플루언서 공구를 가장 먼저 확인하세요.`,
+        empty: '오늘 새로 올라온 공구가 아직 없어요',
       }
     case 'deadline':
       return {

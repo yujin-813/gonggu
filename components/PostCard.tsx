@@ -41,8 +41,10 @@ export default function PostCard({
   const [imgFailed, setImgFailed] = useState(false)
   const [showCompare, setShowCompare] = useState(false)
   const compareCount = siblings.length
-  const isUpcoming = post.status === 'upcoming'
   const periodState = getPeriodState(post)
+  // 저장된 status가 아니라 날짜로 계산한 상태를 본다 — 오픈일이 지났는데 status만
+  // upcoming으로 남은 글이 '오픈 예정'으로 잘못 표시되던 문제
+  const isUpcoming = periodState.kind === 'upcoming'
   const badge = badgeFromState(periodState)
   const dt = periodTextFromState(periodState)
   const closed = isExpired(post)

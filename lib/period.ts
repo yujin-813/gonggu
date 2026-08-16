@@ -25,9 +25,23 @@ export type PeriodState =
   | { kind: 'range'; startDate: string; deadline: string; daysLeft: number }
   | { kind: 'deadline_only'; deadline: string; daysLeft: number }
 
+/**
+ * status가 upcoming이어도 오픈일이 지났으면 더 이상 "오픈 예정"이 아니다.
+ *
+ * status는 한 번 upcoming으로 저장되면 아무도 바꿔주지 않는다. 그래서 오픈일이 지난 글이
+ * 계속 upcoming으로 남고, daysToOpen이 음수가 되어 배지가 '오늘 오픈!'으로 떴다.
+ * (마감된 공구가 새로 여는 공구처럼 보이는 문제) 상태는 저장값이 아니라 날짜로 판단한다.
+ */
+function isStillUpcoming(post: Pick<Post, 'status' | 'start_date'>): boolean {
+  if (post.status !== 'upcoming') return false
+  // 일정만 잡히고 오픈일이 아직 안 정해진 자리표시자는 그대로 오픈 예정으로 둔다
+  if (!post.start_date) return true
+  return daysLeft(post.start_date) >= 0
+}
+
 /** 공구의 기간 상태를 하나의 값으로 정리한다 — 이후 표시 로직은 전부 이 결과만 보고 분기한다. */
 export function getPeriodState(post: PeriodInput): PeriodState {
-  if (post.status === 'upcoming') {
+  if (isStillUpcoming(post)) {
     const startDate = post.start_date || ''
     return { kind: 'upcoming', startDate, daysToOpen: startDate ? daysLeft(startDate) : null }
   }
@@ -83,10 +97,14 @@ export function isPagePublic(post: Pick<Post, 'status' | 'published'>): boolean 
 }
 
 /** 고객 화면에 노출해도 되는 상품인지 — api/posts, api/collections/[id] 등에서 공통으로 쓴다 */
-export function isCustomerVisible(post: Pick<Post, 'status' | 'published' | 'is_evergreen_deal' | 'is_always_on' | 'deadline'>): boolean {
-  if (post.status === 'upcoming') return post.published !== false
-  const isPublished = post.status === 'published' || (!post.status && post.published !== false)
-  if (!isPublished) return false
+export function isCustomerVisible(post: Pick<Post, 'status' | 'published' | 'is_evergreen_deal' | 'is_always_on' | 'deadline' | 'start_date'>): boolean {
+  // 아직 안 열린 공구는 마감일과 무관하게 보여준다 (오픈 예정 카드)
+  if (isStillUpcoming(post)) return post.published !== false
+  // 오픈일이 지난 오픈예정 글은 이제 일반 공구로 취급 — 아래 마감일 검사를 그대로 탄다.
+  // 예전에는 여기서 바로 true를 돌려줘서, 마감일이 지나도 고객 화면에 계속 남아 있었다.
+  const isPublished =
+    post.status === 'published' || post.status === 'upcoming' || (!post.status && post.published !== false)
+  if (!isPublished || post.published === false) return false
   if (post.is_evergreen_deal || post.is_always_on) return true
   if (!post.deadline) return true
   const today = new Date(); today.setHours(0, 0, 0, 0)
@@ -111,7 +129,10 @@ export type PeriodIcon = 'calendar' | 'zap'
 export function badgeFromState(state: PeriodState): { cls: string; icon: BadgeIcon; txt: string } | null {
   switch (state.kind) {
     case 'upcoming':
-      return { cls: 'soon', icon: 'calendar-clock', txt: state.daysToOpen !== null && state.daysToOpen > 0 ? `D-${state.daysToOpen} 오픈` : '오늘 오픈!' }
+      // 오픈일을 모를 때 '오늘 오픈!'이라고 단정하면 안 된다 — 일정만 잡히고 날짜가
+      // 아직 안 정해진 자리표시자에도 그 문구가 붙어 있었다
+      if (state.daysToOpen === null) return { cls: 'soon', icon: 'calendar-clock', txt: '오픈 예정' }
+      return { cls: 'soon', icon: 'calendar-clock', txt: state.daysToOpen > 0 ? `D-${state.daysToOpen} 오픈` : '오늘 오픈!' }
     case 'evergreen':
       return { cls: 'ok', icon: 'package', txt: '상시딜' }
     case 'sold_out_only':
@@ -131,7 +152,7 @@ export function badgeFromState(state: PeriodState): { cls: string; icon: BadgeIc
 /** 카드 하단 기간 텍스트 줄 */
 export function periodTextFromState(state: PeriodState): { cls: string; icon: PeriodIcon; txt: string } {
   switch (state.kind) {
-    case 'upcoming':      return { cls: '', icon: 'calendar', txt: `${fmtDate(state.startDate)} 오픈 예정` }
+    case 'upcoming':      return { cls: '', icon: 'calendar', txt: state.startDate ? `${fmtDate(state.startDate)} 오픈 예정` : '오픈일 미정' }
     case 'evergreen':     return { cls: '', icon: 'calendar', txt: state.startDate ? `${fmtDate(state.startDate)}부터 진행 중` : '상시딜' }
     case 'sold_out_only': return { cls: '', icon: 'calendar', txt: state.startDate ? `${fmtDate(state.startDate)}부터 · 한정수량 소진시 마감` : '한정수량 · 소진시 마감' }
     case 'range':
