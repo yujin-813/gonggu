@@ -3,7 +3,7 @@ import { useState, useEffect, useCallback } from 'react'
 import type { Post, ScraperStatus, InfluencerSource, Collection } from '@/lib/types'
 import { daysLeft, periodLabel, isExpired } from '@/lib/period'
 import { hasPurchaseLink } from '@/lib/purchaseLinks'
-import { CheckCircle2, CircleDot, TriangleAlert, FileEdit, Search, type LucideIcon } from 'lucide-react'
+import { CheckCircle2, CircleDot, TriangleAlert, FileEdit, Search, Flame, ImageOff, type LucideIcon } from 'lucide-react'
 import AddPostModal from '@/components/AddPostModal'
 
 interface DayStat { date: string; visitors: number; events: Record<string, number>; newVisitors: number; returningVisitors: number }
@@ -85,8 +85,8 @@ function LoginScreen({ onLogin }: { onLogin: () => void }) {
 }
 
 const CAT_LABEL: Record<string, string> = {
-  kids: '👶 유아동', life: '🏠 생활', food: '🍽️ 식품',
-  health: '💊 건강', beauty: '💄 뷰티',
+  kids: '유아동', life: '생활', food: '식품',
+  health: '건강', beauty: '뷰티',
 }
 
 export default function AdminPage() {
@@ -809,7 +809,7 @@ function AnalyticsSection({ data, topPosts, topSharedPosts }: { data: DayStat[];
             { key: 'view', label: '페이지뷰', icon: '👁' },
             { key: 'join', label: '공구보기', icon: '🛒' },
             { key: 'bookmark', label: '찜', icon: '❤️' },
-            { key: 'category', label: '카테고리', icon: '🏷' },
+            { key: 'category', label: '카테고리', icon: '' },
             { key: 'search', label: '검색', icon: '' },
             { key: 'share', label: '공유', icon: '📤' },
           ].filter(e => today.events[e.key]).map(e => (
@@ -823,7 +823,7 @@ function AnalyticsSection({ data, topPosts, topSharedPosts }: { data: DayStat[];
       {/* 가장 많이 본 상품 — "공구 보기" 클릭 누적 기준 (전체 기간) */}
       {topPosts.length > 0 && (
         <div style={{ marginTop: 20, paddingTop: 16, borderTop: '1px solid #f1f5f9' }}>
-          <h4 style={{ margin: '0 0 10px', fontSize: 13, fontWeight: 700, color: '#1e293b' }}>🔥 가장 많이 본 상품 TOP 5</h4>
+          <h4 style={{ margin: '0 0 10px', fontSize: 13, fontWeight: 700, color: '#1e293b' }}>가장 많이 본 상품 TOP 5</h4>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
             {topPosts.slice(0, 5).map((p, i) => (
               <div key={p.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '6px 8px', background: i === 0 ? '#fff7ed' : '#f8fafc', borderRadius: 8 }}>
@@ -912,14 +912,14 @@ function AdminPostRow({ post: p, onToggle, onDelete, onEdit, onToggleAlwaysOn, o
         <div style={{ width: 52, height: 52, borderRadius: 8, overflow: 'hidden', background: '#f1f5f9', flexShrink: 0 }}>
           {p.img
             ? <img src={p.img} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-            : <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', fontSize: 20 }}>{p.avatar || '🛍️'}</div>
+            : <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: '#cbd5e1' }}><ImageOff size={20} strokeWidth={1.75} /></div>
           }
         </div>
 
         {/* 정보 */}
         <div className="admin-row-info" style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 3 }}>
-            <span style={{ fontSize: 14, fontWeight: 700, color: '#0f172a', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.title}</span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 3, minWidth: 0 }}>
+            <span style={{ fontSize: 14, fontWeight: 700, color: '#0f172a', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0 }}>{p.title}</span>
             <span style={{ fontSize: 11, background: '#f1f5f9', color: '#64748b', padding: '2px 6px', borderRadius: 10, flexShrink: 0 }}>{CAT_LABEL[p.cat] || p.cat}</span>
           </div>
           <div style={{ fontSize: 12, color: '#64748b', display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
@@ -934,7 +934,7 @@ function AdminPostRow({ post: p, onToggle, onDelete, onEdit, onToggleAlwaysOn, o
                   fontSize: 11, padding: '2px 6px', borderRadius: 10, fontWeight: 600, cursor: 'help',
                   background: stale ? '#fee2e2' : '#f1f5f9', color: stale ? '#dc2626' : '#94a3b8',
                 }}>
-                  🕐 {ago}
+                  {ago}
                 </span>
               )
             })()}
@@ -948,7 +948,7 @@ function AdminPostRow({ post: p, onToggle, onDelete, onEdit, onToggleAlwaysOn, o
               <span key={i} style={{ fontSize: 10, background: '#fee2e2', color: '#dc2626', padding: '1px 5px', borderRadius: 8 }}>{r}</span>
             ))}
             {p.brand && <span style={{ color: '#6366f1', fontWeight: 600 }}>{p.brand}</span>}
-            <span style={{ color: expired ? '#ef4444' : '#6366f1' }}>📅 {periodLabel}</span>
+            <span style={{ color: expired ? '#ef4444' : '#6366f1' }}>{periodLabel}</span>
             {hiddenFromCustomers && (
               <span title="마감일이 지나서 상시딜/소진시 마감이 아니면 고객 화면(/) 에는 자동으로 안 보여요"
                 style={{ fontSize: 11, background: '#fee2e2', color: '#dc2626', padding: '2px 6px', borderRadius: 10, fontWeight: 700, cursor: 'help' }}>
@@ -984,7 +984,7 @@ function AdminPostRow({ post: p, onToggle, onDelete, onEdit, onToggleAlwaysOn, o
             </button>
             <button onClick={() => onQuickReview(p, 'always_on')}
               style={{ flex: 1, padding: '7px 0', background: '#fef9c3', color: '#92400e', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 12, fontWeight: 700 }}>
-              📦 상시판매
+              상시판매
             </button>
             <button onClick={() => setShowExcludeReasons(true)}
               style={{ flex: 1, padding: '7px 0', background: '#fee2e2', color: '#dc2626', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 12, fontWeight: 700 }}>
@@ -1033,7 +1033,7 @@ function AdminPostRow({ post: p, onToggle, onDelete, onEdit, onToggleAlwaysOn, o
           )}
           <button onClick={() => onEdit(p)}
             style={{ padding: '6px 12px', background: '#ede9fe', color: '#7c3aed', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 12, fontWeight: 600, whiteSpace: 'nowrap' }}>
-            ✏️ 수정
+            수정
           </button>
           <button onClick={() => onToggle(p)}
             style={{ padding: '6px 12px', borderRadius: 8, border: 'none', cursor: 'pointer', fontSize: 12, fontWeight: 600, whiteSpace: 'nowrap',
@@ -1041,7 +1041,7 @@ function AdminPostRow({ post: p, onToggle, onDelete, onEdit, onToggleAlwaysOn, o
             {published ? '공개' : '숨김'}
           </button>
           {(p.is_evergreen_deal || p.is_always_on) && <span title="상시딜로 설정됨" style={{ fontSize: 14, cursor: 'default' }}>⏰</span>}
-          {p.sale_until_sold_out && <span title="소진시 마감으로 설정됨" style={{ fontSize: 14, cursor: 'default' }}>🔥</span>}
+          {p.sale_until_sold_out && <span title="소진시 마감으로 설정됨" style={{ display: 'inline-flex', color: '#dc2626' }}><Flame size={13} strokeWidth={2.5} /></span>}
           <button onClick={() => setShowMore(v => !v)}
             title="더 많은 작업"
             style={{ padding: '6px 10px', background: showMore ? '#e2e8f0' : '#f1f5f9', color: '#475569', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 12, fontWeight: 700 }}>
@@ -1080,7 +1080,7 @@ function AdminPostRow({ post: p, onToggle, onDelete, onEdit, onToggleAlwaysOn, o
               title="한정수량으로 재고 소진시 마감되고, 고정된 마감일은 없는 공구"
               style={{ padding: '6px 10px', borderRadius: 8, border: 'none', cursor: 'pointer', fontSize: 11, fontWeight: 600, whiteSpace: 'nowrap',
                 background: p.sale_until_sold_out ? '#fee2e2' : '#f1f5f9', color: p.sale_until_sold_out ? '#b91c1c' : '#94a3b8' }}>
-              {p.sale_until_sold_out ? '🔥 소진시 해제' : '소진시로 설정'}
+              {p.sale_until_sold_out ? '소진시 해제' : '소진시로 설정'}
             </button>
             {p.status !== 'excluded' && (
               <button onClick={() => setShowExcludeReasons(true)}
@@ -1107,11 +1107,11 @@ const SOURCE_TYPE_COLORS: Record<string, string> = {
 
 const CAT_OPTIONS = [
   { value: '', label: '카테고리 없음' },
-  { value: 'kids', label: '👶 유아동' },
-  { value: 'life', label: '🏠 생활' },
-  { value: 'food', label: '🍽️ 식품' },
-  { value: 'health', label: '💊 건강' },
-  { value: 'beauty', label: '💄 뷰티' },
+  { value: 'kids', label: '유아동' },
+  { value: 'life', label: '생활' },
+  { value: 'food', label: '식품' },
+  { value: 'health', label: '건강' },
+  { value: 'beauty', label: '뷰티' },
 ]
 
 interface InfluencerManagerProps {

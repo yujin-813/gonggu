@@ -85,7 +85,7 @@ export default function RequestPage() {
         <header>
           <div className="header-inner">
             <Link href="/" className="back-btn"><ArrowLeft size={16} /></Link>
-            <div className="logo"><span className="logo-text">🍯 꿀공구</span></div>
+            <div className="logo"><span className="logo-text">꿀공구</span></div>
           </div>
         </header>
         <div style={{ padding: '80px 24px', textAlign: 'center' }}>
@@ -105,7 +105,7 @@ export default function RequestPage() {
       <header>
         <div className="header-inner">
           <Link href="/" className="back-btn"><ArrowLeft size={16} /></Link>
-          <div className="logo"><span className="logo-text">📮 공구 등록 요청</span></div>
+          <div className="logo"><span className="logo-text">공구 등록 요청</span></div>
         </div>
       </header>
 
@@ -165,7 +165,7 @@ export default function RequestPage() {
 
         {error && <p style={{ color: '#ef4444', fontSize: 13, margin: '0 0 8px', fontWeight: 600 }}>❌ {error}</p>}
         <button className="btn-submit" onClick={handleSubmit} disabled={loading} style={{ width: '100%' }}>
-          {loading ? '제출 중...' : '등록 요청하기 📮'}
+          {loading ? '제출 중...' : '등록 요청하기'}
         </button>
       </div>
     </>

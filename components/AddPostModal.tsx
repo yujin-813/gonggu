@@ -4,14 +4,14 @@ import type { Post, Category, PurchaseLink } from '@/lib/types'
 import { normalizePurchaseLinks } from '@/lib/purchaseLinks'
 
 const CATEGORIES = [
-  { value: 'kids',   label: '👶 유아동' },
-  { value: 'life',   label: '🏠 생활' },
-  { value: 'food',   label: '🍽️ 식품' },
-  { value: 'health', label: '💊 건강' },
-  { value: 'beauty', label: '💄 뷰티' },
+  { value: 'kids',   label: '유아동' },
+  { value: 'life',   label: '생활' },
+  { value: 'food',   label: '식품' },
+  { value: 'health', label: '건강' },
+  { value: 'beauty', label: '뷰티' },
 ]
 const CAT_EMOJI: Record<string, string> = {
-  kids:'👶', life:'🏠', food:'🍽️', health:'💊', beauty:'💄',
+  kids:'', life:'', food:'', health:'', beauty:'',
 }
 
 function todayStr() { return new Date().toISOString().split('T')[0] }

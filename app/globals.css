@@ -869,9 +869,19 @@ header {
   justify-content: flex-end;
 }
 
-@media (max-width: 640px) {
-  .admin-row { flex-direction: column; align-items: flex-start; gap: 10px; }
-  .admin-row-actions { width: 100%; justify-content: flex-start; }
+@media (max-width: 720px) {
+  /* 세로로 쌓을 때 align-items: flex-start를 쓰면 자식이 콘텐츠 폭만큼 늘어난다.
+     제목이 nowrap이라 긴 상품명 하나가 화면 전체를 옆으로 밀어냈다 — stretch로 가둔다. */
+  .admin-row { flex-direction: column; align-items: stretch; gap: 10px; }
+  .admin-row-info { width: 100%; min-width: 0; }
+  .admin-row-actions {
+    width: 100%;
+    justify-content: flex-start;
+    flex-wrap: wrap;
+    padding-top: 8px;
+    border-top: 1px solid #f1f5f9;
+    gap: 6px;
+  }
 }
 @media (max-width: 480px) {
   .admin-row-actions { gap: 6px; }
@@ -927,34 +937,7 @@ header {
   .price-sale-big { font-size: 20px; }
 }
 
-/* 어드민 반응형 */
-.admin-row {
-  display: flex;
-  gap: 14px;
-  align-items: center;
-}
-.admin-row-actions {
-  display: flex;
-  gap: 8px;
-  align-items: center;
-  flex-shrink: 0;
-}
-@media (max-width: 700px) {
-  .admin-row { flex-wrap: wrap; gap: 10px; }
-  .admin-row-info { flex: 1 1 100%; min-width: 0; }
-  .admin-row-actions {
-    width: 100%;
-    justify-content: flex-end;
-    padding-top: 8px;
-    border-top: 1px solid #f1f5f9;
-    gap: 6px;
-  }
-  .admin-row-actions a,
-  .admin-row-actions button {
-    font-size: 11px !important;
-    padding: 5px 8px !important;
-  }
-}
+
 
 /* ── 검색 착지 페이지(/today, /deadline, /monthly, /category) ─────────────── */
 /* 컬렉션 히어로와 달리 배경색이 데이터로 안 오므로 브랜드 색을 그대로 쓴다 */
