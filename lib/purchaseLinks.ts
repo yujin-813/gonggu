@@ -27,14 +27,17 @@ export function normalizePurchaseLinks(post: Pick<Post,
   'purchase_links' | 'partners_platform' | 'partners_price' | 'partners_url'
   | 'partners_option_note' | 'partners_checked_at' | 'partners_visible'
 >): PurchaseLink[] {
-  const links: PurchaseLink[] = [...(post.purchase_links || [])].filter(l => l && l.url)
+  // url 없이 가격만 있는 항목도 남긴다 — 관리자가 '판정 채우기'에서 가격만 넣는 경우가 있고,
+  // 그 값은 링크로 띄우진 않아도 판정 기준으로는 써야 한다.
+  // (링크로 노출할지는 visiblePurchaseLinks가 url 유무로 따로 판단한다)
+  const links: PurchaseLink[] = [...(post.purchase_links || [])].filter(l => l && (l.url || l.price))
 
-  if (post.partners_platform && post.partners_url) {
+  if (post.partners_platform && (post.partners_url || post.partners_price)) {
     const already = links.some(l => l.platform === post.partners_platform)
     if (!already) {
       links.push({
         platform: post.partners_platform,
-        url: post.partners_url,
+        url: post.partners_url || '',
         price: post.partners_price ?? null,
         note: post.partners_option_note ?? null,
         checked_at: post.partners_checked_at ?? null,
