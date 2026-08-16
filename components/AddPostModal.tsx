@@ -81,6 +81,7 @@ export default function AddPostModal({ onClose, onSubmit, editPost, existingGrou
   // 대체 구매 링크는 여러 판매처를 가질 수 있어서 배열로 관리한다.
   // 예전 단일 필드(partners_*)로 저장된 값도 normalizePurchaseLinks가 함께 읽어준다.
   const [purchaseLinks, setPurchaseLinks] = useState<PurchaseLink[]>([])
+  const [marketPrice, setMarketPrice] = useState('')
 
   const [imgFile,    setImgFile]    = useState<File | null>(null)
   const [imgPreview, setImgPreview] = useState('')   // blob URL or existing img URL
@@ -112,6 +113,7 @@ export default function AddPostModal({ onClose, onSubmit, editPost, existingGrou
     setCustomVerdictDetail(editPost.custom_verdict_detail || '')
     setCustomVerdictCls(editPost.custom_verdict_cls || 'good')
     setPurchaseLinks(normalizePurchaseLinks(editPost))
+    setMarketPrice(editPost.market_price ? String(editPost.market_price) : '')
     const gk = editPost.group_key || ''
     setGroupKey(gk)
     setNewGroupMode(false)
@@ -238,6 +240,7 @@ export default function AddPostModal({ onClose, onSubmit, editPost, existingGrou
         price:        price ? parseInt(price) : 0,
         origPrice:    origPrice ? parseInt(origPrice) : null,
         market_price_note: marketPriceNote.trim() || null,
+        market_price:      marketPrice ? parseInt(marketPrice) : null,
         is_exclusive_deal: isExclusiveDeal,
         start_date:   startDate || '',
         deadline:     endDate,
@@ -436,10 +439,23 @@ export default function AddPostModal({ onClose, onSubmit, editPost, existingGrou
                 ? '위에 비교가가 입력돼 있는 동안은 체크해도 화면엔 반영 안 돼요 — 비교가를 지우면 적용됩니다'
                 : '고객 화면에 "네이버 최저가 정보가 없어요" 대신 "여기서만 만나볼 수 있어요"로 표시돼요 — 실제로 다른 채널에서 안 파는 게 확실할 때만 체크해주세요'}
             </p>
-            {isEdit && editPost?.market_price && !origPrice && (
-              <p style={{ fontSize: 11, color: '#6366f1', margin: '4px 0 0' }}>
-                🔍 과거 자동 매칭된 네이버 최저가: {editPost.market_price.toLocaleString()}원 (자동 검색 종료로 더 이상 갱신되지 않는 값이에요 — 직접 입력하면 그 값이 우선 사용돼요)
-              </p>
+            {/* 자동 매칭값은 엉뚱한 상품을 잡는 경우가 있는데(예: 59,000원 드라이기에
+                19,800원이 매칭됨) 지금까지 고칠 방법이 없어서 판정이 계속 틀렸다.
+                여기서 바로 고치거나 지울 수 있게 한다. */}
+            {isEdit && editPost?.market_price != null && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, margin: '6px 0 0', flexWrap: 'wrap' }}>
+                <span style={{ fontSize: 11, color: '#64748b' }}>자동 매칭된 네이버 최저가</span>
+                <input
+                  type="number"
+                  value={marketPrice}
+                  onChange={e => setMarketPrice(e.target.value)}
+                  placeholder="비우면 사용 안 함"
+                  style={{ width: 120, padding: '5px 8px', borderRadius: 6, border: '1.5px solid #e2e8f0', fontSize: 12, outline: 'none' }}
+                />
+                <span style={{ fontSize: 11, color: '#94a3b8' }}>
+                  상품이 다르면 지워주세요 — 판정이 이 값에 끌려갑니다
+                </span>
+              </div>
             )}
             {marketUrl && origPrice && (
               <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 4 }}>

@@ -92,25 +92,38 @@ function gradeFromRate(rate: number): DealGradeKey {
  * 비교 기준가는 "다른 데서 사면 얼마인가"라서, 알고 있는 다른 판매처 가격 중 가장 싼 값을
  * 쓴다. 관리자가 확인한 구매 링크 가격과 정가, 자동 매칭된 네이버 최저가가 후보다.
  */
+/**
+ * 자동 매칭된 네이버 최저가가 공구가의 이 비율보다 낮으면 다른 상품을 잡은 것으로 본다.
+ *
+ * 실제 사례: 데코아르 초미니 드라이기(공구가 59,000 · 정가 99,000)에 자동 매칭값이
+ * 19,800원으로 들어와 있었다. 40% 할인 상품이 '아쉽딜'로 판정됐다. 니치 상품이거나
+ * 옵션이 다르면 엉뚱한 상품과 매칭되는데, 그 값을 그대로 믿으면 판정이 뒤집힌다.
+ */
+const AUTO_MATCH_FLOOR = 0.5
+
 export function getDealVerdict(post: Post): DealVerdict {
-  const candidates: ComparePrice[] = []
+  // 사람이 확인한 값과 자동으로 긁어온 값을 나눠 담는다 — 신뢰도가 다르기 때문이다
+  const verified: ComparePrice[] = []
+  const auto: ComparePrice[] = []
 
   for (const link of normalizePurchaseLinks(post)) {
     if (link.price && link.price > 0) {
       const name = link.platform === 'coupang' ? '쿠팡' : link.platform === 'naver' ? '네이버' : '다른 판매처'
-      candidates.push({ label: name, price: link.price, checkedAt: link.checked_at })
-    }
-  }
-  if (post.market_price && post.market_price > 0) {
-    // 이미 같은 이름(네이버)이 관리자 확인 값으로 들어와 있으면 자동 매칭값은 쓰지 않는다 —
-    // 사람이 확인한 쪽이 더 정확하다
-    if (!candidates.some(c => c.label === '네이버')) {
-      candidates.push({ label: '네이버 최저가', price: post.market_price })
+      verified.push({ label: name, price: link.price, checkedAt: link.checked_at })
     }
   }
   if (post.origPrice && post.origPrice > 0) {
-    candidates.push({ label: '정가', price: post.origPrice })
+    verified.push({ label: '정가', price: post.origPrice })
   }
+  if (post.market_price && post.market_price > 0 && !verified.some(c => c.label === '네이버')) {
+    auto.push({ label: '네이버 최저가', price: post.market_price })
+  }
+
+  // 믿기 어려운 자동 매칭은 기준에서도 화면에서도 뺀다. 관리자가 값을 고치면 다시 들어온다.
+  const trustedAuto = auto.filter(c => !post.price || c.price >= post.price * AUTO_MATCH_FLOOR)
+
+  // 기준가는 믿을 수 있는 값들 중 가장 싼 것 — 이래야 할인율을 부풀리지 않는다
+  const candidates: ComparePrice[] = [...verified, ...trustedAuto]
 
   const exclusive = !!post.is_exclusive_deal
 
