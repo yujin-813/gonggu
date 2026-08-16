@@ -3,7 +3,7 @@ import { useState, useEffect, useCallback } from 'react'
 import type { Post, ScraperStatus, InfluencerSource, Collection } from '@/lib/types'
 import { daysLeft, periodLabel, isExpired } from '@/lib/period'
 import { hasPurchaseLink } from '@/lib/purchaseLinks'
-import { CheckCircle2, CircleDot, TriangleAlert, FileEdit, Search, Flame, ImageOff, type LucideIcon } from 'lucide-react'
+import { CheckCircle2, CircleDot, TriangleAlert, FileEdit, Search, Flame, ImageOff, Eye, EyeOff, Package, type LucideIcon } from 'lucide-react'
 import AddPostModal from '@/components/AddPostModal'
 
 interface DayStat { date: string; visitors: number; events: Record<string, number>; newVisitors: number; returningVisitors: number }
@@ -938,6 +938,9 @@ function AdminPostRow({ post: p, onToggle, onDelete, onEdit, onToggleAlwaysOn, o
                 </span>
               )
             })()}
+            <span style={{ fontSize: 11, background: published ? '#dcfce7' : '#f1f5f9', color: published ? '#15803d' : '#64748b', padding: '2px 7px', borderRadius: 10, fontWeight: 700 }}>
+              {published ? '공개 중' : '숨김'}
+            </span>
             {p.status === 'candidate'    && <span style={{ fontSize: 11, background: '#fef9c3', color: '#a16207',  padding: '2px 6px', borderRadius: 10, fontWeight: 600 }}>공구 후보</span>}
             {p.status === 'needs_review' && <span style={{ fontSize: 11, background: '#fff7ed', color: '#c2410c',  padding: '2px 6px', borderRadius: 10, fontWeight: 600 }}>검수 필요</span>}
             {p.status === 'ready'        && <span style={{ fontSize: 11, background: '#dcfce7', color: '#15803d',  padding: '2px 6px', borderRadius: 10, fontWeight: 600 }}>공개 가능</span>}
@@ -1035,12 +1038,17 @@ function AdminPostRow({ post: p, onToggle, onDelete, onEdit, onToggleAlwaysOn, o
             style={{ padding: '6px 12px', background: '#ede9fe', color: '#7c3aed', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 12, fontWeight: 600, whiteSpace: 'nowrap' }}>
             수정
           </button>
+          {/* 버튼 문구는 "지금 상태"가 아니라 "누르면 일어날 일"이어야 한다.
+              상태(공개 중 / 숨김)는 위 배지 줄에서 따로 보여준다. */}
           <button onClick={() => onToggle(p)}
-            style={{ padding: '6px 12px', borderRadius: 8, border: 'none', cursor: 'pointer', fontSize: 12, fontWeight: 600, whiteSpace: 'nowrap',
-              background: published ? '#dcfce7' : '#fff7ed', color: published ? '#16a34a' : '#ea580c' }}>
-            {published ? '공개' : '숨김'}
+            title={published ? '고객 화면에서 숨깁니다' : '고객 화면에 공개합니다'}
+            style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '6px 12px', borderRadius: 8, border: 'none', cursor: 'pointer', fontSize: 12, fontWeight: 600, whiteSpace: 'nowrap',
+              background: published ? '#f1f5f9' : '#dcfce7', color: published ? '#475569' : '#16a34a' }}>
+            {published
+              ? <><EyeOff size={13} strokeWidth={2.5} /> 숨기기</>
+              : <><Eye size={13} strokeWidth={2.5} /> 공개하기</>}
           </button>
-          {(p.is_evergreen_deal || p.is_always_on) && <span title="상시딜로 설정됨" style={{ fontSize: 14, cursor: 'default' }}>⏰</span>}
+          {(p.is_evergreen_deal || p.is_always_on) && <span title="상시딜로 설정됨" style={{ display: 'inline-flex', color: '#b45309' }}><Package size={13} strokeWidth={2.5} /></span>}
           {p.sale_until_sold_out && <span title="소진시 마감으로 설정됨" style={{ display: 'inline-flex', color: '#dc2626' }}><Flame size={13} strokeWidth={2.5} /></span>}
           <button onClick={() => setShowMore(v => !v)}
             title="더 많은 작업"
@@ -1056,7 +1064,7 @@ function AdminPostRow({ post: p, onToggle, onDelete, onEdit, onToggleAlwaysOn, o
               title="켜면 홈 상단 '이번 주 우리가 고른 공구'에 노출됩니다"
               style={{ padding: '6px 10px', borderRadius: 8, border: 'none', cursor: 'pointer', fontSize: 11, fontWeight: 600, whiteSpace: 'nowrap',
                 background: p.is_featured ? '#fef3c7' : '#f1f5f9', color: p.is_featured ? '#b45309' : '#94a3b8' }}>
-              {p.is_featured ? '추천 해제' : '이번 주 추천'}
+              {p.is_featured ? '추천 해제' : '추천하기'}
             </button>
             {p.is_featured && (
               <label title="숫자가 작을수록 홈에서 먼저 보입니다"
@@ -1074,7 +1082,7 @@ function AdminPostRow({ post: p, onToggle, onDelete, onEdit, onToggleAlwaysOn, o
               title="상시딜로 설정하면 마감일 없이도 공개 가능"
               style={{ padding: '6px 10px', borderRadius: 8, border: 'none', cursor: 'pointer', fontSize: 11, fontWeight: 600, whiteSpace: 'nowrap',
                 background: (p.is_evergreen_deal || p.is_always_on) ? '#fef3c7' : '#f1f5f9', color: (p.is_evergreen_deal || p.is_always_on) ? '#92400e' : '#94a3b8' }}>
-              {(p.is_evergreen_deal || p.is_always_on) ? '⏰ 상시딜 해제' : '상시딜로 설정'}
+              {(p.is_evergreen_deal || p.is_always_on) ? '상시딜 해제' : '상시딜로 설정'}
             </button>
             <button onClick={() => onToggleSoldOutOnly(p)}
               title="한정수량으로 재고 소진시 마감되고, 고정된 마감일은 없는 공구"
