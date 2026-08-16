@@ -94,3 +94,19 @@ export function listAdminIps(): AdminIpRecord[] {
 export function forgetAdminIp(ip: string) {
   save(load().filter(r => r.ip !== ip))
 }
+
+// 검색엔진 크롤러는 자바스크립트를 실행하므로 track('view')가 그대로 찍힌다.
+// 실제로 확인해 보니 어느 날의 방문 이벤트가 전부 Googlebot·네이버 Yeti였다 —
+// 걸러내지 않으면 "방문자 6명"이 사람인 줄 알고 잘못된 판단을 하게 된다.
+const BOT_UA = /bot|crawler|spider|crawling|yeti|slurp|facebookexternalhit|embedly|preview|scrapy|python-urllib|curl|wget|headless|lighthouse|pagespeed|gptbot|claudebot|ccbot|perplexity/i
+
+/** 구글·네이버 크롤러가 쓰는 대역 — UA를 위장하는 경우가 있어 IP로도 본다 */
+const BOT_IP_PREFIX = ['66.249.', '125.209.235.', '64.233.', '66.102.', '72.14.', '74.125.']
+
+export function isBotRequest(request: NextRequest): boolean {
+  const ua = request.headers.get('user-agent') || ''
+  if (!ua) return true                       // UA 없는 요청은 사람이 아니다
+  if (BOT_UA.test(ua)) return true
+  const ip = clientIp(request)
+  return !!ip && BOT_IP_PREFIX.some(pre => ip.startsWith(pre))
+}

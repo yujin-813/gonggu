@@ -1,8 +1,10 @@
 'use client'
 import { useState, useEffect, useCallback } from 'react'
 import type { Post, ScraperStatus, InfluencerSource, Collection } from '@/lib/types'
-import { daysLeft, periodLabel, isExpired } from '@/lib/period'
-import { hasPurchaseLink } from '@/lib/purchaseLinks'
+import { daysLeft, periodLabel, isExpired, isCustomerVisible } from '@/lib/period'
+import { hasPurchaseLink, normalizePurchaseLinks } from '@/lib/purchaseLinks'
+import { getDealVerdict } from '@/lib/dealGrade'
+import { GradeBadge } from '@/components/DealVerdictBox'
 import { CheckCircle2, CircleDot, TriangleAlert, FileEdit, Search, Flame, ImageOff, Eye, EyeOff, Package, type LucideIcon } from 'lucide-react'
 import AddPostModal from '@/components/AddPostModal'
 
@@ -95,7 +97,7 @@ export default function AdminPage() {
   const [showAddModal, setShowAddModal] = useState(false)
   const [editingPost, setEditingPost]   = useState<Post | null>(null)
   const [loading, setLoading]         = useState(true)
-  const [filter, setFilter]           = useState<'all' | 'candidate' | 'needs_review' | 'ready' | 'published' | 'expired' | 'excluded' | 'upcoming' | 'featured' | 'no_link'>('all')
+  const [filter, setFilter]           = useState<'all' | 'candidate' | 'needs_review' | 'ready' | 'published' | 'expired' | 'excluded' | 'upcoming' | 'featured' | 'no_link' | 'pending'>('all')
   const [searchQ, setSearchQ]         = useState('')
   const [analytics, setAnalytics]     = useState<DayStat[]>([])
   const [topPosts, setTopPosts]       = useState<TopPost[]>([])
@@ -112,7 +114,7 @@ export default function AdminPage() {
   const [instPostUrl, setInstPostUrl] = useState('')
   const [instPostBusy, setInstPostBusy] = useState(false)
   const [instPostMsg, setInstPostMsg] = useState('')
-  const [adminTab, setAdminTab] = useState<'posts' | 'influencers' | 'collections' | 'settings'>('posts')
+  const [adminTab, setAdminTab] = useState<'posts' | 'influencers' | 'collections' | 'verdict' | 'settings'>('posts')
   const [collections, setCollections] = useState<Collection[]>([])
   const [editingInfluencer, setEditingInfluencer] = useState<string | null>(null)
   const [editInfluencerDraft, setEditInfluencerDraft] = useState<Partial<InfluencerSource>>({})
@@ -448,6 +450,8 @@ export default function AdminPage() {
       // 종료 페이지에 검색 유입은 계속 들어오는데 대체 구매 링크가 없으면 보낼 곳이 없다 —
       // 그런 상품을 찾아 링크를 채우기 위한 필터
       filter === 'no_link'   ? isPublishedExpired(p) && !hasPurchaseLink(p) :
+      // 비교 가격이 없어 등급을 못 매기는 상품 — 판정기의 신뢰도가 여기서 갈린다
+      filter === 'pending'   ? !getDealVerdict(p).grade :
       st === filter
     const q = searchQ.toLowerCase()
     const matchQ = !q || p.title.toLowerCase().includes(q) || p.account.toLowerCase().includes(q)
@@ -464,6 +468,7 @@ export default function AdminPage() {
   const upcomingCount    = countBy('upcoming')
   const featuredCount    = posts.filter(p => p.is_featured).length
   const noLinkCount      = posts.filter(p => isPublishedExpired(p) && !hasPurchaseLink(p)).length
+  const pendingCount     = posts.filter(p => !getDealVerdict(p).grade).length
 
   // 인증 확인 중 (hydration 전)
   if (authed === null) return null
@@ -512,6 +517,7 @@ export default function AdminPage() {
             { key: 'posts',       label: '공구 관리' },
             { key: 'influencers', label: '인플루언서 관리' },
             { key: 'collections', label: '컬렉션 관리' },
+            { key: 'verdict',     label: '판정 채우기' },
             { key: 'settings',    label: '통계 설정' },
           ] as const).map(({ key, label }) => (
             <button key={key} onClick={() => setAdminTab(key)}
@@ -622,6 +628,7 @@ export default function AdminPage() {
                   { key: 'excluded',     label: `제외 ${excludedCount}`,         color: '#94a3b8' },
                   { key: 'upcoming',     label: `오픈예정 ${upcomingCount}`,      color: '#7c3aed' },
                   { key: 'featured',     label: `추천 ${featuredCount}`,       color: '#f59e0b' },
+                  { key: 'pending',      label: `판정 대기 ${pendingCount}`,      color: '#475569' },
                   { key: 'no_link',      label: `종료·링크없음 ${noLinkCount}`,   color: '#dc2626' },
                 ] as const).map(({ key, label, color }) => (
                   <button key={key} onClick={() => setFilter(key)} className="admin-chip"
@@ -694,6 +701,8 @@ export default function AdminPage() {
         )}
 
         {/* 통계 설정 탭 — 관리자 방문이 고객 통계에 섞이지 않게 관리 */}
+        {adminTab === 'verdict' && <VerdictFiller posts={posts} onSaved={fetchPosts} />}
+
         {adminTab === 'settings' && <AdminIpManager />}
 
         {/* 컬렉션 관리 탭 */}
@@ -941,6 +950,9 @@ function AdminPostRow({ post: p, onToggle, onDelete, onEdit, onToggleAlwaysOn, o
             <span style={{ fontSize: 11, background: published ? '#dcfce7' : '#f1f5f9', color: published ? '#15803d' : '#64748b', padding: '2px 7px', borderRadius: 10, fontWeight: 700 }}>
               {published ? '공개 중' : '숨김'}
             </span>
+            {/* 고객 화면과 같은 판정을 관리자에서도 보여준다 — 아쉽딜·판정 대기가 어떤
+                상품인지 목록에서 바로 알아야 손볼 대상을 고를 수 있다 */}
+            <GradeBadge display={getDealVerdict(p).display} size="sm" />
             {p.status === 'candidate'    && <span style={{ fontSize: 11, background: '#fef9c3', color: '#a16207',  padding: '2px 6px', borderRadius: 10, fontWeight: 600 }}>공구 후보</span>}
             {p.status === 'needs_review' && <span style={{ fontSize: 11, background: '#fff7ed', color: '#c2410c',  padding: '2px 6px', borderRadius: 10, fontWeight: 600 }}>검수 필요</span>}
             {p.status === 'ready'        && <span style={{ fontSize: 11, background: '#dcfce7', color: '#15803d',  padding: '2px 6px', borderRadius: 10, fontWeight: 600 }}>공개 가능</span>}
@@ -1663,6 +1675,133 @@ function AdminIpManager() {
           </tbody>
         </table></div>
       )}
+    </div>
+  )
+}
+
+// 판정 채우기 — 비교 가격이 없어 등급을 못 매기는 상품을 한 화면에서 연달아 채운다.
+// 상품마다 수정 모달을 열면 한 건당 클릭이 대여섯 번인데, 여기서는 두 칸만 치고 저장이다.
+// 판정 대기가 많으면 "공구가 진짜 싼지 알려주는 곳"이라는 약속이 깨지므로 이 작업이 제일 급하다.
+function VerdictFiller({ posts, onSaved }: { posts: Post[]; onSaved: () => void }) {
+  const pending = posts
+    .filter(p => !getDealVerdict(p).grade)
+    .sort((a, b) => {
+      // 고객 화면에 보이는 것부터 — 안 보이는 상품은 채워도 지금 효과가 없다
+      const av = isCustomerVisible(a) ? 0 : 1
+      const bv = isCustomerVisible(b) ? 0 : 1
+      if (av !== bv) return av - bv
+      return (b.scraped_at || '').localeCompare(a.scraped_at || '')
+    })
+
+  if (pending.length === 0) {
+    return (
+      <div style={{ background: '#fff', borderRadius: 12, padding: 28, border: '1px solid #e2e8f0', textAlign: 'center' }}>
+        <CheckCircle2 size={34} strokeWidth={1.75} style={{ color: '#22c55e', marginBottom: 10 }} />
+        <p style={{ fontSize: 14, fontWeight: 700, marginBottom: 4 }}>판정 대기 상품이 없어요</p>
+        <p style={{ fontSize: 13, color: '#64748b' }}>모든 공구에 비교 가격이 들어가 있어요.</p>
+      </div>
+    )
+  }
+
+  return (
+    <div style={{ background: '#fff', borderRadius: 12, padding: 20, border: '1px solid #e2e8f0' }}>
+      <h2 style={{ fontSize: 17, fontWeight: 800, marginBottom: 6 }}>판정 채우기</h2>
+      <p style={{ fontSize: 13, color: '#64748b', lineHeight: 1.7, marginBottom: 16 }}>
+        비교 가격이 없어 등급을 못 매기는 공구 <strong style={{ color: '#0f172a' }}>{pending.length}건</strong>이에요.
+        쿠팡·네이버에서 같은 상품을 찾아 가격만 넣으면 바로 판정이 붙습니다.
+        <br />둘 중 하나만 넣어도 되고, 넣는 즉시 아래에 예상 등급이 보여요.
+      </p>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+        {pending.map(p => <VerdictFillRow key={p.id} post={p} onSaved={onSaved} />)}
+      </div>
+    </div>
+  )
+}
+
+const fillInput: React.CSSProperties = {
+  padding: '7px 10px', borderRadius: 8, border: '1.5px solid #e2e8f0',
+  outline: 'none', width: '100%', boxSizing: 'border-box',
+}
+
+function VerdictFillRow({ post, onSaved }: { post: Post; onSaved: () => void }) {
+  const existing = normalizePurchaseLinks(post)
+  const [coupang, setCoupang] = useState(String(existing.find(l => l.platform === 'coupang')?.price ?? ''))
+  const [naver, setNaver]     = useState(String(existing.find(l => l.platform === 'naver')?.price ?? ''))
+  const [coupangUrl, setCoupangUrl] = useState(existing.find(l => l.platform === 'coupang')?.url ?? '')
+  const [naverUrl, setNaverUrl]     = useState(existing.find(l => l.platform === 'naver')?.url ?? '')
+  const [saving, setSaving] = useState(false)
+  const [done, setDone] = useState(false)
+
+  // 입력하는 동안 등급이 어떻게 나올지 바로 보여준다 — 저장하고 목록에서 다시 찾아
+  // 확인하는 왕복을 없애기 위함
+  const preview = (() => {
+    const prices = [parseInt(coupang) || 0, parseInt(naver) || 0].filter(n => n > 0)
+    if (!prices.length || !post.price) return null
+    return getDealVerdict({
+      ...post,
+      purchase_links: prices.map((price, i) => ({ platform: i === 0 ? 'coupang' : 'naver', url: 'x', price, visible: true })),
+    } as Post).display
+  })()
+
+  async function save() {
+    setSaving(true)
+    const links = []
+    if (parseInt(coupang) > 0) links.push({ platform: 'coupang' as const, url: coupangUrl.trim() || null, price: parseInt(coupang), visible: true, checked_at: new Date().toISOString() })
+    if (parseInt(naver) > 0)   links.push({ platform: 'naver'   as const, url: naverUrl.trim()   || null, price: parseInt(naver),   visible: true, checked_at: new Date().toISOString() })
+    await fetch(`/api/posts/${post.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      // url 없이 가격만 넣어도 판정에는 쓰인다 (고객 화면 링크 노출은 url이 있을 때만)
+      body: JSON.stringify({ purchase_links: links.map(l => ({ ...l, url: l.url || '' })) }),
+    })
+    setSaving(false)
+    setDone(true)
+    onSaved()
+  }
+
+  const canSave = parseInt(coupang) > 0 || parseInt(naver) > 0
+
+  return (
+    <div style={{ border: '1px solid #e2e8f0', borderRadius: 10, padding: 12, background: done ? '#f0fdf4' : '#fff' }}>
+      <div style={{ display: 'flex', gap: 10, alignItems: 'flex-start', marginBottom: 10 }}>
+        <div style={{ width: 44, height: 44, borderRadius: 8, background: '#f1f5f9', flexShrink: 0, overflow: 'hidden' }}>
+          {post.img
+            ? <img src={post.img} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+            : <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: '#cbd5e1' }}><ImageOff size={18} /></div>}
+        </div>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontSize: 13.5, fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{post.title}</div>
+          <div style={{ fontSize: 12, color: '#64748b', marginTop: 2, display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+            <span>공구가 <strong style={{ color: '#0f172a' }}>{post.price?.toLocaleString()}원</strong></span>
+            {post.market_url && <a href={post.market_url} target="_blank" rel="noreferrer" style={{ color: '#6366f1' }}>네이버 검색 →</a>}
+            <a href={`https://www.coupang.com/np/search?q=${encodeURIComponent(post.title)}`} target="_blank" rel="noreferrer" style={{ color: '#dc2626' }}>쿠팡 검색 →</a>
+          </div>
+        </div>
+        {preview && <GradeBadge display={preview} size="sm" />}
+      </div>
+
+      <div className="admin-2col" style={{ gap: 8 }}>
+        <input type="number" value={coupang} onChange={e => { setCoupang(e.target.value); setDone(false) }}
+          placeholder="쿠팡 가격" style={{ ...fillInput, fontSize: 13 }} />
+        <input type="number" value={naver} onChange={e => { setNaver(e.target.value); setDone(false) }}
+          placeholder="네이버 가격" style={{ ...fillInput, fontSize: 13 }} />
+      </div>
+      <div className="admin-2col" style={{ gap: 8, marginTop: 6 }}>
+        <input type="url" value={coupangUrl} onChange={e => setCoupangUrl(e.target.value)}
+          placeholder="쿠팡 링크 (선택)" style={{ ...fillInput, fontSize: 12 }} />
+        <input type="url" value={naverUrl} onChange={e => setNaverUrl(e.target.value)}
+          placeholder="네이버 링크 (선택)" style={{ ...fillInput, fontSize: 12 }} />
+      </div>
+
+      <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 8 }}>
+        <button onClick={save} disabled={!canSave || saving}
+          style={{ padding: '7px 16px', borderRadius: 8, border: 'none', fontSize: 13, fontWeight: 700,
+            cursor: canSave && !saving ? 'pointer' : 'not-allowed',
+            background: done ? '#dcfce7' : canSave ? '#6366f1' : '#e2e8f0',
+            color: done ? '#15803d' : canSave ? '#fff' : '#94a3b8' }}>
+          {saving ? '저장 중…' : done ? '저장됨' : '저장'}
+        </button>
+      </div>
     </div>
   )
 }

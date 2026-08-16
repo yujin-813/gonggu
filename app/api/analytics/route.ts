@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { recordEvent, getSummary, getTopPosts, getTopSharedPosts, CLICK_TYPES } from '@/lib/analytics'
 import { loadPosts } from '@/lib/store'
 import { AUTH_COOKIE, computeToken, safeEqual } from '@/lib/auth'
-import { ADMIN_SEEN_COOKIE, isAdminIp, clientIp } from '@/lib/adminTrace'
+import { ADMIN_SEEN_COOKIE, isAdminIp, clientIp, isBotRequest } from '@/lib/adminTrace'
 
 // 운영자 본인의 방문인지 — 세 겹으로 본다. 자세한 이유는 lib/adminTrace.ts 참고.
 // 클라이언트의 track()도 비슷한 판정을 하지만 그쪽은 건너뛸 수 있으므로(스크립트 차단,
@@ -28,6 +28,8 @@ export async function POST(request: NextRequest) {
     const safeClickType = CLICK_TYPES.includes(clickType) ? clickType : undefined
     // 관리자 브라우저의 이벤트는 조용히 버린다 — 클라이언트에는 성공으로 응답해서
     // 통계 제외 여부가 화면 동작에 영향을 주지 않도록 한다
+    // 크롤러가 JS를 실행해 찍는 이벤트를 걸러낸다 — 안 걸러내면 방문자 수가 봇으로 채워진다
+    if (isBotRequest(request)) return NextResponse.json({ ok: true, skipped: 'bot' })
     if (await isAdminRequest(request)) return NextResponse.json({ ok: true, skipped: 'admin' })
     recordEvent(type, sessionId, { visitorId, postId, clickType: safeClickType })
     return NextResponse.json({ ok: true })
