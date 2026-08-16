@@ -15,6 +15,8 @@ import { Users } from 'lucide-react'
 
 interface Props {
   title: string
+  /** 운영자가 직접 고른 영역 — 크기는 같게 두고 배경으로만 구분한다 */
+  highlight?: boolean
   /** 제목 왼쪽 아이콘 — 이모지는 기기마다 모양이 달라 쓰지 않는다 */
   icon?: React.ReactNode
   /** 우측 "더보기"가 향하는 곳 — 없으면 버튼을 숨긴다 */
@@ -22,11 +24,11 @@ interface Props {
   posts: Post[]
 }
 
-export default function DealStrip({ title, icon, moreHref, posts }: Props) {
+export default function DealStrip({ title, icon, moreHref, posts, highlight }: Props) {
   if (posts.length === 0) return null
 
   return (
-    <section className="strip">
+    <section className={`strip ${highlight ? "strip-pick" : ""}`}>
       <div className="strip-head">
         <h2 className="strip-title">{icon}{title}</h2>
         {moreHref && <Link href={moreHref} className="strip-more">더보기 →</Link>}

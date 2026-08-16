@@ -1444,3 +1444,7 @@ header {
   .admin-header-right button,
   .admin-header-right a { font-size: 12px !important; padding: 6px 10px !important; white-space: nowrap; }
 }
+
+/* 운영자가 직접 고른 영역 — 카드 크기는 다른 영역과 같게 두고 바탕으로만 구분한다 */
+.strip-pick { background: var(--brand-light); }
+.strip-pick .strip-title { color: #B45309; }

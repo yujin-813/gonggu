@@ -3,7 +3,6 @@ import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import type { Post, Category } from '@/lib/types'
 import { CATEGORY_LABEL, categoryIcon } from '@/lib/categoryIcons'
-import PostCard from '@/components/PostCard'
 import Toast from '@/components/Toast'
 import DealStrip, { InfluencerStrip } from '@/components/DealStrip'
 import { track } from '@/lib/track'
@@ -35,39 +34,6 @@ interface Props {
   influencers: InfluencerSummary[]
 }
 
-function BigSection({
-  icon, title, subtitle, posts, bookmarks, onToggleBookmark, onJoin,
-}: {
-  icon: React.ReactNode
-  title: string
-  subtitle?: string
-  posts: Post[]
-  bookmarks: Set<number>
-  onToggleBookmark: (id: number) => void
-  onJoin: (id: number) => void
-}) {
-  if (posts.length === 0) return null
-  return (
-    <section className="home-section">
-      <div className="home-section-head">
-        <h2 className="home-section-title">{icon}{title}</h2>
-        {subtitle && <p className="home-section-sub">{subtitle}</p>}
-      </div>
-      <div className="home-section-feed">
-        {posts.map(p => (
-          <PostCard
-            key={p.id}
-            post={p}
-            isBookmarked={bookmarks.has(p.id)}
-            onToggleBookmark={onToggleBookmark}
-            onJoin={onJoin}
-          />
-        ))}
-      </div>
-    </section>
-  )
-}
-
 export default function HomeSections({
   featured, popular, today, endingSoon, monthly, categories, influencers,
 }: Props) {
@@ -88,22 +54,14 @@ export default function HomeSections({
     })
   }
 
-  const onJoin = (id: number) => track('join', { postId: id, clickType: 'groupbuy' })
-  const big = { bookmarks, onToggleBookmark: toggleBookmark, onJoin }
 
   return (
     <div className="home-sections">
-      {/* 클릭 데이터가 쌓이기 전에는 popular가 비는데, 그때는 영역이 통째로 감춰진다 */}
-      <BigSection
-        icon={<Flame size={18} strokeWidth={2.5} />} title="지금 많이 보는 공구"
-        subtitle="최근 일주일 동안 가장 많이 눌러본 공구예요"
-        posts={popular} {...big}
-      />
-      <BigSection
-        icon={<Award size={18} strokeWidth={2.5} />} title="이번 주 우리가 고른 공구"
-        subtitle="꿀공구가 직접 확인하고 골랐어요"
-        posts={featured} {...big}
-      />
+      {/* 모든 영역을 같은 크기의 작은 카드로 통일한다. 전체 크기 카드는 한 영역이
+          화면을 다 차지해서, 홈에서 "무엇이 있는지" 훑는 목적에 맞지 않았다.
+          (클릭 데이터가 쌓이기 전에는 popular가 비는데, 그때는 영역이 통째로 감춰진다) */}
+      <DealStrip icon={<Flame size={17} strokeWidth={2.5} />} title="지금 많이 보는 공구" posts={popular} />
+      <DealStrip icon={<Award size={17} strokeWidth={2.5} />} title="이번 주 우리가 고른 공구" posts={featured} highlight />
 
       <DealStrip icon={<CalendarDays size={17} strokeWidth={2.5} />} title="오늘 새로 올라온 공구" moreHref="/today"    posts={today} />
       <DealStrip icon={<AlarmClock size={17} strokeWidth={2.5} />} title="마감 임박 공구" moreHref="/deadline" posts={endingSoon} />

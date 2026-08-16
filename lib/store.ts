@@ -46,25 +46,6 @@ export function saveScraperStatus(status: ScraperStatus): void {
   atomicWrite(STATUS_FILE, JSON.stringify(status, null, 2))
 }
 
-// 스크래퍼 키워드 설정
-const CONFIG_FILE = path.join(DATA_DIR, 'scraper_config.json')
-
-export interface ScraperConfig {
-  include_keywords: string[]
-  exclude_keywords: string[]
-}
-
-export function loadScraperConfig(): ScraperConfig {
-  ensureDir()
-  if (!fs.existsSync(CONFIG_FILE)) return { include_keywords: [], exclude_keywords: [] }
-  try { return JSON.parse(fs.readFileSync(CONFIG_FILE, 'utf-8')) }
-  catch { return { include_keywords: [], exclude_keywords: [] } }
-}
-
-export function saveScraperConfig(config: ScraperConfig): void {
-  ensureDir()
-  atomicWrite(CONFIG_FILE, JSON.stringify(config, null, 2))
-}
 
 // 인스타 추적 계정 (scraper.py가 읽는 tracked_profiles.json, 문자열 배열)
 export function loadProfiles(): string[] {
