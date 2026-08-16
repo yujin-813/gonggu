@@ -323,25 +323,29 @@ header {
   background: linear-gradient(135deg, var(--gray-1), var(--gray-2));
 }
 
+/* 마감은 2순위 — 좌상단(1순위)은 판정 배지가 쓰고, 마감은 아래에 작게 붙인다.
+   급한 것만 색으로 구분하고 나머지는 흰 바탕에 담백하게 둔다. */
 .badge-deadline {
   position: absolute;
-  top: 12px; left: 12px;
-  border-radius: 8px;
-  padding: 4px 10px;
-  font-size: 12px;
+  bottom: 12px; left: 12px;
+  border-radius: 999px;
+  padding: 3px 9px;
+  font-size: 11px;
   font-weight: 700;
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: 3px;
+  background: rgba(255, 255, 255, .94);
+  color: var(--gray-4);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, .12);
 }
 .badge-deadline.urgent { background: #D02B1F; color: white; }
-.badge-deadline.soon   { background: #FF9500; color: white; }
-.badge-deadline.ok     { background: #34C759; color: white; }
-.badge-deadline.closed { background: #8E8E93; color: white; }
+.badge-deadline.soon   { background: rgba(255, 255, 255, .94); color: #B45309; }
+.badge-deadline.closed { background: rgba(120, 120, 128, .92); color: white; }
 
 .badge-new {
   position: absolute;
-  bottom: 12px; left: 12px;
+  bottom: 12px; right: 12px;
   border-radius: 8px;
   padding: 4px 10px;
   font-size: 11px;
@@ -1320,3 +1324,140 @@ header {
 .home-section-title, .strip-title, .roller-title { display: flex; align-items: center; gap: 6px; }
 .grade-badge { gap: 4px; }
 .strip-grade { display: inline-flex; align-items: center; gap: 3px; }
+
+/* 판정 대기·단독 공구 — 등급은 아니지만 같은 모양으로 보여야 "빈 상태"로 안 읽힌다 */
+.grade-pending   { background: #F1F5F9; color: #475569; }
+.grade-exclusive { background: #EEF2FF; color: #4338CA; }
+.verdict-pending   { background: var(--gray-1); border-color: var(--gray-2); }
+.verdict-exclusive { background: #F8F9FF; border-color: #DDE2FB; }
+.verdict-empty { color: var(--gray-3); }
+
+/* ── 판정 배지 (1순위) ──────────────────────────────────────────────────── */
+/* 이미지 좌상단 — 홈을 훑을 때 이 배지가 반복해서 보여야 "가격을 판정해주는 곳"이라는
+   신호가 쌓인다. 그래서 연한 칩이 아니라 꽉 찬 색으로 눈에 띄게 둔다. */
+.badge-verdict {
+  position: absolute;
+  top: 12px; left: 12px;
+  display: flex; align-items: center; gap: 5px;
+  padding: 6px 13px;
+  border-radius: 999px;
+  font-size: 14px;
+  font-weight: 800;
+  letter-spacing: -0.2px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, .16);
+}
+
+.grade-solid-honey     { background: var(--brand); color: #fff; }
+.grade-solid-good      { background: #16A34A; color: #fff; }
+.grade-solid-hmm       { background: #CA8A04; color: #fff; }
+.grade-solid-meh       { background: #E11D48; color: #fff; }
+.grade-solid-pending   { background: rgba(255,255,255,.94); color: #475569; }
+.grade-solid-exclusive { background: #4F46E5; color: #fff; }
+
+/* 작은 카드도 같은 우선순위 — 판정이 좌상단, 마감은 아래 */
+.strip-grade {
+  position: absolute; top: 6px; left: 6px; bottom: auto;
+  display: inline-flex; align-items: center; gap: 3px;
+  font-size: 11.5px; font-weight: 800;
+  padding: 3px 9px; border-radius: 999px;
+  box-shadow: 0 1px 5px rgba(0, 0, 0, .16);
+}
+.strip-badge {
+  top: auto; bottom: 6px; left: 6px;
+  background: rgba(255, 255, 255, .94);
+  color: var(--gray-4);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, .12);
+}
+.strip-badge.urgent { background: #D02B1F; color: #fff; }
+.strip-badge.soon   { background: rgba(255, 255, 255, .94); color: #B45309; }
+.strip-badge.closed { background: rgba(120, 120, 128, .92); color: #fff; }
+
+/* ── 관리자 모바일 ───────────────────────────────────────────────────────── */
+/* 관리자도 폰에서 자주 본다. 데스크톱 기준으로 짜인 가로 배치가 좁은 화면에서 무너지던
+   지점들을 정리한다. */
+
+/* 상태 필터는 개수가 많아 줄바꿈하면 화면을 다 먹는다 — 한 줄로 두고 옆으로 민다.
+   nowrap이 없으면 좁은 화면에서 "공 구 후 보" 처럼 글자가 세로로 쪼개진다. */
+.admin-filter-chips {
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  padding-bottom: 2px;
+}
+.admin-filter-chips::-webkit-scrollbar { display: none; }
+.admin-chip {
+  flex: none;
+  white-space: nowrap;
+  padding: 7px 14px;
+  border-radius: 20px;
+  border: none;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+/* 2단으로 나란히 두던 설정 영역 — 좁은 화면에선 한 단으로 내려 잘리지 않게 */
+.admin-2col { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+
+@media (max-width: 720px) {
+  .admin-2col { grid-template-columns: 1fr; gap: 14px; }
+  .admin-chip { font-size: 12.5px; padding: 6px 12px; }
+
+  /* 상단 요약 카드가 세로 공간을 너무 먹어 정작 작업할 목록이 한참 아래로 밀렸다 */
+  .admin-stats { gap: 8px; }
+  .admin-stat-card { padding: 12px !important; }
+  .admin-stat-num { font-size: 20px !important; }
+
+  /* 헤더가 sticky라 좁은 화면에선 버튼이 밀려 잘린다 */
+  .admin-header-right { gap: 6px; }
+}
+
+.admin-stat-card {
+  background: #fff;
+  border-radius: 12px;
+  padding: 16px 18px;
+  border: 1px solid #e2e8f0;
+  display: flex; align-items: center; gap: 12px;
+  min-width: 0;
+}
+.admin-stat-icon {
+  width: 34px; height: 34px; flex: none;
+  border-radius: 10px;
+  display: inline-flex; align-items: center; justify-content: center;
+}
+.admin-stat-num { font-size: 21px; font-weight: 800; line-height: 1.15; }
+.admin-stat-label { font-size: 12px; color: #64748b; white-space: nowrap; }
+
+/* 관리자 본문 — 자식 중 하나가 넘쳐도 페이지 전체가 옆으로 밀리지 않게 가둔다 */
+.admin-body {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 24px 16px;
+  min-width: 0;
+}
+/* 표처럼 줄일 수 없는 내용은 그 블록 안에서만 가로로 스크롤한다 */
+.admin-scroll-x { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+
+@media (max-width: 720px) {
+  .admin-body { padding: 16px 12px; }
+}
+
+/* 관리자 헤더 — 좁은 화면에서 제목이 버튼을 밀어내 잘리던 문제 */
+.admin-header {
+  background: #1a1a2e; color: #fff;
+  padding: 14px 20px;
+  display: flex; align-items: center; gap: 12px;
+  position: sticky; top: 0; z-index: 100;
+}
+.admin-header-title {
+  font-weight: 800; font-size: 18px;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  min-width: 0;
+}
+@media (max-width: 720px) {
+  .admin-header { padding: 12px 14px; gap: 8px; }
+  .admin-header-title { font-size: 16px; }
+  .admin-header-right button,
+  .admin-header-right a { font-size: 12px !important; padding: 6px 10px !important; white-space: nowrap; }
+}

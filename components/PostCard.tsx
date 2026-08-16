@@ -13,6 +13,7 @@ import { shareContent } from '@/lib/share'
 import { track } from '@/lib/track'
 import { visiblePurchaseLinks, PLATFORM_LABEL, PLATFORM_DISCLOSURE } from '@/lib/purchaseLinks'
 import DealVerdictBox from './DealVerdictBox'
+import GradeIcon from './GradeIcon'
 import { getDealVerdict, shareLabel } from '@/lib/dealGrade'
 
 const SITE_URL = 'https://gonggu.asknuggetdata.com'
@@ -64,6 +65,9 @@ export default function PostCard({
 
   // 마감된 공구는 상세 페이지의 종료 안내(EndedDealNotice)가 대체 구매처를 "당시 공구가"와
   // 구분해 더 정확하게 보여주므로, 카드에서는 중복 노출하지 않는다
+  // 판정 결과는 배지·공유 문구 양쪽에서 쓴다 — 공유되는 건 "상품"이 아니라 "가격 판정"이라,
+  // 받는 사람이 링크를 누르기 전에 이미 싼지 알 수 있어야 열어볼 이유가 생긴다
+  const verdict = getDealVerdict(post)
   const altLinks = closed ? [] : visiblePurchaseLinks(post)
   const purchaseLink = post.purchase_url || post.url
   const canOpenPurchase = !closed && !isUpcoming && !!purchaseLink
@@ -73,16 +77,13 @@ export default function PostCard({
     window.open(purchaseLink, '_blank')
   }
 
-  // 공유되는 건 "상품"이 아니라 "가격 판정 결과"다 — 받는 사람이 링크를 누르기 전에
-  // 이미 싼지 아닌지 알 수 있어야 열어볼 이유가 생긴다
-  const verdict = getDealVerdict(post)
   async function handleShare(e: React.MouseEvent) {
     e.stopPropagation()
     const priceLine = `공구가 ${post.price.toLocaleString()}원`
     const compareLine = verdict.referencePrice
       ? ` · ${verdict.referenceLabel} ${verdict.referencePrice.toLocaleString()}원`
       : ''
-    const gradeLine = verdict.grade ? `[${verdict.grade.label}] ` : ''
+    const gradeLine = `[${verdict.display.label}] `
     const result = await shareContent({
       title: `${gradeLine}${post.title}`,
       description: `${priceLine}${compareLine}`,
@@ -119,9 +120,16 @@ export default function PostCard({
         ) : (
           <div className="img-placeholder"><CatIcon size={40} strokeWidth={1.5} /></div>
         )}
+        {/* 시각적 우선순위: ① 판정 ② 마감 ③ 상품명·가격.
+            "여기는 가격을 판정해주는 곳"이라는 신호가 스크롤할 때 반복해서 눈에 들어와야
+            하므로, 가장 잘 보이는 좌상단은 마감이 아니라 판정 배지가 차지한다. */}
+        <div className={`badge-verdict grade-solid-${verdict.display.key}`}>
+          <GradeIcon state={verdict.display.key} size={14} />
+          {verdict.display.label}
+        </div>
         {badge && BadgeIconEl && (
           <div className={`badge-deadline ${badge.cls}`}>
-            <BadgeIconEl size={13} strokeWidth={2.25} /> {badge.txt}
+            <BadgeIconEl size={11} strokeWidth={2.5} /> {badge.txt}
           </div>
         )}
         {isNew && <div className="badge-new">NEW</div>}

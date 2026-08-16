@@ -35,7 +35,7 @@ export default function DealStrip({ title, icon, moreHref, posts }: Props) {
       <div className="strip-scroll">
         {posts.map(p => {
           const badge = badgeFromState(getPeriodState(p))
-          const grade = getDealVerdict(p).grade
+          const display = getDealVerdict(p).display
           const CatIcon = categoryIcon(p.cat)
           return (
             <Link
@@ -48,9 +48,12 @@ export default function DealStrip({ title, icon, moreHref, posts }: Props) {
                 {p.img
                   ? <img src={p.img} alt={p.title} loading="lazy" />
                   : <div className="strip-thumb-empty"><CatIcon size={22} strokeWidth={1.5} /></div>}
+                {/* 좌상단은 판정이 차지한다 — 홈을 훑을 때 판정 배지가 반복해서 보여야
+                    "가격을 판정해주는 곳"이라는 게 전달된다. 마감은 아래 작은 칩으로 내린다. */}
+                <span className={`strip-grade grade-solid-${display.key}`}>
+                  <GradeIcon state={display.key} size={11} />{display.label}
+                </span>
                 {badge && <span className={`strip-badge ${badge.cls}`}>{badge.txt}</span>}
-                {/* 작은 카드에서도 싼지 아닌지 바로 보이게 — 홈에서 훑을 때 이게 판단 기준이 된다 */}
-                {grade && <span className={`strip-grade grade-${grade.key}`}><GradeIcon grade={grade.key} size={10} />{grade.label}</span>}
               </div>
               <p className="strip-name">{p.title}</p>
               {p.price > 0 && <p className="strip-price">{p.price.toLocaleString()}원</p>}

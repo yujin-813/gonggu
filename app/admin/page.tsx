@@ -3,6 +3,7 @@ import { useState, useEffect, useCallback } from 'react'
 import type { Post, ScraperStatus, InfluencerSource, Collection } from '@/lib/types'
 import { daysLeft, periodLabel, isExpired } from '@/lib/period'
 import { hasPurchaseLink } from '@/lib/purchaseLinks'
+import { CheckCircle2, CircleDot, TriangleAlert, FileEdit, Search, type LucideIcon } from 'lucide-react'
 import AddPostModal from '@/components/AddPostModal'
 
 interface DayStat { date: string; visitors: number; events: Record<string, number>; newVisitors: number; returningVisitors: number }
@@ -44,10 +45,10 @@ function LoginScreen({ onLogin }: { onLogin: () => void }) {
     }}>
       <div style={{
         background: '#fff', borderRadius: 16, padding: '40px 36px',
-        boxShadow: '0 4px 24px rgba(0,0,0,0.08)', width: 340,
+        boxShadow: '0 4px 24px rgba(0,0,0,0.08)', width: '100%', maxWidth: 340,
       }}>
         <div style={{ textAlign: 'center', marginBottom: 28 }}>
-          <div style={{ fontSize: 40, marginBottom: 8 }}>🍯</div>
+          <img src="/logo-symbol.png" alt="" width={44} height={44} style={{ marginBottom: 10 }} />
           <div style={{ fontWeight: 700, fontSize: 20, color: '#1e293b' }}>꿀공구 관리자</div>
           <div style={{ fontSize: 13, color: '#94a3b8', marginTop: 4 }}>비밀번호를 입력하세요</div>
         </div>
@@ -261,7 +262,7 @@ export default function AdminPage() {
       const d = await r.json()
       if (r.ok) {
         const lastLine = (d.output as string || '').split('\n').filter(Boolean).pop()?.trim()
-        setInstPostMsg(`✅ ${lastLine || '수집 완료 — 검수 대기에 추가됨'}`)
+        setInstPostMsg(`${lastLine || '수집 완료 — 검수 대기에 추가됨'}`)
         setInstPostUrl('')
         await fetchPosts()
       } else {
@@ -471,8 +472,8 @@ export default function AdminPage() {
   return (
     <div style={{ minHeight: '100vh', background: '#f8fafc', fontFamily: "'Noto Sans KR', sans-serif" }}>
       {/* 헤더 */}
-      <header style={{ background: '#1a1a2e', color: '#fff', padding: '16px 24px', display: 'flex', alignItems: 'center', gap: 16, position: 'sticky', top: 0, zIndex: 100 }}>
-        <div style={{ fontWeight: 700, fontSize: 20 }}>🍯 꿀공구 관리자</div>
+      <header className="admin-header">
+        <div className="admin-header-title">꿀공구 관리자</div>
         <div className="admin-header-right">
           <a href="/" target="_blank" rel="noopener noreferrer" style={{ color: '#a5b4fc', fontSize: 13, textDecoration: 'none' }}>
             고객 페이지 보기 →
@@ -492,14 +493,14 @@ export default function AdminPage() {
         </div>
       </header>
 
-      <div style={{ maxWidth: 1100, margin: '0 auto', padding: '24px 16px' }}>
+      <div className="admin-body">
 
         {/* 통계 카드 */}
         <div className="admin-stats">
-          <StatCard label="공개됨"    value={publishedCount}   icon="✅" color="#22c55e" />
-          <StatCard label="공개 가능" value={readyCount}        icon="🟢" color="#6366f1" />
-          <StatCard label="검수 필요" value={needsReviewCount}  icon="⚠️" color="#f97316" />
-          <StatCard label="공구 후보" value={candidateCount}    icon="📝" color="#eab308" />
+          <StatCard label="공개됨"    value={publishedCount}   Icon={CheckCircle2}  color="#22c55e" />
+          <StatCard label="공개 가능" value={readyCount}        Icon={CircleDot}     color="#6366f1" />
+          <StatCard label="검수 필요" value={needsReviewCount}  Icon={TriangleAlert} color="#f97316" />
+          <StatCard label="공구 후보" value={candidateCount}    Icon={FileEdit}      color="#eab308" />
         </div>
 
         {/* 방문자 분석 */}
@@ -560,9 +561,9 @@ export default function AdminPage() {
             {/* 키워드 설정 */}
             <div style={{ background: '#fff', borderRadius: 12, padding: 20, marginBottom: 24, border: '1px solid #e2e8f0' }}>
               <h3 style={{ margin: '0 0 14px', fontSize: 15, fontWeight: 700, color: '#1e293b' }}>⚙️ 수집 키워드 설정</h3>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>
+              <div className="admin-2col">
                 <div>
-                  <div style={{ fontSize: 13, fontWeight: 600, color: '#16a34a', marginBottom: 8 }}>✅ 추가 포함 키워드</div>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: '#16a34a', marginBottom: 8 }}>추가 포함 키워드</div>
                   <p style={{ fontSize: 11, color: '#94a3b8', margin: '0 0 8px' }}>이 단어가 캡션에 있으면 공구로 수집</p>
                   <div style={{ display: 'flex', gap: 6, marginBottom: 8 }}>
                     <input value={newInclude} onChange={e => setNewInclude(e.target.value)}
@@ -584,7 +585,7 @@ export default function AdminPage() {
                   </div>
                 </div>
                 <div>
-                  <div style={{ fontSize: 13, fontWeight: 600, color: '#dc2626', marginBottom: 8 }}>🚫 추가 제외 키워드</div>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: '#dc2626', marginBottom: 8 }}>추가 제외 키워드</div>
                   <p style={{ fontSize: 11, color: '#94a3b8', margin: '0 0 8px' }}>이 단어가 캡션에 있으면 수집 제외</p>
                   <div style={{ display: 'flex', gap: 6, marginBottom: 8 }}>
                     <input value={newExclude} onChange={e => setNewExclude(e.target.value)}
@@ -610,7 +611,7 @@ export default function AdminPage() {
 
             {/* 필터 + 검색 */}
             <div className="admin-filter">
-              <div style={{ display: 'flex', gap: 6 }}>
+              <div className="admin-filter-chips">
                 {([
                   { key: 'all',          label: '전체',                       color: '#6366f1' },
                   { key: 'candidate',    label: `공구 후보 ${candidateCount}`,   color: '#eab308' },
@@ -620,14 +621,13 @@ export default function AdminPage() {
                   { key: 'expired',      label: `마감됨 ${expiredCount}`,        color: '#94a3b8' },
                   { key: 'excluded',     label: `제외 ${excludedCount}`,         color: '#94a3b8' },
                   { key: 'upcoming',     label: `오픈예정 ${upcomingCount}`,      color: '#7c3aed' },
-                  { key: 'featured',     label: `🍯 추천 ${featuredCount}`,       color: '#f59e0b' },
+                  { key: 'featured',     label: `추천 ${featuredCount}`,       color: '#f59e0b' },
                   { key: 'no_link',      label: `종료·링크없음 ${noLinkCount}`,   color: '#dc2626' },
                 ] as const).map(({ key, label, color }) => (
-                  <button key={key} onClick={() => setFilter(key)}
+                  <button key={key} onClick={() => setFilter(key)} className="admin-chip"
                     style={{
-                      padding: '6px 14px', borderRadius: 20, border: 'none', cursor: 'pointer', fontSize: 13,
                       background: filter === key ? color : '#e2e8f0',
-                      color: filter === key ? '#fff' : '#475569', fontWeight: 600,
+                      color: filter === key ? '#fff' : '#475569',
                     }}>
                     {label}
                   </button>
@@ -732,13 +732,15 @@ export default function AdminPage() {
   )
 }
 
-function StatCard({ label, value, icon, color }: { label: string; value: number; icon: string; color: string }) {
+function StatCard({ label, value, Icon, color }: { label: string; value: number; Icon: LucideIcon; color: string }) {
   return (
-    <div style={{ background: '#fff', borderRadius: 12, padding: '18px 20px', border: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', gap: 14 }}>
-      <div style={{ fontSize: 28 }}>{icon}</div>
-      <div>
-        <div style={{ fontSize: 22, fontWeight: 700, color }}>{value}</div>
-        <div style={{ fontSize: 12, color: '#64748b' }}>{label}</div>
+    <div className="admin-stat-card">
+      <span className="admin-stat-icon" style={{ background: `${color}1a`, color }}>
+        <Icon size={18} strokeWidth={2.5} />
+      </span>
+      <div style={{ minWidth: 0 }}>
+        <div className="admin-stat-num" style={{ color }}>{value}</div>
+        <div className="admin-stat-label">{label}</div>
       </div>
     </div>
   )
@@ -760,7 +762,7 @@ function AnalyticsSection({ data, topPosts, topSharedPosts }: { data: DayStat[];
 
   return (
     <div style={{ background: '#fff', borderRadius: 12, padding: 20, marginBottom: 24, border: '1px solid #e2e8f0' }}>
-      <h3 style={{ margin: '0 0 16px', fontSize: 15, fontWeight: 700, color: '#1e293b' }}>📊 방문자 분석</h3>
+      <h3 style={{ margin: '0 0 16px', fontSize: 15, fontWeight: 700, color: '#1e293b' }}>방문자 분석</h3>
 
       {/* 요약 카드 */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(110px, 1fr))', gap: 10, marginBottom: 20 }}>
@@ -808,7 +810,7 @@ function AnalyticsSection({ data, topPosts, topSharedPosts }: { data: DayStat[];
             { key: 'join', label: '공구보기', icon: '🛒' },
             { key: 'bookmark', label: '찜', icon: '❤️' },
             { key: 'category', label: '카테고리', icon: '🏷' },
-            { key: 'search', label: '검색', icon: '🔍' },
+            { key: 'search', label: '검색', icon: '' },
             { key: 'share', label: '공유', icon: '📤' },
           ].filter(e => today.events[e.key]).map(e => (
             <div key={e.key} style={{ background: '#f1f5f9', borderRadius: 8, padding: '6px 12px', fontSize: 12, color: '#475569' }}>
@@ -936,12 +938,12 @@ function AdminPostRow({ post: p, onToggle, onDelete, onEdit, onToggleAlwaysOn, o
                 </span>
               )
             })()}
-            {p.status === 'candidate'    && <span style={{ fontSize: 11, background: '#fef9c3', color: '#a16207',  padding: '2px 6px', borderRadius: 10, fontWeight: 600 }}>📝 공구 후보</span>}
-            {p.status === 'needs_review' && <span style={{ fontSize: 11, background: '#fff7ed', color: '#c2410c',  padding: '2px 6px', borderRadius: 10, fontWeight: 600 }}>⚠️ 검수 필요</span>}
-            {p.status === 'ready'        && <span style={{ fontSize: 11, background: '#dcfce7', color: '#15803d',  padding: '2px 6px', borderRadius: 10, fontWeight: 600 }}>🟢 공개 가능</span>}
-            {p.status === 'excluded'     && <span style={{ fontSize: 11, background: '#f1f5f9', color: '#64748b',  padding: '2px 6px', borderRadius: 10, fontWeight: 600 }}>🚫 제외</span>}
-            {p.status === 'upcoming'     && <span style={{ fontSize: 11, background: '#ede9fe', color: '#7c3aed',  padding: '2px 6px', borderRadius: 10, fontWeight: 600 }}>🗓️ 오픈 예정</span>}
-            {p.source === 'influencer_request' && <span title="인플루언서가 직접 제출한 등록 요청" style={{ fontSize: 11, background: '#e0f2fe', color: '#0369a1', padding: '2px 6px', borderRadius: 10, fontWeight: 600, cursor: 'help' }}>📮 직접 제보</span>}
+            {p.status === 'candidate'    && <span style={{ fontSize: 11, background: '#fef9c3', color: '#a16207',  padding: '2px 6px', borderRadius: 10, fontWeight: 600 }}>공구 후보</span>}
+            {p.status === 'needs_review' && <span style={{ fontSize: 11, background: '#fff7ed', color: '#c2410c',  padding: '2px 6px', borderRadius: 10, fontWeight: 600 }}>검수 필요</span>}
+            {p.status === 'ready'        && <span style={{ fontSize: 11, background: '#dcfce7', color: '#15803d',  padding: '2px 6px', borderRadius: 10, fontWeight: 600 }}>공개 가능</span>}
+            {p.status === 'excluded'     && <span style={{ fontSize: 11, background: '#f1f5f9', color: '#64748b',  padding: '2px 6px', borderRadius: 10, fontWeight: 600 }}>제외</span>}
+            {p.status === 'upcoming'     && <span style={{ fontSize: 11, background: '#ede9fe', color: '#7c3aed',  padding: '2px 6px', borderRadius: 10, fontWeight: 600 }}>오픈 예정</span>}
+            {p.source === 'influencer_request' && <span title="인플루언서가 직접 제출한 등록 요청" style={{ fontSize: 11, background: '#e0f2fe', color: '#0369a1', padding: '2px 6px', borderRadius: 10, fontWeight: 600, cursor: 'help' }}>직접 제보</span>}
             {p.review_reason && p.review_reason.length > 0 && p.review_reason.map((r, i) => (
               <span key={i} style={{ fontSize: 10, background: '#fee2e2', color: '#dc2626', padding: '1px 5px', borderRadius: 8 }}>{r}</span>
             ))}
@@ -950,23 +952,23 @@ function AdminPostRow({ post: p, onToggle, onDelete, onEdit, onToggleAlwaysOn, o
             {hiddenFromCustomers && (
               <span title="마감일이 지나서 상시딜/소진시 마감이 아니면 고객 화면(/) 에는 자동으로 안 보여요"
                 style={{ fontSize: 11, background: '#fee2e2', color: '#dc2626', padding: '2px 6px', borderRadius: 10, fontWeight: 700, cursor: 'help' }}>
-                ⚠️ 마감 지남 · 고객화면엔 숨김
+                마감 지남 · 고객화면엔 숨김
               </span>
             )}
             <span style={{ fontWeight: 600, color: '#0f172a' }}>{p.price?.toLocaleString()}원</span>
             {p.market_price && p.price && p.market_price > p.price && (
               <span title={`네이버 쇼핑 최저가: ${p.market_price.toLocaleString()}원`}
                 style={{ fontSize: 11, background: '#fef9c3', color: '#92400e', padding: '2px 6px', borderRadius: 10, fontWeight: 700, cursor: 'help' }}>
-                🏷️ 최저가比 {Math.round((1 - p.price / p.market_price) * 100)}%↓
+                최저가比 {Math.round((1 - p.price / p.market_price) * 100)}%↓
               </span>
             )}
             {p.extraction_debug && (
               <span
                 title={JSON.stringify(p.extraction_debug, null, 2)}
                 style={{ fontSize: 10, background: '#f0f9ff', color: '#0369a1', padding: '1px 5px', borderRadius: 8, cursor: 'help' }}>
-                🔍 {(p.extraction_debug as Record<string,unknown>).extraction_method as string || '추출'}
+                {(p.extraction_debug as Record<string,unknown>).extraction_method as string || '추출'}
                 {(p.extraction_debug as Record<string,unknown>).extraction_error
-                  ? ' ⚠️'
+                  ? ' (오류)'
                   : (p.extraction_debug as Record<string,unknown>).extraction_confidence === 'high' ? ' ✓' : ''}
               </span>
             )}
@@ -978,7 +980,7 @@ function AdminPostRow({ post: p, onToggle, onDelete, onEdit, onToggleAlwaysOn, o
           <div style={{ display: 'flex', gap: 6, marginTop: 8, paddingTop: 8, borderTop: '1px solid #e2e8f0' }}>
             <button onClick={() => onQuickReview(p, 'approve')}
               style={{ flex: 1, padding: '7px 0', background: '#dcfce7', color: '#15803d', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 12, fontWeight: 700 }}>
-              ✅ 공구 확정
+              공구 확정
             </button>
             <button onClick={() => onQuickReview(p, 'always_on')}
               style={{ flex: 1, padding: '7px 0', background: '#fef9c3', color: '#92400e', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 12, fontWeight: 700 }}>
@@ -986,7 +988,7 @@ function AdminPostRow({ post: p, onToggle, onDelete, onEdit, onToggleAlwaysOn, o
             </button>
             <button onClick={() => setShowExcludeReasons(true)}
               style={{ flex: 1, padding: '7px 0', background: '#fee2e2', color: '#dc2626', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 12, fontWeight: 700 }}>
-              🚫 제외
+              제외
             </button>
           </div>
         )}
@@ -1036,7 +1038,7 @@ function AdminPostRow({ post: p, onToggle, onDelete, onEdit, onToggleAlwaysOn, o
           <button onClick={() => onToggle(p)}
             style={{ padding: '6px 12px', borderRadius: 8, border: 'none', cursor: 'pointer', fontSize: 12, fontWeight: 600, whiteSpace: 'nowrap',
               background: published ? '#dcfce7' : '#fff7ed', color: published ? '#16a34a' : '#ea580c' }}>
-            {published ? '✅ 공개' : '🙈 숨김'}
+            {published ? '공개' : '숨김'}
           </button>
           {(p.is_evergreen_deal || p.is_always_on) && <span title="상시딜로 설정됨" style={{ fontSize: 14, cursor: 'default' }}>⏰</span>}
           {p.sale_until_sold_out && <span title="소진시 마감으로 설정됨" style={{ fontSize: 14, cursor: 'default' }}>🔥</span>}
@@ -1054,7 +1056,7 @@ function AdminPostRow({ post: p, onToggle, onDelete, onEdit, onToggleAlwaysOn, o
               title="켜면 홈 상단 '이번 주 우리가 고른 공구'에 노출됩니다"
               style={{ padding: '6px 10px', borderRadius: 8, border: 'none', cursor: 'pointer', fontSize: 11, fontWeight: 600, whiteSpace: 'nowrap',
                 background: p.is_featured ? '#fef3c7' : '#f1f5f9', color: p.is_featured ? '#b45309' : '#94a3b8' }}>
-              {p.is_featured ? '🍯 추천 해제' : '이번 주 추천'}
+              {p.is_featured ? '추천 해제' : '이번 주 추천'}
             </button>
             {p.is_featured && (
               <label title="숫자가 작을수록 홈에서 먼저 보입니다"
@@ -1084,7 +1086,7 @@ function AdminPostRow({ post: p, onToggle, onDelete, onEdit, onToggleAlwaysOn, o
               <button onClick={() => setShowExcludeReasons(true)}
                 title="이 공구를 제외 처리 (고객 화면에서 숨겨짐)"
                 style={{ padding: '6px 10px', background: '#fee2e2', color: '#dc2626', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 12, fontWeight: 600, whiteSpace: 'nowrap' }}>
-                🚫 제외
+                제외
               </button>
             )}
             <button onClick={() => onDelete(p.id)}
@@ -1179,11 +1181,11 @@ function InfluencerManager({
           <input type="url" value={newSourceUrl} onChange={e => onNewUrlChange(e.target.value)}
             onKeyDown={e => { if (e.key === 'Enter') onAdd() }}
             placeholder="링크 URL (예: link.inpock.co.kr/handle, linktr.ee/handle)"
-            style={{ ...inputStyle, flex: 2, minWidth: 220 }} />
+            style={{ ...inputStyle, flex: '2 1 220px', minWidth: 0 }} />
           <input type="text" value={newSourceName} onChange={e => onNewNameChange(e.target.value)}
             onKeyDown={e => { if (e.key === 'Enter') onAdd() }}
             placeholder="이름 (선택)"
-            style={{ ...inputStyle, flex: 1, minWidth: 120 }} />
+            style={{ ...inputStyle, flex: '1 1 120px', minWidth: 0 }} />
           <button onClick={onAdd}
             style={{ background: '#6366f1', color: '#fff', border: 'none', borderRadius: 8, padding: '9px 18px', fontWeight: 700, cursor: 'pointer', fontSize: 14, whiteSpace: 'nowrap' }}>
             추가
@@ -1208,7 +1210,7 @@ function InfluencerManager({
         </div>
       ) : filteredSources.length === 0 ? (
         <div style={{ textAlign: 'center', padding: 60, color: '#94a3b8' }}>
-          <div style={{ fontSize: 40, marginBottom: 12 }}>🔍</div>
+          <Search size={38} strokeWidth={1.5} style={{ marginBottom: 12, color: '#cbd5e1' }} />
           <div>검색 결과가 없습니다.</div>
         </div>
       ) : (
@@ -1622,7 +1624,7 @@ function AdminIpManager() {
       ) : !data || data.ips.length === 0 ? (
         <p style={{ fontSize: 13, color: '#94a3b8' }}>등록된 관리자 IP가 없어요</p>
       ) : (
-        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+        <div className="admin-scroll-x"><table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13, minWidth: 420 }}>
           <thead>
             <tr style={{ borderBottom: '1px solid #e2e8f0' }}>
               <th style={{ textAlign: 'left', padding: '8px 0', color: '#64748b', fontWeight: 700 }}>IP</th>
@@ -1651,7 +1653,7 @@ function AdminIpManager() {
               </tr>
             ))}
           </tbody>
-        </table>
+        </table></div>
       )}
     </div>
   )

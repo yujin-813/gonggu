@@ -25,6 +25,29 @@ export const GRADES: Record<DealGradeKey, Omit<DealGrade, 'key'>> = {
   meh:   { label: '아쉽딜', line: '공구 가격 메리트가 적어요. 다른 곳이 더 나을 수 있어요.' },
 }
 
+// 등급을 매길 수 없는 경우도 화면에서는 같은 모양으로 보여야 한다. 비교가가 없다고
+// 빈 회색 상자만 띄우면 "정보가 없는 실패 상태"로 읽히는데, 실제로는 아직 확인 못 한
+// "판정 보류"일 뿐이다. 그래서 등급(4종)과 별개인 상태를 두 개 더 둔다 —
+// 4등급 체계 자체는 그대로 유지된다.
+export type VerdictState = DealGradeKey | 'pending' | 'exclusive'
+
+export interface VerdictDisplay {
+  key: VerdictState
+  label: string
+  line: string
+}
+
+export const NON_GRADE_STATES: Record<'pending' | 'exclusive', Omit<VerdictDisplay, 'key'>> = {
+  pending: {
+    label: '판정 대기',
+    line: '다른 판매처에서 같은 상품을 찾지 못했어요. 가격 외에 구성과 혜택도 함께 확인해보세요.',
+  },
+  exclusive: {
+    label: '단독 공구',
+    line: '다른 곳에서는 판매하지 않는 공구 전용 상품이라 비교할 가격이 없어요.',
+  },
+}
+
 /** 관리자가 직접 입력한 판단 문구의 색상 구분을 등급으로 옮길 때 쓰는 대응표 */
 const CLS_TO_GRADE: Record<string, DealGradeKey> = {
   great: 'honey', good: 'good', neutral: 'hmm', check: 'meh',
@@ -38,7 +61,9 @@ export interface ComparePrice {
 }
 
 export interface DealVerdict {
-  /** 판정할 수 없을 때 null — 이때는 등급 배지를 아예 띄우지 않는다 */
+  /** 화면에 항상 하나는 있는 표시 상태 — 등급 4종 또는 판정 대기·단독 공구 */
+  display: VerdictDisplay
+  /** 실제 등급이 매겨졌을 때만 채워진다. "등급인가 아닌가"를 구분해야 할 때 쓴다 */
   grade: DealGrade | null
   /** 비교에 쓴 "다른 곳에서 살 수 있는 최저가" */
   referencePrice: number | null
@@ -91,6 +116,7 @@ export function getDealVerdict(post: Post): DealVerdict {
   // 오픈 예정이거나 가격이 없으면 판정 대상이 아니다
   if (!post.price || post.status === 'upcoming') {
     return {
+      display: { key: 'pending', ...NON_GRADE_STATES.pending },
       grade: null, referencePrice: null, referenceLabel: '', discountRate: null,
       comparePrices: candidates, customLine: null, exclusive,
     }
@@ -105,6 +131,7 @@ export function getDealVerdict(post: Post): DealVerdict {
   if (post.custom_verdict) {
     const key = CLS_TO_GRADE[post.custom_verdict_cls || 'neutral'] || 'hmm'
     return {
+      display: { key, ...GRADES[key] },
       grade: { key, ...GRADES[key] },
       referencePrice: cheapest?.price ?? null,
       referenceLabel: cheapest?.label ?? '',
@@ -116,7 +143,9 @@ export function getDealVerdict(post: Post): DealVerdict {
   }
 
   if (!cheapest) {
+    const key = exclusive ? 'exclusive' : 'pending'
     return {
+      display: { key, ...NON_GRADE_STATES[key] },
       grade: null, referencePrice: null, referenceLabel: '', discountRate: null,
       comparePrices: [], customLine: null, exclusive,
     }
@@ -125,6 +154,7 @@ export function getDealVerdict(post: Post): DealVerdict {
   const rate = (cheapest.price - post.price) / cheapest.price
   const key = gradeFromRate(rate)
   return {
+    display: { key, ...GRADES[key] },
     grade: { key, ...GRADES[key] },
     referencePrice: cheapest.price,
     referenceLabel: cheapest.label,

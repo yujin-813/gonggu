@@ -16,10 +16,12 @@ const W = 800
 const H = 400
 
 const GRADE_COLOR: Record<string, { bg: string; fg: string }> = {
-  honey: { bg: '#FFF3D6', fg: '#B45309' },
-  good:  { bg: '#DCFCE7', fg: '#15803D' },
-  hmm:   { bg: '#FEF9C3', fg: '#854D0E' },
-  meh:   { bg: '#FFF1F2', fg: '#BE123C' },
+  honey:     { bg: '#FFF3D6', fg: '#B45309' },
+  good:      { bg: '#DCFCE7', fg: '#15803D' },
+  hmm:       { bg: '#FEF9C3', fg: '#854D0E' },
+  meh:       { bg: '#FFF1F2', fg: '#BE123C' },
+  pending:   { bg: '#F1F5F9', fg: '#475569' },
+  exclusive: { bg: '#EEF2FF', fg: '#4338CA' },
 }
 
 export async function GET(_req: Request, { params }: { params: { id: string } }) {
@@ -42,7 +44,7 @@ export async function GET(_req: Request, { params }: { params: { id: string } })
   }
 
   const v = getDealVerdict(post)
-  const color = v.grade ? GRADE_COLOR[v.grade.key] : { bg: '#F1F5F9', fg: '#475569' }
+  const color = GRADE_COLOR[v.display.key] || { bg: '#F1F5F9', fg: '#475569' }
   const period = getPeriodState(post)
   const dday =
     period.kind === 'range' || period.kind === 'deadline_only'
@@ -63,14 +65,14 @@ export async function GET(_req: Request, { params }: { params: { id: string } })
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 22, fontWeight: 800, color: '#F0A500' }}>
             꿀공구 판정
           </div>
-          {v.grade && (
+          {(
             <div style={{
               display: 'flex', alignItems: 'center',
               background: color.bg, color: color.fg,
               fontSize: 28, fontWeight: 800,
               padding: '8px 20px', borderRadius: 999,
             }}>
-              {v.grade.label}
+              {v.display.label}
             </div>
           )}
         </div>
@@ -108,7 +110,7 @@ export async function GET(_req: Request, { params }: { params: { id: string } })
           <span style={{ fontSize: 26, fontWeight: 800, color: color.fg }}>
             {v.discountRate !== null
               ? `${v.referenceLabel} 대비 약 ${rateText(v.discountRate)}`
-              : '가격 비교 정보 없음'}
+              : v.display.key === 'exclusive' ? '여기서만 만나볼 수 있어요' : '아직 가격 비교가 어려워요'}
           </span>
           {dday && <span style={{ fontSize: 22, fontWeight: 700, color: '#888888' }}>{dday}</span>}
         </div>
