@@ -1,7 +1,7 @@
 'use client'
 import { useState, useEffect, useCallback } from 'react'
 import type { Post, ScraperStatus, InfluencerSource, Collection } from '@/lib/types'
-import { daysLeft, periodLabel, isExpired, isCustomerVisible } from '@/lib/period'
+import { daysLeft, periodLabel, isExpired, isCustomerVisible, isPagePublic } from '@/lib/period'
 import { hasPurchaseLink, normalizePurchaseLinks } from '@/lib/purchaseLinks'
 import { getDealVerdict } from '@/lib/dealGrade'
 import { GradeBadge } from '@/components/DealVerdictBox'
@@ -487,7 +487,7 @@ export default function AdminPage() {
             { key: 'posts',       label: '공구 관리' },
             { key: 'influencers', label: '인플루언서 관리' },
             { key: 'collections', label: '컬렉션 관리' },
-            { key: 'verdict',     label: '판정 채우기' },
+            { key: 'verdict',     label: '채우기' },
             { key: 'settings',    label: '통계 설정' },
           ] as const).map(({ key, label }) => (
             <button key={key} onClick={() => setAdminTab(key)}
@@ -1601,38 +1601,78 @@ function AdminIpManager() {
 // 판정 채우기 — 비교 가격이 없어 등급을 못 매기는 상품을 한 화면에서 연달아 채운다.
 // 상품마다 수정 모달을 열면 한 건당 클릭이 대여섯 번인데, 여기서는 두 칸만 치고 저장이다.
 // 판정 대기가 많으면 "공구가 진짜 싼지 알려주는 곳"이라는 약속이 깨지므로 이 작업이 제일 급하다.
+// 채우기 — 손이 가야 하는 상품을 한 화면에서 연달아 처리한다.
+// 상품마다 수정 모달을 열면 한 건에 8~10 클릭이라 100건 넘는 작업은 현실적으로 못 한다.
+//
+// 두 가지 대상이 같은 필드(purchase_links)를 채우므로 화면을 나누지 않고 여기서 전환한다.
+//   판정 대기     — 비교 가격이 없어 등급을 못 매기는 공구. 가격이 필요하다.
+//   종료·링크없음 — 마감됐는데 지금 살 곳을 못 알려주는 공구. 링크가 필요하다.
 function VerdictFiller({ posts, onSaved }: { posts: Post[]; onSaved: () => void }) {
-  const pending = posts
-    .filter(p => !getDealVerdict(p).grade)
-    .sort((a, b) => {
-      // 고객 화면에 보이는 것부터 — 안 보이는 상품은 채워도 지금 효과가 없다
-      const av = isCustomerVisible(a) ? 0 : 1
-      const bv = isCustomerVisible(b) ? 0 : 1
-      if (av !== bv) return av - bv
-      return (b.scraped_at || '').localeCompare(a.scraped_at || '')
-    })
+  const [mode, setMode] = useState<'pending' | 'ended'>('pending')
 
-  if (pending.length === 0) {
-    return (
-      <div style={{ background: '#fff', borderRadius: 12, padding: 28, border: '1px solid #e2e8f0', textAlign: 'center' }}>
-        <CheckCircle2 size={34} strokeWidth={1.75} style={{ color: '#22c55e', marginBottom: 10 }} />
-        <p style={{ fontSize: 14, fontWeight: 700, marginBottom: 4 }}>판정 대기 상품이 없어요</p>
-        <p style={{ fontSize: 13, color: '#64748b' }}>모든 공구에 비교 가격이 들어가 있어요.</p>
-      </div>
-    )
+  // 고객 화면에 보이는 것부터 — 안 보이는 상품은 채워도 지금 효과가 없다
+  const byImpact = (a: Post, b: Post) => {
+    const av = isCustomerVisible(a) ? 0 : 1
+    const bv = isCustomerVisible(b) ? 0 : 1
+    if (av !== bv) return av - bv
+    return (b.scraped_at || '').localeCompare(a.scraped_at || '')
   }
+
+  const pending = posts.filter(p => !getDealVerdict(p).grade).sort(byImpact)
+  // 마감된 공구는 검색 유입이 계속 들어오는데 보낼 곳이 없으면 그대로 이탈한다
+  const ended = posts
+    .filter(p => isPagePublic(p) && isExpired(p) && !hasPurchaseLink(p))
+    .sort((a, b) => (b.deadline || '').localeCompare(a.deadline || ''))
+
+  const list = mode === 'pending' ? pending : ended
+
+  const tabs = [
+    { key: 'pending' as const, label: `판정 대기 ${pending.length}`, color: '#475569' },
+    { key: 'ended'   as const, label: `종료·링크없음 ${ended.length}`, color: '#dc2626' },
+  ]
 
   return (
     <div style={{ background: '#fff', borderRadius: 12, padding: 20, border: '1px solid #e2e8f0' }}>
-      <h2 style={{ fontSize: 17, fontWeight: 800, marginBottom: 6 }}>판정 채우기</h2>
-      <p style={{ fontSize: 13, color: '#64748b', lineHeight: 1.7, marginBottom: 16 }}>
-        비교 가격이 없어 등급을 못 매기는 공구 <strong style={{ color: '#0f172a' }}>{pending.length}건</strong>이에요.
-        쿠팡·네이버에서 같은 상품을 찾아 가격만 넣으면 바로 판정이 붙습니다.
-        <br />둘 중 하나만 넣어도 되고, 넣는 즉시 아래에 예상 등급이 보여요.
-      </p>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-        {pending.map(p => <VerdictFillRow key={p.id} post={p} onSaved={onSaved} />)}
+      <h2 style={{ fontSize: 17, fontWeight: 800, marginBottom: 12 }}>채우기</h2>
+
+      <div style={{ display: 'flex', gap: 6, marginBottom: 14 }}>
+        {tabs.map(t => (
+          <button key={t.key} onClick={() => setMode(t.key)}
+            style={{ padding: '7px 14px', borderRadius: 20, border: 'none', cursor: 'pointer', fontSize: 13, fontWeight: 700, whiteSpace: 'nowrap',
+              background: mode === t.key ? t.color : '#e2e8f0', color: mode === t.key ? '#fff' : '#475569' }}>
+            {t.label}
+          </button>
+        ))}
       </div>
+
+      <p style={{ fontSize: 13, color: '#64748b', lineHeight: 1.7, marginBottom: 16 }}>
+        {mode === 'pending' ? (
+          <>
+            비교 가격이 없어 등급을 못 매기는 공구예요. 쿠팡·네이버에서 같은 상품을 찾아
+            가격만 넣으면 바로 판정이 붙습니다.
+            <br />둘 중 하나만 넣어도 되고, 넣는 즉시 아래에 예상 등급이 보여요.
+          </>
+        ) : (
+          <>
+            마감됐는데 &quot;지금 살 수 있는 곳&quot;을 못 알려주는 공구예요. 검색으로 계속 들어오는데
+            보낼 곳이 없으면 그대로 나갑니다.
+            <br />링크만 넣어도 됩니다 — 가격을 모르면 &quot;가격 확인하기&quot;로 보내요.
+          </>
+        )}
+      </p>
+
+      {list.length === 0 ? (
+        <div style={{ textAlign: 'center', padding: '24px 0' }}>
+          <CheckCircle2 size={32} strokeWidth={1.75} style={{ color: '#22c55e', marginBottom: 8 }} />
+          <p style={{ fontSize: 14, fontWeight: 700 }}>
+            {mode === 'pending' ? '판정 대기 상품이 없어요' : '링크가 빠진 종료 공구가 없어요'}
+          </p>
+        </div>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+          {list.map(p => <VerdictFillRow key={p.id} post={p} mode={mode} onSaved={onSaved} />)}
+        </div>
+      )}
     </div>
   )
 }
@@ -1642,7 +1682,7 @@ const fillInput: React.CSSProperties = {
   outline: 'none', width: '100%', boxSizing: 'border-box',
 }
 
-function VerdictFillRow({ post, onSaved }: { post: Post; onSaved: () => void }) {
+function VerdictFillRow({ post, mode, onSaved }: { post: Post; mode: 'pending' | 'ended'; onSaved: () => void }) {
   const existing = normalizePurchaseLinks(post)
   const [coupang, setCoupang] = useState(String(existing.find(l => l.platform === 'coupang')?.price ?? ''))
   const [naver, setNaver]     = useState(String(existing.find(l => l.platform === 'naver')?.price ?? ''))
@@ -1665,20 +1705,26 @@ function VerdictFillRow({ post, onSaved }: { post: Post; onSaved: () => void }) 
   async function save() {
     setSaving(true)
     const links = []
-    if (parseInt(coupang) > 0) links.push({ platform: 'coupang' as const, url: coupangUrl.trim() || null, price: parseInt(coupang), visible: true, checked_at: new Date().toISOString() })
-    if (parseInt(naver) > 0)   links.push({ platform: 'naver'   as const, url: naverUrl.trim()   || null, price: parseInt(naver),   visible: true, checked_at: new Date().toISOString() })
+    const now = new Date().toISOString()
+    if (coupangUrl.trim() || parseInt(coupang) > 0)
+      links.push({ platform: 'coupang' as const, url: coupangUrl.trim(), price: parseInt(coupang) || null, visible: true, checked_at: now })
+    if (naverUrl.trim() || parseInt(naver) > 0)
+      links.push({ platform: 'naver' as const, url: naverUrl.trim(), price: parseInt(naver) || null, visible: true, checked_at: now })
     await fetch(`/api/posts/${post.id}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       // url 없이 가격만 넣어도 판정에는 쓰인다 (고객 화면 링크 노출은 url이 있을 때만)
-      body: JSON.stringify({ purchase_links: links.map(l => ({ ...l, url: l.url || '' })) }),
+      body: JSON.stringify({ purchase_links: links }),
     })
     setSaving(false)
     setDone(true)
     onSaved()
   }
 
-  const canSave = parseInt(coupang) > 0 || parseInt(naver) > 0
+  // 종료 공구는 링크만 있어도 "지금 살 수 있는 곳"을 안내할 수 있다 (가격은 선택)
+  const canSave = mode === 'ended'
+    ? !!(coupangUrl.trim() || naverUrl.trim() || parseInt(coupang) > 0 || parseInt(naver) > 0)
+    : parseInt(coupang) > 0 || parseInt(naver) > 0
 
   return (
     <div style={{ border: '1px solid #e2e8f0', borderRadius: 10, padding: 12, background: done ? '#f0fdf4' : '#fff' }}>
@@ -1691,25 +1737,40 @@ function VerdictFillRow({ post, onSaved }: { post: Post; onSaved: () => void }) 
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ fontSize: 13.5, fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{post.title}</div>
           <div style={{ fontSize: 12, color: '#64748b', marginTop: 2, display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-            <span>공구가 <strong style={{ color: '#0f172a' }}>{post.price?.toLocaleString()}원</strong></span>
+            {/* 종료 공구는 "당시" 가격이라는 걸 분명히 한다 — 지금 쿠팡 가격과 헷갈리면 안 된다 */}
+            <span>{mode === 'ended' ? '당시 공구가' : '공구가'} <strong style={{ color: '#0f172a' }}>{post.price?.toLocaleString()}원</strong></span>
+            {mode === 'ended' && post.deadline && <span style={{ color: '#dc2626' }}>{post.deadline.slice(5).replace('-', '.')} 마감</span>}
             {post.market_url && <a href={post.market_url} target="_blank" rel="noreferrer" style={{ color: '#6366f1' }}>네이버 검색 →</a>}
             <a href={`https://www.coupang.com/np/search?q=${encodeURIComponent(post.title)}`} target="_blank" rel="noreferrer" style={{ color: '#dc2626' }}>쿠팡 검색 →</a>
           </div>
         </div>
-        {preview && <GradeBadge display={preview} size="sm" />}
+        {mode === 'pending' && preview && <GradeBadge display={preview} size="sm" />}
       </div>
 
+      {/* 판정 대기는 '가격'이, 종료 공구는 '링크'가 핵심이라 중요한 칸을 위에 둔다 */}
       <div className="admin-2col" style={{ gap: 8 }}>
-        <input type="number" value={coupang} onChange={e => { setCoupang(e.target.value); setDone(false) }}
-          placeholder="쿠팡 가격" style={{ ...fillInput, fontSize: 13 }} />
-        <input type="number" value={naver} onChange={e => { setNaver(e.target.value); setDone(false) }}
-          placeholder="네이버 가격" style={{ ...fillInput, fontSize: 13 }} />
+        <input type={mode === 'ended' ? 'url' : 'number'}
+          value={mode === 'ended' ? coupangUrl : coupang}
+          onChange={e => { mode === 'ended' ? setCoupangUrl(e.target.value) : setCoupang(e.target.value); setDone(false) }}
+          placeholder={mode === 'ended' ? '쿠팡 링크' : '쿠팡 가격'}
+          style={{ ...fillInput, fontSize: 13 }} />
+        <input type={mode === 'ended' ? 'url' : 'number'}
+          value={mode === 'ended' ? naverUrl : naver}
+          onChange={e => { mode === 'ended' ? setNaverUrl(e.target.value) : setNaver(e.target.value); setDone(false) }}
+          placeholder={mode === 'ended' ? '네이버 링크' : '네이버 가격'}
+          style={{ ...fillInput, fontSize: 13 }} />
       </div>
       <div className="admin-2col" style={{ gap: 8, marginTop: 6 }}>
-        <input type="url" value={coupangUrl} onChange={e => setCoupangUrl(e.target.value)}
-          placeholder="쿠팡 링크 (선택)" style={{ ...fillInput, fontSize: 12 }} />
-        <input type="url" value={naverUrl} onChange={e => setNaverUrl(e.target.value)}
-          placeholder="네이버 링크 (선택)" style={{ ...fillInput, fontSize: 12 }} />
+        <input type={mode === 'ended' ? 'number' : 'url'}
+          value={mode === 'ended' ? coupang : coupangUrl}
+          onChange={e => mode === 'ended' ? setCoupang(e.target.value) : setCoupangUrl(e.target.value)}
+          placeholder={mode === 'ended' ? '쿠팡 가격 (선택)' : '쿠팡 링크 (선택)'}
+          style={{ ...fillInput, fontSize: 12 }} />
+        <input type={mode === 'ended' ? 'number' : 'url'}
+          value={mode === 'ended' ? naver : naverUrl}
+          onChange={e => mode === 'ended' ? setNaver(e.target.value) : setNaverUrl(e.target.value)}
+          placeholder={mode === 'ended' ? '네이버 가격 (선택)' : '네이버 링크 (선택)'}
+          style={{ ...fillInput, fontSize: 12 }} />
       </div>
 
       <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 8 }}>
