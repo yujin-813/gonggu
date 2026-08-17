@@ -6,13 +6,21 @@ import type { Post } from './types'
 export function daysLeft(deadline?: string): number {
   if (!deadline) return 999
   const today = new Date(); today.setHours(0, 0, 0, 0)
-  const d = new Date(deadline); d.setHours(0, 0, 0, 0)
+  // 시각이 섞여 있으면 타임존에 따라 하루가 밀릴 수 있어 날짜만 떼서 본다
+  const d = new Date(dateOnly(deadline)); d.setHours(0, 0, 0, 0)
   return Math.ceil((d.getTime() - today.getTime()) / 86400000)
 }
 
-export function fmtDate(dateStr?: string): string {
+/** 날짜 필드에 시각이 섞여 들어와도("2026-08-17T00:00:00+09:00") 깨지지 않게 앞 10자만 본다 */
+export function dateOnly(dateStr?: string): string {
   if (!dateStr) return ''
-  const [, m, d] = dateStr.split('-')
+  return dateStr.length >= 10 && dateStr[4] === '-' ? dateStr.slice(0, 10) : dateStr
+}
+
+export function fmtDate(dateStr?: string): string {
+  const d0 = dateOnly(dateStr)
+  if (!d0) return ''
+  const [, m, d] = d0.split('-')
   return `${parseInt(m)}.${parseInt(d)}`
 }
 
@@ -108,7 +116,7 @@ export function isCustomerVisible(post: Pick<Post, 'status' | 'published' | 'is_
   if (post.is_evergreen_deal || post.is_always_on) return true
   if (!post.deadline) return true
   const today = new Date(); today.setHours(0, 0, 0, 0)
-  return new Date(post.deadline) >= today
+  return new Date(dateOnly(post.deadline)) >= today
 }
 
 const NEW_WINDOW_HOURS = 48

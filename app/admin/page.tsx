@@ -1,7 +1,7 @@
 'use client'
 import { useState, useEffect, useCallback } from 'react'
 import type { Post, ScraperStatus, InfluencerSource, Collection } from '@/lib/types'
-import { daysLeft, periodLabel, isExpired, isCustomerVisible, isPagePublic } from '@/lib/period'
+import { daysLeft, periodLabel, isExpired, isCustomerVisible, isPagePublic, fmtDate } from '@/lib/period'
 import { hasPurchaseLink, normalizePurchaseLinks } from '@/lib/purchaseLinks'
 import { getDealVerdict } from '@/lib/dealGrade'
 import { GradeBadge } from '@/components/DealVerdictBox'
@@ -1739,7 +1739,7 @@ function VerdictFillRow({ post, mode, onSaved }: { post: Post; mode: 'pending' |
           <div style={{ fontSize: 12, color: '#64748b', marginTop: 2, display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
             {/* 종료 공구는 "당시" 가격이라는 걸 분명히 한다 — 지금 쿠팡 가격과 헷갈리면 안 된다 */}
             <span>{mode === 'ended' ? '당시 공구가' : '공구가'} <strong style={{ color: '#0f172a' }}>{post.price?.toLocaleString()}원</strong></span>
-            {mode === 'ended' && post.deadline && <span style={{ color: '#dc2626' }}>{post.deadline.slice(5).replace('-', '.')} 마감</span>}
+            {mode === 'ended' && post.deadline && <span style={{ color: '#dc2626' }}>{fmtDate(post.deadline)} 마감</span>}
             {post.market_url && <a href={post.market_url} target="_blank" rel="noreferrer" style={{ color: '#6366f1' }}>네이버 검색 →</a>}
             <a href={`https://www.coupang.com/np/search?q=${encodeURIComponent(post.title)}`} target="_blank" rel="noreferrer" style={{ color: '#dc2626' }}>쿠팡 검색 →</a>
           </div>

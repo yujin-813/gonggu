@@ -193,6 +193,18 @@ def _is_closed_or_excluded(p):
     return False
 
 
+def _date_only(value):
+    """ISO 일시("2026-08-17T00:00:00+09:00")든 날짜든 YYYY-MM-DD 로 통일한다.
+
+    날짜 필드에 시각이 섞이면 화면 표시가 깨지고, deadline < today 같은 문자열 비교가
+    어긋난다("2026-08-17T..." > "2026-08-17"). 저장 직전에 한 번만 잘라 둔다.
+    """
+    if not value:
+        return ""
+    text = str(value).strip()
+    return text[:10] if len(text) >= 10 and text[4] == "-" else text
+
+
 def _normalize_title(t):
     return re.sub(r"\s+", "", (t or "")).strip().lower()
 
@@ -238,8 +250,8 @@ def extract_schedules(blocks):
             out.append({
                 "id":    s["id"],
                 "title": title,
-                "start": (s.get("start_at") or "")[:10],
-                "end":   (s.get("end_at") or "")[:10],
+                "start": _date_only(s.get("start_at")),
+                "end":   _date_only(s.get("end_at")),
             })
     return out
 
@@ -1151,7 +1163,10 @@ def collect(handles, source_obj=None, write_result=True):
             # 보고 건너뛴다 — 내용이 바뀌면 새 후보로 다시 검수 대상에 올라간다(기존 글은 그대로 둠,
             # 중복이 생겨도 어차피 관리자가 검수 후 올리므로 문제 없음)
             price = price_from_stickers(b.get("stickers"))
-            deadline = b.get("open_until") or ""
+            # open_until은 "2026-08-17T00:00:00+09:00" 같은 ISO 일시로 온다. 그대로 저장하면
+            # 화면에서 "8.17T00:00:00+09:00"처럼 깨지고, 문자열 비교로 마감 여부를 판단하는
+            # 곳에서 같은 날짜인데 안 지난 것으로 잘못 계산된다. 날짜만 남긴다.
+            deadline = _date_only(b.get("open_until"))
             # 인플루언서가 직접 적은 일정이라 스티커/구매페이지 추출값보다 정확하다 —
             # 일정이 바뀌면 fingerprint도 바뀌어 새 내용으로 다시 검수에 올라간다
             start_date = ""
