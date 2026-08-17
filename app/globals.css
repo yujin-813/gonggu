@@ -1448,3 +1448,8 @@ header {
 /* 운영자가 직접 고른 영역 — 카드 크기는 다른 영역과 같게 두고 바탕으로만 구분한다 */
 .strip-pick { background: var(--brand-light); }
 .strip-pick .strip-title { color: #B45309; }
+
+/* 여러 상품(골라담기·모음전) — 등급이 아니라 "판정할 수 없는 유형"임을 색으로도 구분 */
+.grade-multi   { background: #EEF2FF; color: #4338CA; }
+.verdict-multi { background: #F8F9FF; border-color: #DDE2FB; }
+.grade-solid-multi { background: #4F46E5; color: #fff; }

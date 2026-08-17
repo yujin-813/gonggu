@@ -86,6 +86,12 @@ export interface Post {
   // 기존 데이터는 lib/purchaseLinks.ts의 normalizePurchaseLinks()가 읽을 때 자동으로
   // 합쳐주므로 일괄 마이그레이션 없이 그대로 둔다.
   purchase_links?: PurchaseLink[]
+  /**
+   * 한 링크 안에서 서로 다른 상품을 옵션별로 다른 가격에 파는 공구(골라담기·모음전 등).
+   * 이런 공구는 price가 최저가가 아니라 대표 가격이고, 가격 하나로 전체를 판정할 수 없다.
+   * 값이 없으면 제목으로 자동 판단하고, true/false를 넣으면 그 값이 우선한다.
+   */
+  is_multi_option?: boolean
   // 관리자가 직접 고른 "이번 주 추천" — 날짜 규칙과 무관하게 홈 상단에 노출된다
   is_featured?: boolean
   featured_order?: number | null

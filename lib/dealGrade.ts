@@ -30,7 +30,7 @@ export const GRADES: Record<DealGradeKey, Omit<DealGrade, 'key'>> = {
 // 빈 회색 상자만 띄우면 "정보가 없는 실패 상태"로 읽히는데, 실제로는 아직 확인 못 한
 // "판정 보류"일 뿐이다. 그래서 등급(4종)과 별개인 상태를 두 개 더 둔다 —
 // 4등급 체계 자체는 그대로 유지된다.
-export type VerdictState = DealGradeKey | 'pending' | 'exclusive'
+export type VerdictState = DealGradeKey | 'pending' | 'exclusive' | 'multi'
 
 export interface VerdictDisplay {
   key: VerdictState
@@ -38,7 +38,11 @@ export interface VerdictDisplay {
   line: string
 }
 
-export const NON_GRADE_STATES: Record<'pending' | 'exclusive', Omit<VerdictDisplay, 'key'>> = {
+export const NON_GRADE_STATES: Record<'pending' | 'exclusive' | 'multi', Omit<VerdictDisplay, 'key'>> = {
+  multi: {
+    label: '여러 상품',
+    line: '상품마다 가격이 달라 하나로 판정하기 어려워요. 링크에서 원하는 상품의 가격을 확인해보세요.',
+  },
   pending: {
     label: '판정 대기',
     line: '다른 판매처에서 같은 상품을 찾지 못했어요. 가격 외에 구성과 혜택도 함께 확인해보세요.',
@@ -77,6 +81,17 @@ export interface DealVerdict {
   customLine?: string | null
   /** 다른 곳에서 아예 안 파는 상품이라고 관리자가 확인한 경우 */
   exclusive: boolean
+}
+
+// 한 링크에서 여러 상품을 옵션별 가격으로 파는 공구는 대표가 하나로 전체를 판정할 수 없다.
+// "약 25종 골라담기"에 꿀딜을 붙이면 25종 전부가 싸다고 말하는 셈이라, 판정기가 거짓말을 한다.
+// 제목이 확실할 때만 자동 판단하고("골라담기", "모음전"), "6종 선물상자"처럼 한 세트를 파는
+// 것일 수도 있는 표현은 건드리지 않고 관리자 판단에 맡긴다.
+const MULTI_OPTION_TITLE = /골라담기|모음전|기획전|모음|택\s*\d|컬렉션|중\s*택/
+
+export function isMultiOption(post: Pick<Post, 'title' | 'is_multi_option'>): boolean {
+  if (typeof post.is_multi_option === 'boolean') return post.is_multi_option
+  return MULTI_OPTION_TITLE.test(post.title || '')
 }
 
 function gradeFromRate(rate: number): DealGradeKey {
@@ -126,6 +141,16 @@ export function getDealVerdict(post: Post): DealVerdict {
   const candidates: ComparePrice[] = [...verified, ...trustedAuto]
 
   const exclusive = !!post.is_exclusive_deal
+
+  // 여러 상품을 옵션별 가격으로 파는 공구는 비교 자체가 성립하지 않는다.
+  // 비교가를 같이 보여주면 "이 가격끼리 비교했다"는 오해를 주므로 아예 비운다.
+  if (isMultiOption(post)) {
+    return {
+      display: { key: 'multi', ...NON_GRADE_STATES.multi },
+      grade: null, referencePrice: null, referenceLabel: '', discountRate: null,
+      comparePrices: [], customLine: null, exclusive,
+    }
+  }
 
   // 오픈 예정이거나 가격이 없으면 판정 대상이 아니다
   if (!post.price || getPeriodState(post).kind === 'upcoming') {

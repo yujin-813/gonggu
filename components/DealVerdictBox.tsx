@@ -33,7 +33,8 @@ export default function DealVerdictBox({ post }: { post: Post }) {
       <table className="verdict-table">
         <tbody>
           <tr className="verdict-row-main">
-            <th>공구가</th>
+            {/* 여러 상품 공구의 price는 최저가가 아니라 대표 가격이다 — 그렇게 밝힌다 */}
+            <th>{v.display.key === 'multi' ? '대표 공구가' : '공구가'}</th>
             <td>{post.price ? `${post.price.toLocaleString()}원` : '—'}</td>
           </tr>
           {v.comparePrices.length > 0 ? (
@@ -57,7 +58,11 @@ export default function DealVerdictBox({ post }: { post: Post }) {
       <p className="verdict-rate">
         {v.discountRate !== null
           ? <>{v.referenceLabel} 대비 <strong>약 {rateText(v.discountRate)}</strong></>
-          : <strong>{v.display.key === 'exclusive' ? '여기서만 만나볼 수 있어요' : '아직 가격 비교가 어려워요'}</strong>}
+          : <strong>{
+              v.display.key === 'exclusive' ? '여기서만 만나볼 수 있어요'
+              : v.display.key === 'multi' ? '상품별로 가격이 달라요'
+              : '아직 가격 비교가 어려워요'
+            }</strong>}
       </p>
 
       <p className="verdict-line">{v.customLine || v.display.line}</p>

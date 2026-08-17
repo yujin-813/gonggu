@@ -25,7 +25,7 @@ export async function PATCH(request: NextRequest, { params }: Ctx) {
   if (idx === -1) {
     return NextResponse.json({ error: '게시글을 찾을 수 없습니다' }, { status: 404 })
   }
-  const allowed: (keyof Post)[] = ['published','status','review_reason','title','brand','group_key','market_url','market_price','market_price_note','purchase_url','is_always_on','is_evergreen_deal','sale_until_sold_out','is_exclusive_deal','extraction_debug','price','origPrice','start_date','deadline','cat','img','url','account','custom_verdict','custom_verdict_detail','custom_verdict_cls','partners_platform','partners_price','partners_url','partners_option_note','partners_checked_at','partners_visible','purchase_links','is_featured','featured_order']
+  const allowed: (keyof Post)[] = ['published','status','review_reason','title','brand','group_key','market_url','market_price','market_price_note','purchase_url','is_always_on','is_evergreen_deal','sale_until_sold_out','is_exclusive_deal','extraction_debug','price','origPrice','start_date','deadline','cat','img','url','account','custom_verdict','custom_verdict_detail','custom_verdict_cls','partners_platform','partners_price','partners_url','partners_option_note','partners_checked_at','partners_visible','purchase_links','is_multi_option','is_featured','featured_order']
   for (const key of allowed) {
     if (key in body) {
       (posts[idx] as unknown as Record<string, unknown>)[key] = body[key]
@@ -45,7 +45,7 @@ export async function PUT(request: NextRequest, { params }: Ctx) {
   if (idx === -1) {
     return NextResponse.json({ error: '게시글을 찾을 수 없습니다' }, { status: 404 })
   }
-  const allowed: (keyof Post)[] = ['title','brand','group_key','market_url','market_price','market_price_note','purchase_url','is_always_on','is_evergreen_deal','sale_until_sold_out','is_exclusive_deal','extraction_debug','account','cat','price','origPrice','start_date','deadline','img','url','caption','published','status','review_reason','custom_verdict','custom_verdict_detail','custom_verdict_cls','partners_platform','partners_price','partners_url','partners_option_note','partners_checked_at','partners_visible','purchase_links','is_featured','featured_order']
+  const allowed: (keyof Post)[] = ['title','brand','group_key','market_url','market_price','market_price_note','purchase_url','is_always_on','is_evergreen_deal','sale_until_sold_out','is_exclusive_deal','extraction_debug','account','cat','price','origPrice','start_date','deadline','img','url','caption','published','status','review_reason','custom_verdict','custom_verdict_detail','custom_verdict_cls','partners_platform','partners_price','partners_url','partners_option_note','partners_checked_at','partners_visible','purchase_links','is_multi_option','is_featured','featured_order']
   const patch: Partial<Post> = {}
   for (const key of allowed) {
     if (key in body) {

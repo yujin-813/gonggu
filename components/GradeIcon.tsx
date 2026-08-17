@@ -1,4 +1,4 @@
-import { Sparkles, ThumbsUp, Eye, TriangleAlert, Search, BadgeCheck, type LucideProps } from 'lucide-react'
+import { Sparkles, ThumbsUp, Eye, TriangleAlert, Search, BadgeCheck, Layers, type LucideProps } from 'lucide-react'
 import type { VerdictState } from '@/lib/dealGrade'
 
 // 판정 아이콘은 여기서만 정한다 — 카드·상세·목록이 서로 다른 그림을 쓰면 같은 판정인지
@@ -13,6 +13,7 @@ export const STATE_ICON: Record<VerdictState, React.ComponentType<LucideProps>> 
   meh: TriangleAlert,
   pending: Search,
   exclusive: BadgeCheck,
+  multi: Layers,
 }
 
 export default function GradeIcon({ state, size = 13 }: { state: VerdictState; size?: number }) {

@@ -3,7 +3,7 @@ import { useState, useEffect, useCallback } from 'react'
 import type { Post, ScraperStatus, InfluencerSource, Collection } from '@/lib/types'
 import { daysLeft, periodLabel, isExpired, isCustomerVisible, isPagePublic, fmtDate } from '@/lib/period'
 import { hasPurchaseLink, normalizePurchaseLinks } from '@/lib/purchaseLinks'
-import { getDealVerdict } from '@/lib/dealGrade'
+import { getDealVerdict, isMultiOption } from '@/lib/dealGrade'
 import { GradeBadge } from '@/components/DealVerdictBox'
 import { CheckCircle2, CircleDot, TriangleAlert, FileEdit, Search, Flame, ImageOff, Eye, EyeOff, Package, type LucideIcon } from 'lucide-react'
 import AddPostModal from '@/components/AddPostModal'
@@ -314,6 +314,18 @@ export default function AdminPage() {
     })
   }
 
+  // 제목만으로는 "6종 선물상자"(한 세트)와 "6종 골라담기"(여러 상품)를 구분 못 한다.
+  // 자동 판단을 관리자가 뒤집을 수 있게 명시값을 저장한다.
+  async function toggleMultiOption(p: Post) {
+    const next = !isMultiOption(p)
+    setPosts(prev => prev.map(x => x.id === p.id ? { ...x, is_multi_option: next } : x))
+    await fetch(`/api/posts/${p.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ is_multi_option: next }),
+    })
+  }
+
   async function toggleEvergreenDeal(p: Post) {
     const next = !(p.is_evergreen_deal || p.is_always_on)
     const onlyDeadlineMissing =
@@ -574,7 +586,7 @@ export default function AdminPage() {
               </div>
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                {visible.map(p => <AdminPostRow key={p.id} post={p} onToggle={togglePublished} onDelete={deletePost} onEdit={setEditingPost} onToggleAlwaysOn={toggleEvergreenDeal} onToggleSoldOutOnly={toggleSoldOutOnly} onQuickReview={quickReview} onToggleFeatured={toggleFeatured} onSetFeaturedOrder={setFeaturedOrder} periodLabel={periodLabel(p)} />)}
+                {visible.map(p => <AdminPostRow key={p.id} post={p} onToggle={togglePublished} onDelete={deletePost} onEdit={setEditingPost} onToggleAlwaysOn={toggleEvergreenDeal} onToggleSoldOutOnly={toggleSoldOutOnly} onQuickReview={quickReview} onToggleFeatured={toggleFeatured} onSetFeaturedOrder={setFeaturedOrder} onToggleMultiOption={toggleMultiOption} periodLabel={periodLabel(p)} />)}
               </div>
             )}
           </>
@@ -797,7 +809,7 @@ function scrapedAgo(scrapedAt?: string): string | null {
   return `${dateLabel} · ${days}일 전 수집`
 }
 
-function AdminPostRow({ post: p, onToggle, onDelete, onEdit, onToggleAlwaysOn, onToggleSoldOutOnly, onQuickReview, onToggleFeatured, onSetFeaturedOrder, periodLabel }: {
+function AdminPostRow({ post: p, onToggle, onDelete, onEdit, onToggleAlwaysOn, onToggleSoldOutOnly, onQuickReview, onToggleFeatured, onSetFeaturedOrder, onToggleMultiOption, periodLabel }: {
   post: Post
   onToggle: (p: Post) => void
   onDelete: (id: number) => void
@@ -807,6 +819,7 @@ function AdminPostRow({ post: p, onToggle, onDelete, onEdit, onToggleAlwaysOn, o
   onQuickReview: (p: Post, action: 'approve' | 'always_on' | 'exclude', reason?: string) => void
   onToggleFeatured: (p: Post) => void
   onSetFeaturedOrder: (p: Post, order: number) => void
+  onToggleMultiOption: (p: Post) => void
   periodLabel: string
 }) {
   // upcoming 공구는 status가 'upcoming' 그대로 유지된 채 published 필드만으로 공개 여부를 결정한다
@@ -1009,6 +1022,12 @@ function AdminPostRow({ post: p, onToggle, onDelete, onEdit, onToggleAlwaysOn, o
                 />
               </label>
             )}
+            <button onClick={() => onToggleMultiOption(p)}
+              title="한 링크에서 여러 상품을 옵션별 가격으로 파는 공구 — 켜면 등급 대신 '여러 상품'으로 표시됩니다"
+              style={{ padding: '6px 10px', borderRadius: 8, border: 'none', cursor: 'pointer', fontSize: 11, fontWeight: 600, whiteSpace: 'nowrap',
+                background: isMultiOption(p) ? '#eef2ff' : '#f1f5f9', color: isMultiOption(p) ? '#4338ca' : '#94a3b8' }}>
+              {isMultiOption(p) ? '여러 상품 해제' : '여러 상품으로'}
+            </button>
             <button onClick={() => onToggleAlwaysOn(p)}
               title="상시딜로 설정하면 마감일 없이도 공개 가능"
               style={{ padding: '6px 10px', borderRadius: 8, border: 'none', cursor: 'pointer', fontSize: 11, fontWeight: 600, whiteSpace: 'nowrap',
