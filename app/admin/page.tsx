@@ -1759,8 +1759,22 @@ function VerdictFillRow({ post, mode, onSaved }: { post: Post; mode: 'pending' |
             {/* 종료 공구는 "당시" 가격이라는 걸 분명히 한다 — 지금 쿠팡 가격과 헷갈리면 안 된다 */}
             <span>{mode === 'ended' ? '당시 공구가' : '공구가'} <strong style={{ color: '#0f172a' }}>{post.price?.toLocaleString()}원</strong></span>
             {mode === 'ended' && post.deadline && <span style={{ color: '#dc2626' }}>{fmtDate(post.deadline)} 마감</span>}
-            {post.market_url && <a href={post.market_url} target="_blank" rel="noreferrer" style={{ color: '#6366f1' }}>네이버 검색 →</a>}
-            <a href={`https://www.coupang.com/np/search?q=${encodeURIComponent(post.title)}`} target="_blank" rel="noreferrer" style={{ color: '#dc2626' }}>쿠팡 검색 →</a>
+            {/* 쿠팡은 일반 검색이 아니라 파트너스에서 찾아야 추적 링크를 만들 수 있다.
+                파트너스는 해시 라우팅 SPA라 검색어가 자동으로 채워지지 않을 수 있어,
+                상품명을 클립보드에 복사해 두고 붙여넣게 한다. */}
+            <a href={`https://partners.coupang.com/#/product/search?keyword=${encodeURIComponent(post.title)}`}
+              target="_blank" rel="noreferrer"
+              onClick={() => navigator.clipboard?.writeText(post.title).catch(() => {})}
+              title="파트너스 검색을 새 탭에서 열고 상품명을 복사합니다"
+              style={{ color: '#dc2626', fontWeight: 600 }}>쿠팡 파트너스 →</a>
+            <a href={`https://search.shopping.naver.com/search/all?query=${encodeURIComponent(post.title)}`}
+              target="_blank" rel="noreferrer" style={{ color: '#16a34a', fontWeight: 600 }}>네이버쇼핑 →</a>
+            <button type="button"
+              onClick={() => navigator.clipboard?.writeText(post.title).catch(() => {})}
+              title="상품명을 복사합니다 — 파트너스 검색창에 붙여넣으세요"
+              style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', color: '#94a3b8', fontSize: 12 }}>
+              상품명 복사
+            </button>
           </div>
         </div>
         {mode === 'pending' && preview && <GradeBadge display={preview} size="sm" />}
