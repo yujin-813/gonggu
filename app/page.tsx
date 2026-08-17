@@ -1,6 +1,6 @@
 import {
   visiblePosts, featuredPosts, endingSoonPosts, popularPosts, categorySections,
-  todayPosts, monthlyPosts, influencerSummaries, SITE_URL,
+  todayPosts, monthlyPosts, influencerSummaries, endedButBuyablePosts, SITE_URL,
 } from '@/lib/landing'
 import { getPopularPostIds } from '@/lib/analytics'
 import JsonLd, { websiteSchema, itemListSchema } from '@/components/JsonLd'
@@ -40,6 +40,7 @@ export default function Home() {
           monthly={monthlyPosts(posts).slice(0, STRIP_LIMIT)}
           categories={categorySections(posts, STRIP_LIMIT)}
           influencers={influencerSummaries(posts)}
+          endedButBuyable={endedButBuyablePosts()}
         />}
       />
     </>

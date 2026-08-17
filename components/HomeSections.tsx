@@ -6,7 +6,7 @@ import { CATEGORY_LABEL, categoryIcon } from '@/lib/categoryIcons'
 import Toast from '@/components/Toast'
 import DealStrip, { InfluencerStrip } from '@/components/DealStrip'
 import { track } from '@/lib/track'
-import { Flame, Award, CalendarDays, AlarmClock, CalendarRange } from 'lucide-react'
+import { Flame, Award, CalendarDays, AlarmClock, CalendarRange, ShoppingBag } from 'lucide-react'
 
 // 홈 큐레이션. 두 종류의 영역이 있다.
 //
@@ -32,10 +32,12 @@ interface Props {
   monthly: Post[]
   categories: { cat: Category; posts: Post[] }[]
   influencers: InfluencerSummary[]
+  /** 공구는 끝났지만 대체 구매처가 있는 상품 */
+  endedButBuyable: Post[]
 }
 
 export default function HomeSections({
-  featured, popular, today, endingSoon, monthly, categories, influencers,
+  featured, popular, today, endingSoon, monthly, categories, influencers, endedButBuyable,
 }: Props) {
   const [bookmarks, setBookmarks] = useState<Set<number>>(new Set())
   const [toast, setToast] = useState({ message: '', visible: false })
@@ -78,6 +80,15 @@ export default function HomeSections({
       ))}
 
       <InfluencerStrip influencers={influencers} />
+
+      {/* 마감 공구는 목록에서 사라지지만, 대체 구매처를 확인해 둔 것은 여기서 다시 만난다.
+          마감된 공구가 진행 중보다 많고 검색 유입도 그쪽이 크므로, 사이트 안에서도
+          닿을 수 있어야 한다. */}
+      <DealStrip
+        icon={<ShoppingBag size={17} strokeWidth={2.5} />}
+        title="공구는 끝났지만 지금 살 수 있어요"
+        posts={endedButBuyable}
+      />
 
       <Toast
         message={toast.message}

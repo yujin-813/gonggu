@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { loadPosts, savePosts } from '@/lib/store'
 import type { Post } from '@/lib/types'
-import { daysLeft, isCustomerVisible } from '@/lib/period'
+import { daysLeft, isCustomerVisible, isPagePublic } from '@/lib/period'
 import { enforcePurchaseLinkRequirement } from '@/lib/postGuards'
 
 const CAT_EMOJI: Record<string, string> = {
@@ -16,11 +16,14 @@ export async function GET(request: NextRequest) {
   const page     = parseInt(searchParams.get('page') || '1')
   const perPage  = parseInt(searchParams.get('per_page') || '50')
   const adminMode = searchParams.get('admin') === '1'
+  // 마감된 공구는 기본적으로 목록에서 빼지만, "이 상품 공구가 얼마였지?"를 찾는
+  // 검색에는 나와야 한다. 그럴 때만 켜서 쓴다.
+  const includeEnded = searchParams.get('ended') === '1'
 
   let posts = loadPosts()
 
   // 고객 페이지: published + upcoming 포함, 마감일 미경과
-  if (!adminMode) posts = posts.filter(isCustomerVisible)
+  if (!adminMode) posts = posts.filter(includeEnded ? isPagePublic : isCustomerVisible)
 
   if (cat && cat !== 'all') posts = posts.filter(p => p.cat === cat)
   if (search) {

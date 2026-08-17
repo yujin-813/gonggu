@@ -1,5 +1,6 @@
 import type { Post, Category } from './types'
-import { getPeriodState, isCustomerVisible, isPagePublic, daysLeft } from './period'
+import { getPeriodState, isCustomerVisible, isPagePublic, isExpired, daysLeft } from './period'
+import { hasPurchaseLink } from './purchaseLinks'
 import { loadPosts } from './store'
 import { CATEGORY_LABEL } from './categoryIcons'
 
@@ -209,4 +210,15 @@ export function influencerSummaries(posts: Post[], limit = 12) {
     }
   }
   return [...byAccount.values()].sort((a, b) => b.count - a.count).slice(0, limit)
+}
+
+/**
+ * 공구는 끝났지만 지금 살 수 있는 상품 — 홈 하단 영역.
+ * 대체 구매처를 확인해 둔 것만 넣는다. 링크가 없으면 사용자가 할 수 있는 게 없다.
+ */
+export function endedButBuyablePosts(limit = 12): Post[] {
+  return routablePosts()
+    .filter(p => isExpired(p) && hasPurchaseLink(p))
+    .sort((a, b) => (b.deadline || '').localeCompare(a.deadline || ''))
+    .slice(0, limit)
 }

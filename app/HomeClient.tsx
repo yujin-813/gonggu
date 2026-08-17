@@ -9,7 +9,7 @@ import PostCard from '@/components/PostCard'
 import Toast from '@/components/Toast'
 import type { Post, Category, SortOrder, Collection } from '@/lib/types'
 import { categoryIcon } from '@/lib/categoryIcons'
-import { isEvergreen } from '@/lib/period'
+import { isEvergreen, isExpired } from '@/lib/period'
 import { getVisitorId, track } from '@/lib/track'
 import { Bell, ArrowLeft, Heart, Star, Clock, Loader2, Search, MessageCircle, X } from 'lucide-react'
 
@@ -55,6 +55,10 @@ export default function HomeClient({ sections }: { sections?: React.ReactNode })
   const [viewingFollowed, setViewingFollowed] = useState(false)
   const [pushSubscribed, setPushSubscribed] = useState(false)
   const [collections, setCollections] = useState<Collection[]>([])
+  // "이 상품 공구가 얼마였지?"를 찾는 사람에게는 마감된 공구도 답이 된다.
+  // 평소 목록에는 안 넣고, 검색을 시작할 때 한 번만 따로 받아온다.
+  const [endedPosts, setEndedPosts] = useState<Post[]>([])
+  const [endedLoaded, setEndedLoaded] = useState(false)
   const [groupHistory, setGroupHistory] = useState<Record<string, { id: number; price: number; origPrice: number | null; date: string }[]>>({})
   const [kakaoBannerDismissed, setKakaoBannerDismissed] = useState(true)  // 초기 렌더 깜빡임 방지 — mount 시 localStorage 값으로 교체
 
@@ -161,6 +165,16 @@ export default function HomeClient({ sections }: { sections?: React.ReactNode })
     })
   }
 
+  // 검색어가 처음 입력되는 순간에만 지난 공구를 불러온다 — 첫 진입 속도를 건드리지 않기 위함
+  useEffect(() => {
+    if (!searchQuery.trim() || endedLoaded) return
+    setEndedLoaded(true)
+    fetch('/api/posts?ended=1&per_page=500')
+      .then(r => r.json())
+      .then(d => setEndedPosts((d.posts ?? []).filter((p: Post) => isExpired(p))))
+      .catch(() => {})
+  }, [searchQuery, endedLoaded])
+
   async function fetchPosts() {
     setLoading(true)
     try {
@@ -244,6 +258,15 @@ export default function HomeClient({ sections }: { sections?: React.ReactNode })
       p.account.toLowerCase().includes(q)
     )
   }
+
+  // 지난 공구는 진행 중과 섞지 않고 아래에 따로 모아 보여준다 — 마감된 걸 지금 살 수
+  // 있는 것처럼 보이면 안 되기 때문이다
+  const endedMatches = searchQuery.trim()
+    ? endedPosts.filter(p => {
+        const q = searchQuery.toLowerCase()
+        return p.title.toLowerCase().includes(q) || p.account.toLowerCase().includes(q)
+      })
+    : []
 
   const sorted = [...filtered].sort((a, b) => {
     if (sortOrder === 'latest') return (b.scraped_at || '').localeCompare(a.scraped_at || '')
@@ -433,7 +456,7 @@ export default function HomeClient({ sections }: { sections?: React.ReactNode })
             <div className="empty-icon">
               {viewingBookmarks ? <Heart size={36} /> : viewingFollowed ? <Star size={36} /> : <Search size={36} />}
             </div>
-            <p>{viewingBookmarks ? '아직 찜한 공구가 없어요' : viewingFollowed ? '아직 팔로우한 인플루언서가 없어요' : '검색 결과가 없어요'}</p>
+            <p>{viewingBookmarks ? '아직 찜한 공구가 없어요' : viewingFollowed ? '아직 팔로우한 인플루언서가 없어요' : endedMatches.length > 0 ? '진행 중인 공구는 없어요' : '검색 결과가 없어요'}</p>
           </div>
         ) : (
           sorted.map(post => (
@@ -455,6 +478,32 @@ export default function HomeClient({ sections }: { sections?: React.ReactNode })
           ))
         )}
       </div>
+
+      {/* 지난 공구 — 진행 중과 섞지 않고 구분선 아래에 따로 둔다.
+          "이 상품 공구가 얼마였지?"에 답하되, 지금 살 수 있는 것처럼 보이면 안 된다. */}
+      {endedMatches.length > 0 && (
+        <div className="past-deals">
+          <div className="past-deals-head">
+            <h2 className="past-deals-title">지난 공구 {endedMatches.length}건</h2>
+            <p className="past-deals-sub">이미 마감된 공구예요. 당시 가격과 지금 살 수 있는 곳을 확인해보세요.</p>
+          </div>
+          <div className="strip-scroll">
+            {endedMatches.slice(0, 20).map(p => (
+              <Link key={p.id} href={`/post/${p.id}`} className="strip-card"
+                onClick={() => track('click', { postId: p.id, clickType: 'detail' })}>
+                <div className="strip-thumb">
+                  {p.img
+                    ? <img src={p.img} alt={p.title} loading="lazy" />
+                    : <div className="strip-thumb-empty" />}
+                  <span className="strip-badge closed">마감</span>
+                </div>
+                <p className="strip-name">{p.title}</p>
+                {p.price > 0 && <p className="strip-price">당시 {p.price.toLocaleString()}원</p>}
+              </Link>
+            ))}
+          </div>
+        </div>
+      )}
 
       <Toast
         message={toast.message}
