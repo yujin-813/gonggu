@@ -4,8 +4,9 @@ import type { Post, ScraperStatus, InfluencerSource, Collection } from '@/lib/ty
 import { daysLeft, periodLabel, isExpired, isCustomerVisible, isPagePublic, fmtDate } from '@/lib/period'
 import { hasPurchaseLink, normalizePurchaseLinks } from '@/lib/purchaseLinks'
 import { getDealVerdict, isMultiOption } from '@/lib/dealGrade'
+import { partnerSearchQuery } from '@/lib/searchQuery'
 import { GradeBadge } from '@/components/DealVerdictBox'
-import { CheckCircle2, CircleDot, TriangleAlert, FileEdit, Search, Flame, ImageOff, Eye, EyeOff, Package, type LucideIcon } from 'lucide-react'
+import { CheckCircle2, CircleDot, TriangleAlert, FileEdit, Search, Flame, ImageOff, Eye, EyeOff, Package, Copy, type LucideIcon } from 'lucide-react'
 import AddPostModal from '@/components/AddPostModal'
 
 interface DayStat { date: string; visitors: number; events: Record<string, number>; newVisitors: number; returningVisitors: number }
@@ -1709,14 +1710,19 @@ function VerdictFillRow({ post, mode, onSaved }: { post: Post; mode: 'pending' |
   const [naverUrl, setNaverUrl]     = useState(existing.find(l => l.platform === 'naver')?.url ?? '')
   const [saving, setSaving] = useState(false)
   const [done, setDone] = useState(false)
+  const [copied, setCopied] = useState(false)
+  const [orig, setOrig] = useState(String(post.origPrice ?? ''))
+  const searchQuery = partnerSearchQuery(post)
 
   // 입력하는 동안 등급이 어떻게 나올지 바로 보여준다 — 저장하고 목록에서 다시 찾아
   // 확인하는 왕복을 없애기 위함
   const preview = (() => {
     const prices = [parseInt(coupang) || 0, parseInt(naver) || 0].filter(n => n > 0)
-    if (!prices.length || !post.price) return null
+    const origNum = parseInt(orig) || 0
+    if ((!prices.length && !origNum) || !post.price) return null
     return getDealVerdict({
       ...post,
+      origPrice: origNum || null,
       purchase_links: prices.map((price, i) => ({ platform: i === 0 ? 'coupang' : 'naver', url: 'x', price, visible: true })),
     } as Post).display
   })()
@@ -1733,7 +1739,7 @@ function VerdictFillRow({ post, mode, onSaved }: { post: Post; mode: 'pending' |
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       // url 없이 가격만 넣어도 판정에는 쓰인다 (고객 화면 링크 노출은 url이 있을 때만)
-      body: JSON.stringify({ purchase_links: links }),
+      body: JSON.stringify({ purchase_links: links, origPrice: parseInt(orig) || null }),
     })
     setSaving(false)
     setDone(true)
@@ -1743,7 +1749,7 @@ function VerdictFillRow({ post, mode, onSaved }: { post: Post; mode: 'pending' |
   // 종료 공구는 링크만 있어도 "지금 살 수 있는 곳"을 안내할 수 있다 (가격은 선택)
   const canSave = mode === 'ended'
     ? !!(coupangUrl.trim() || naverUrl.trim() || parseInt(coupang) > 0 || parseInt(naver) > 0)
-    : parseInt(coupang) > 0 || parseInt(naver) > 0
+    : parseInt(coupang) > 0 || parseInt(naver) > 0 || parseInt(orig) > 0
 
   return (
     <div style={{ border: '1px solid #e2e8f0', borderRadius: 10, padding: 12, background: done ? '#f0fdf4' : '#fff' }}>
@@ -1759,28 +1765,47 @@ function VerdictFillRow({ post, mode, onSaved }: { post: Post; mode: 'pending' |
             {/* 종료 공구는 "당시" 가격이라는 걸 분명히 한다 — 지금 쿠팡 가격과 헷갈리면 안 된다 */}
             <span>{mode === 'ended' ? '당시 공구가' : '공구가'} <strong style={{ color: '#0f172a' }}>{post.price?.toLocaleString()}원</strong></span>
             {mode === 'ended' && post.deadline && <span style={{ color: '#dc2626' }}>{fmtDate(post.deadline)} 마감</span>}
-            {/* 쿠팡은 일반 검색이 아니라 파트너스에서 찾아야 추적 링크를 만들 수 있다.
-                파트너스는 해시 라우팅 SPA라 검색어가 자동으로 채워지지 않을 수 있어,
-                상품명을 클립보드에 복사해 두고 붙여넣게 한다. */}
-            <a href={`https://partners.coupang.com/#/product/search?keyword=${encodeURIComponent(post.title)}`}
-              target="_blank" rel="noreferrer"
-              onClick={() => navigator.clipboard?.writeText(post.title).catch(() => {})}
-              title="파트너스 검색을 새 탭에서 열고 상품명을 복사합니다"
+            {/* 파트너스는 검색어를 직접 입력해야 하고, 인포크 제목엔 인플루언서명·프로모션
+                문구·기간이 섞여 있어 그대로 넣으면 안 나온다. 정리한 검색어를 보여주고
+                누르면 복사되게 해서 붙여넣기만 하면 되게 한다. (완벽하진 않으니 원본도 남긴다) */}
+            <a href="https://partners.coupang.com/#/product/search" target="_blank" rel="noreferrer"
+              onClick={() => navigator.clipboard?.writeText(searchQuery).catch(() => {})}
+              title="파트너스를 새 탭으로 열고 아래 검색어를 복사합니다"
               style={{ color: '#dc2626', fontWeight: 600 }}>쿠팡 파트너스 →</a>
-            <a href={`https://search.shopping.naver.com/search/all?query=${encodeURIComponent(post.title)}`}
+            <a href={`https://search.shopping.naver.com/search/all?query=${encodeURIComponent(searchQuery)}`}
               target="_blank" rel="noreferrer" style={{ color: '#16a34a', fontWeight: 600 }}>네이버쇼핑 →</a>
-            <button type="button"
-              onClick={() => navigator.clipboard?.writeText(post.title).catch(() => {})}
-              title="상품명을 복사합니다 — 파트너스 검색창에 붙여넣으세요"
-              style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', color: '#94a3b8', fontSize: 12 }}>
-              상품명 복사
-            </button>
           </div>
         </div>
         {mode === 'pending' && preview && <GradeBadge display={preview} size="sm" />}
       </div>
 
       {/* 판정 대기는 '가격'이, 종료 공구는 '링크'가 핵심이라 중요한 칸을 위에 둔다 */}
+      {/* 검색어 — 눌러서 복사. 브랜드가 확인돼 있으면 앞에 붙는다 */}
+      <button type="button" onClick={() => { navigator.clipboard?.writeText(searchQuery).catch(() => {}); setCopied(true); setTimeout(() => setCopied(false), 1400) }}
+        title="검색어를 복사합니다 — 파트너스 검색창에 붙여넣으세요"
+        style={{ display: 'flex', alignItems: 'center', gap: 6, width: '100%', textAlign: 'left', marginBottom: 8,
+          padding: '7px 10px', borderRadius: 8, border: '1px dashed #cbd5e1', background: copied ? '#dcfce7' : '#f8fafc',
+          cursor: 'pointer', fontSize: 12.5, color: '#475569' }}>
+        <Copy size={13} strokeWidth={2.5} style={{ flexShrink: 0 }} />
+        <span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontWeight: 600 }}>
+          {searchQuery}
+        </span>
+        <span style={{ flexShrink: 0, color: copied ? '#15803d' : '#94a3b8', fontWeight: 700 }}>
+          {copied ? '복사됨' : '복사'}
+        </span>
+      </button>
+
+      {mode === 'pending' && (
+        // 정가는 공구 게시물에 대부분 적혀 있어서 파트너스를 거치지 않고도 바로 판정이 붙는다.
+        // 판정 대기를 가장 빨리 줄이는 길이라 맨 위에 둔다.
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+          <input type="number" value={orig} onChange={e => { setOrig(e.target.value); setDone(false) }}
+            placeholder="정가 (가장 빠른 방법)"
+            style={{ ...fillInput, fontSize: 13, flex: 1, borderColor: orig ? '#c7d2fe' : '#e2e8f0' }} />
+          <span style={{ fontSize: 11.5, color: '#94a3b8', whiteSpace: 'nowrap' }}>공구 게시물에 적힌 값</span>
+        </div>
+      )}
+
       <div className="admin-2col" style={{ gap: 8 }}>
         <input type={mode === 'ended' ? 'url' : 'number'}
           value={mode === 'ended' ? coupangUrl : coupang}
