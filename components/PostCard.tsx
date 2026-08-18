@@ -189,13 +189,22 @@ export default function PostCard({
         <div className="card-title">{post.title}</div>
 
         {/* 가장 중요한 정보: 얼마인지 · 얼마나 싼지 — 카드에서 가장 크게 */}
+        {/* 세트가 여러 개면 가격 하나만 보여주면 어느 구성인지 알 수 없다 — "N원부터"로 알린다 */}
         <div className="price-block">
-          <span className="price-sale-big">{post.price.toLocaleString()}원</span>
+          <span className="price-sale-big">
+            {verdict.fromPrice ? `${verdict.fromPrice.toLocaleString()}원부터` : `${post.price.toLocaleString()}원`}
+          </span>
           {savedAmount > 0 && (
             <span className="discount-chip">{savedLabel}보다 {savedAmount.toLocaleString()}원({savedRate}%) 저렴</span>
           )}
         </div>
-        {post.origPrice && post.origPrice > post.price && (
+        {verdict.options.length > 1 && (
+          <div className="price-from-note">
+            총 {verdict.options.length}개 구성
+            {verdict.rateRange && ` · 최대 ${Math.round(verdict.rateRange.max * 100)}% 저렴`}
+          </div>
+        )}
+        {!verdict.options.length && post.origPrice && post.origPrice > post.price && (
           post.market_url
             ? <a href={post.market_url} target="_blank" rel="noopener noreferrer" className="price-orig" style={{ textDecoration: 'none', display: 'inline-block', marginBottom: post.market_price ? 2 : 8 }}>
                 네이버쇼핑 {post.origPrice.toLocaleString()}원 →

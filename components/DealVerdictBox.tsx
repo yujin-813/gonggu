@@ -30,6 +30,41 @@ export default function DealVerdictBox({ post }: { post: Post }) {
         <GradeBadge display={v.display} />
       </div>
 
+      {/* 세트 옵션이 있으면 게시물 단위 비교 대신 옵션별 표를 보여준다.
+          어느 구성이 얼마나 싼지가 실제로 알고 싶은 정보다. */}
+      {v.options.length > 0 ? (
+        <div className="scroller">
+          <table className="verdict-table option-table">
+            <thead>
+              <tr>
+                <th>구성</th>
+                <th className="num">공구가</th>
+                <th className="num">일반 구매가</th>
+                <th className="num">혜택</th>
+              </tr>
+            </thead>
+            <tbody>
+              {v.options.map((o, i) => (
+                <tr key={i}>
+                  <td className="option-name">
+                    {o.option.name || `구성 ${i + 1}`}
+                    {o.option.gift && <span className="option-gift">사은품 {o.option.gift}</span>}
+                  </td>
+                  <td className="num option-price">{o.option.price.toLocaleString()}원</td>
+                  <td className="num option-compare">
+                    {o.option.comparePrice ? `약 ${o.option.comparePrice.toLocaleString()}원` : '—'}
+                  </td>
+                  <td className="num option-saved">
+                    {o.saved !== null && o.discountRate !== null
+                      ? <><strong>{o.saved.toLocaleString()}원 절약</strong><span>{Math.round(o.discountRate * 100)}%↓</span></>
+                      : '—'}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      ) : (
       <table className="verdict-table">
         <tbody>
           <tr className="verdict-row-main">
@@ -54,9 +89,15 @@ export default function DealVerdictBox({ post }: { post: Post }) {
           )}
         </tbody>
       </table>
+      )}
 
       <p className="verdict-rate">
-        {v.discountRate !== null
+        {v.rateRange
+          ? (v.rateRange.min === v.rateRange.max
+              ? <>구성 {v.options.length}개 · <strong>약 {rateText(v.rateRange.max)}</strong></>
+              // 최댓값만 쓰면 옵션 하나가 유난히 싼 공구가 과장돼 보인다 — 범위를 그대로 알린다
+              : <>구성 {v.options.length}개 · <strong>{Math.round(v.rateRange.min * 100)}~{Math.round(v.rateRange.max * 100)}% 저렴</strong></>)
+          : v.discountRate !== null
           ? <>{v.referenceLabel} 대비 <strong>약 {rateText(v.discountRate)}</strong></>
           : <strong>{
               v.display.key === 'exclusive' ? '여기서만 만나볼 수 있어요'

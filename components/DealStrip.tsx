@@ -37,7 +37,8 @@ export default function DealStrip({ title, icon, moreHref, posts, highlight }: P
       <div className="strip-scroll">
         {posts.map(p => {
           const badge = badgeFromState(getPeriodState(p))
-          const display = getDealVerdict(p).display
+          const v = getDealVerdict(p)
+          const display = v.display
           const CatIcon = categoryIcon(p.cat)
           return (
             <Link
@@ -58,7 +59,11 @@ export default function DealStrip({ title, icon, moreHref, posts, highlight }: P
                 {badge && <span className={`strip-badge ${badge.cls}`}>{badge.txt}</span>}
               </div>
               <p className="strip-name">{p.title}</p>
-              {p.price > 0 && <p className="strip-price">{p.price.toLocaleString()}원</p>}
+              {(v.fromPrice ?? p.price) > 0 && (
+                <p className="strip-price">
+                  {v.fromPrice ? `${v.fromPrice.toLocaleString()}원부터` : `${p.price.toLocaleString()}원`}
+                </p>
+              )}
             </Link>
           )
         })}

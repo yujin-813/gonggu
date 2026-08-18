@@ -1,4 +1,4 @@
-import type { Post } from './types'
+import type { Post, DealOption } from './types'
 import { normalizePurchaseLinks } from './purchaseLinks'
 import { getPeriodState } from './period'
 
@@ -65,6 +65,15 @@ export interface ComparePrice {
   checkedAt?: string | null
 }
 
+/** 세트 하나의 판정 결과 — 상세 페이지 표에 그대로 쓴다 */
+export interface OptionVerdict {
+  option: DealOption
+  /** 비교가가 없으면 null */
+  discountRate: number | null
+  /** 절약 금액 */
+  saved: number | null
+}
+
 export interface DealVerdict {
   /** 화면에 항상 하나는 있는 표시 상태 — 등급 4종 또는 판정 대기·단독 공구 */
   display: VerdictDisplay
@@ -81,6 +90,12 @@ export interface DealVerdict {
   customLine?: string | null
   /** 다른 곳에서 아예 안 파는 상품이라고 관리자가 확인한 경우 */
   exclusive: boolean
+  /** 세트 옵션이 등록돼 있으면 옵션별 판정 — 비어 있으면 단일 상품 공구다 */
+  options: OptionVerdict[]
+  /** 옵션 중 가장 싼 공구가 — 카드에 "N원부터"로 쓴다 */
+  fromPrice: number | null
+  /** 비교 가능한 옵션들의 할인율 범위 */
+  rateRange: { min: number; max: number } | null
 }
 
 // 한 링크에서 여러 상품을 옵션별 가격으로 파는 공구는 대표가 하나로 전체를 판정할 수 없다.
@@ -116,7 +131,54 @@ function gradeFromRate(rate: number): DealGradeKey {
  */
 const AUTO_MATCH_FLOOR = 0.5
 
+/** 세트 옵션이 있는 공구의 판정. 게시물 단위 비교가 대신 옵션별로 계산한다. */
+function verdictFromOptions(post: Post, opts: DealOption[]): DealVerdict {
+  const options: OptionVerdict[] = opts.map(o => {
+    const cp = o.comparePrice && o.comparePrice > 0 ? o.comparePrice : null
+    return {
+      option: o,
+      discountRate: cp && o.price ? (cp - o.price) / cp : null,
+      saved: cp && o.price ? cp - o.price : null,
+    }
+  })
+
+  const rates = options.map(o => o.discountRate).filter((r): r is number => r !== null)
+  const prices = opts.map(o => o.price).filter(n => n > 0)
+  const fromPrice = prices.length ? Math.min(...prices) : null
+
+  // 비교가가 하나도 없으면 아직 판정할 수 없다
+  if (!rates.length) {
+    return {
+      display: { key: 'pending', ...NON_GRADE_STATES.pending },
+      grade: null, referencePrice: null, referenceLabel: '', discountRate: null,
+      comparePrices: [], customLine: null, exclusive: !!post.is_exclusive_deal,
+      options, fromPrice, rateRange: null,
+    }
+  }
+
+  // 등급은 중앙값으로 매긴다. 최댓값을 쓰면 옵션 하나가 유난히 싼 공구가 전부 꿀딜이
+  // 되어 판정이 부풀려진다. 범위는 아래 rateRange로 따로 알려준다.
+  const sorted = [...rates].sort((a, b) => a - b)
+  const median = sorted.length % 2
+    ? sorted[(sorted.length - 1) / 2]
+    : (sorted[sorted.length / 2 - 1] + sorted[sorted.length / 2]) / 2
+  const key = gradeFromRate(median)
+
+  return {
+    display: { key, ...GRADES[key] },
+    grade: { key, ...GRADES[key] },
+    referencePrice: null, referenceLabel: '', discountRate: median,
+    comparePrices: [], customLine: null, exclusive: !!post.is_exclusive_deal,
+    options, fromPrice,
+    rateRange: { min: sorted[0], max: sorted[sorted.length - 1] },
+  }
+}
+
 export function getDealVerdict(post: Post): DealVerdict {
+  // 세트 옵션이 등록돼 있으면 그쪽이 정확하다 — 게시물 단위 비교가보다 우선한다
+  const opts = (post.options || []).filter(o => o && o.price > 0)
+  if (opts.length) return verdictFromOptions(post, opts)
+
   // 사람이 확인한 값과 자동으로 긁어온 값을 나눠 담는다 — 신뢰도가 다르기 때문이다
   const verified: ComparePrice[] = []
   const auto: ComparePrice[] = []
@@ -149,6 +211,7 @@ export function getDealVerdict(post: Post): DealVerdict {
       display: { key: 'multi', ...NON_GRADE_STATES.multi },
       grade: null, referencePrice: null, referenceLabel: '', discountRate: null,
       comparePrices: [], customLine: null, exclusive,
+      options: [], fromPrice: null, rateRange: null,
     }
   }
 
@@ -158,6 +221,7 @@ export function getDealVerdict(post: Post): DealVerdict {
       display: { key: 'pending', ...NON_GRADE_STATES.pending },
       grade: null, referencePrice: null, referenceLabel: '', discountRate: null,
       comparePrices: candidates, customLine: null, exclusive,
+      options: [], fromPrice: null, rateRange: null,
     }
   }
 
@@ -178,6 +242,7 @@ export function getDealVerdict(post: Post): DealVerdict {
       comparePrices: candidates,
       customLine: post.custom_verdict_detail || post.custom_verdict,
       exclusive,
+      options: [], fromPrice: null, rateRange: null,
     }
   }
 
@@ -187,6 +252,7 @@ export function getDealVerdict(post: Post): DealVerdict {
       display: { key, ...NON_GRADE_STATES[key] },
       grade: null, referencePrice: null, referenceLabel: '', discountRate: null,
       comparePrices: [], customLine: null, exclusive,
+      options: [], fromPrice: null, rateRange: null,
     }
   }
 
@@ -201,6 +267,7 @@ export function getDealVerdict(post: Post): DealVerdict {
     comparePrices: candidates,
     customLine: null,
     exclusive,
+    options: [], fromPrice: null, rateRange: null,
   }
 }
 

@@ -1,6 +1,6 @@
 'use client'
 import { useState, useEffect, useRef } from 'react'
-import type { Post, Category, PurchaseLink } from '@/lib/types'
+import type { Post, Category, PurchaseLink, DealOption } from '@/lib/types'
 import { normalizePurchaseLinks } from '@/lib/purchaseLinks'
 
 const CATEGORIES = [
@@ -82,6 +82,7 @@ export default function AddPostModal({ onClose, onSubmit, editPost, existingGrou
   // 예전 단일 필드(partners_*)로 저장된 값도 normalizePurchaseLinks가 함께 읽어준다.
   const [purchaseLinks, setPurchaseLinks] = useState<PurchaseLink[]>([])
   const [marketPrice, setMarketPrice] = useState('')
+  const [options, setOptions] = useState<DealOption[]>([])
 
   const [imgFile,    setImgFile]    = useState<File | null>(null)
   const [imgPreview, setImgPreview] = useState('')   // blob URL or existing img URL
@@ -114,6 +115,7 @@ export default function AddPostModal({ onClose, onSubmit, editPost, existingGrou
     setCustomVerdictCls(editPost.custom_verdict_cls || 'good')
     setPurchaseLinks(normalizePurchaseLinks(editPost))
     setMarketPrice(editPost.market_price ? String(editPost.market_price) : '')
+    setOptions(editPost.options ?? [])
     const gk = editPost.group_key || ''
     setGroupKey(gk)
     setNewGroupMode(false)
@@ -258,6 +260,8 @@ export default function AddPostModal({ onClose, onSubmit, editPost, existingGrou
         custom_verdict:        customVerdict.trim() || null,
         custom_verdict_detail: customVerdict.trim() ? (customVerdictDetail.trim() || null) : null,
         custom_verdict_cls:    customVerdict.trim() ? customVerdictCls : null,
+        // 구성·공구가가 채워진 세트만 저장한다 (빈 줄이 판정에 섞이면 안 된다)
+        options: options.filter(o => o.price > 0),
         purchase_links: cleanedLinks,
         // 예전 단일 필드는 비워 둔다 — 위 배열이 이미 그 값을 흡수했고, 남겨두면
         // 관리자가 지운 링크가 normalizePurchaseLinks를 통해 되살아난다
@@ -565,6 +569,69 @@ export default function AddPostModal({ onClose, onSubmit, editPost, existingGrou
                 ))}
             </div>
           </div>
+        )}
+
+        {/* 세트 옵션 — "공구 글 1개 = 상품 1개"가 아니라 "공구 1개 + 세트 여러 개"다.
+            세트가 7~8개인 공구에 판매가 하나·비교가 하나만 두면 어느 구성 기준인지 알 수
+            없고 판정도 그 하나로만 나온다. 비교가는 세트마다 있어야 한다.
+            옵션을 하나라도 넣으면 위의 판매가·비교가 대신 이 값들로 판정한다. */}
+        <label>
+          공구 옵션
+          <span style={{ fontSize: 12, color: '#94a3b8', fontWeight: 400, marginLeft: 6 }}>
+            (세트가 여러 개일 때만 — 넣으면 위 판매가·비교가 대신 이 값으로 판정해요)
+          </span>
+        </label>
+
+        {options.map((o, i) => {
+          const update = (patch: Partial<DealOption>) =>
+            setOptions(prev => prev.map((x, idx) => idx === i ? { ...x, ...patch } : x))
+          const saved = o.comparePrice && o.price ? o.comparePrice - o.price : 0
+          const rate = o.comparePrice && o.price ? Math.round((1 - o.price / o.comparePrice) * 100) : 0
+          return (
+            <div key={i} style={{ border: '1px solid #e2e8f0', borderRadius: 10, padding: 10, marginBottom: 8 }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+                <span style={{ fontSize: 12, fontWeight: 700, color: '#475569' }}>세트 {i + 1}</span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  {saved > 0 && (
+                    <span style={{ fontSize: 12, fontWeight: 700, color: '#15803d' }}>
+                      {saved.toLocaleString()}원 절약 · {rate}%↓
+                    </span>
+                  )}
+                  <button type="button" onClick={() => setOptions(prev => prev.filter((_, idx) => idx !== i))}
+                    style={{ padding: '3px 9px', background: '#fee2e2', color: '#dc2626', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 11, fontWeight: 600 }}>
+                    삭제
+                  </button>
+                </div>
+              </div>
+              <input type="text" value={o.name} onChange={e => update({ name: e.target.value })}
+                placeholder="구성 (예: 위시 2개 + 칫솔 6개 + 치약 3개)" />
+              <div className="modal-row" style={{ marginTop: 6 }}>
+                <div>
+                  <input type="number" value={o.price || ''} onChange={e => update({ price: parseInt(e.target.value) || 0 })}
+                    placeholder="공구가" />
+                </div>
+                <div>
+                  <input type="number" value={o.comparePrice ?? ''} onChange={e => update({ comparePrice: e.target.value ? parseInt(e.target.value) : null })}
+                    placeholder="개별 구매가 (비교가)" />
+                </div>
+              </div>
+              <input type="text" value={o.gift ?? ''} onChange={e => update({ gift: e.target.value })}
+                placeholder="사은품 (선택 — 가격 비교에는 안 들어가요)" style={{ marginTop: 6 }} />
+            </div>
+          )
+        })}
+
+        <button type="button"
+          onClick={() => setOptions(prev => [...prev, { name: '', price: 0, comparePrice: null, gift: null }])}
+          style={{ padding: '7px 12px', background: '#eef2ff', color: '#4338ca', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 12, fontWeight: 700, marginBottom: 4 }}>
+          + 세트 추가
+        </button>
+
+        {options.length > 0 && (
+          <p style={{ fontSize: 11, color: '#94a3b8', margin: '6px 0 0' }}>
+            고객 화면에는 &quot;{Math.min(...options.filter(o => o.price > 0).map(o => o.price)).toLocaleString()}원부터 · 총 {options.length}개 구성&quot;으로 보이고,
+            상세에서 세트별 표로 펼쳐집니다.
+          </p>
         )}
 
         {/* 대체 구매 링크 — 공구가 끝난 뒤 "지금 바로 사고 싶은" 사용자를 보낼 곳.

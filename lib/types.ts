@@ -87,6 +87,11 @@ export interface Post {
   // 합쳐주므로 일괄 마이그레이션 없이 그대로 둔다.
   purchase_links?: PurchaseLink[]
   /**
+   * 세트 옵션들. 비어 있으면 기존처럼 price/origPrice/market_price로 단일 판정한다 —
+   * 옵션이 하나뿐인 공구가 대부분이라 전부 옮길 필요가 없다.
+   */
+  options?: DealOption[]
+  /**
    * 한 링크 안에서 서로 다른 상품을 옵션별로 다른 가격에 파는 공구(골라담기·모음전 등).
    * 이런 공구는 price가 최저가가 아니라 대표 가격이고, 가격 하나로 전체를 판정할 수 없다.
    * 값이 없으면 제목으로 자동 판단하고, true/false를 넣으면 그 값이 우선한다.
@@ -95,6 +100,24 @@ export interface Post {
   // 관리자가 직접 고른 "이번 주 추천" — 날짜 규칙과 무관하게 홈 상단에 노출된다
   is_featured?: boolean
   featured_order?: number | null
+}
+
+/**
+ * 공구 하나에 들어 있는 세트 옵션.
+ *
+ * "공구 글 1개 = 상품 1개"로 보면 세트가 7~8개인 공구를 담을 수 없다. 게시물에 판매가
+ * 하나·비교가 하나만 두면 어느 세트 기준인지 알 수 없고, 판정도 그 하나로만 나온다.
+ * 비교가는 게시물이 아니라 세트마다 있어야 한다.
+ */
+export interface DealOption {
+  /** 구성 — "위시 2개 + 칫솔 6개 + 치약 3개" */
+  name: string
+  /** 이 세트의 공구가 */
+  price: number
+  /** 같은 구성을 개별로 살 때 가격 */
+  comparePrice?: number | null
+  /** 사은품 — 가격 비교에는 안 넣고 표시만 한다 */
+  gift?: string | null
 }
 
 export type PurchasePlatform = 'naver' | 'coupang' | 'other'
