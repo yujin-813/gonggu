@@ -14,6 +14,7 @@ __NEXT_DATA__ JSON을 파싱한다. 인스타 API를 거치지 않으므로 차�
 
 import argparse
 import hashlib
+import html as html_mod
 import json
 import os
 import re
@@ -528,6 +529,118 @@ def _clean_brand(name):
     return n
 
 
+# ── 세트 옵션 추출 ────────────────────────────────────────────────────────
+# 공구 글 하나에 세트가 여러 개인 경우가 흔한데(닥터노아 3세트, 마리에뜰 10세트),
+# 관리자가 한 줄씩 손으로 옮기는 건 오래 걸린다. 다행히 판매 링크가 도메인 기준으로는
+# 40종 넘게 흩어져 있어도 그 아래 쇼핑몰 솔루션은 몇 개로 뭉쳐 있어서, 솔루션별 파서
+# 두 개면 살아 있는 페이지 상당수를 덮는다.
+#
+# 여기서 못 뽑는 곳(스마트스토어는 네이버가 429로 차단, 스룩페이는 JS 렌더링)은
+# 관리자 모달의 붙여넣기 파서로 처리한다 — 자동 수집은 손을 덜어주는 용도이지
+# 유일한 입력 경로가 아니다.
+
+_OPT_MIN_PRICE = 500          # 이보다 싸면 가격이 아니라 수량·용량 숫자일 가능성이 높다
+_OPT_MAX_PRICE = 10_000_000
+_OPT_MAX_COUNT = 40           # 색상 40종처럼 세트가 아닌 단순 변형은 판정에 쓸 값이 아니다
+
+# "1. 글라스락 햇밥용기 310ml 4조 세트(코코넛밀크)  (17,400원)" → 이름 + 17400
+_WIZ_OPT_PRICE = re.compile(r"\(\s*([\d,]{3,})\s*원?\s*\)\s*$")
+_WIZ_SELECT = re.compile(r"<select[^>]*od_option1[^>]*>(.*?)</select>", re.S | re.I)
+_OPTION_TAG = re.compile(r"<option([^>]*)>(.*?)</option>", re.S | re.I)
+# 카페24는 옵션 배열을 이스케이프된 JSON으로 상세 페이지 안에 박아 둔다
+_C24_OPT = re.compile(
+    r'\\"option_price\\":(\d+),\\"option_name\\":\\".*?\\",\\"option_value\\":\\"(.*?)\\"'
+)
+_UNICODE_ESC = re.compile(r"\\u([0-9a-fA-F]{4})")
+
+
+def _opt_name_clean(raw):
+    """옵션명에서 순번·이스케이프 잔재를 걷어낸다."""
+    n = _UNICODE_ESC.sub(lambda m: chr(int(m.group(1), 16)), raw or "")
+    n = n.replace("\\/", "/").replace("\\", "")       # 카페24 JSON 이스케이프 잔재
+    n = re.sub(r"<[^>]+>", "", n)
+    n = html_mod.unescape(n)
+    n = re.sub(r"^\s*\d+[.)]\s*", "", n)               # "1. " 같은 순번
+    return re.sub(r"\s+", " ", n).strip(" .·-")
+
+
+def _valid_options(opts):
+    """세트 옵션으로 쓸 만한지 — 가격 범위와 개수로 거른다."""
+    out, seen = [], set()
+    for o in opts:
+        name, price = o.get("name"), o.get("price")
+        if not name or not price:
+            continue
+        if not (_OPT_MIN_PRICE <= price <= _OPT_MAX_PRICE):
+            continue
+        key = (name, price)
+        if key in seen:
+            continue
+        seen.add(key)
+        out.append({"name": name[:120], "price": price})
+    return out[:_OPT_MAX_COUNT] if len(out) <= _OPT_MAX_COUNT else []
+
+
+def _collapse_variants(opts):
+    """색상·사이즈만 다른 항목을 한 줄로 접는다.
+
+    "입모아컵(핑크) 21,000 / (옐로우) 21,000 / (블루) 21,000 …"처럼 같은 가격이 색상 수만큼
+    반복되는 게 흔하다. 그대로 두면 15줄짜리 구성표가 되는데, "어느 구성이 이득인가"를
+    보는 데는 도움이 안 된다. 가격이 같고 끝의 괄호만 다르면 같은 구성으로 본다.
+    """
+    groups = {}
+    for o in opts:
+        base = re.sub(r"\s*[(\[][^()\[\]]{1,20}[)\]]\s*$", "", o["name"]).strip()
+        groups.setdefault((o["price"], base or o["name"]), o["name"])
+    if len(groups) == len(opts):
+        return opts
+    return [{"name": base, "price": price} for (price, base) in groups]
+
+
+def _options_wiz(html):
+    """위즈 계열(mamahome·foryou-home·rara-home·mariettle 등 goods_info.wiz)."""
+    m = _WIZ_SELECT.search(html)
+    if not m:
+        return []
+    out = []
+    for om in _OPTION_TAG.finditer(m.group(1)):
+        val = re.search(r'value="([^"]*)"', om.group(1))
+        if not val or val.group(1) in ("", "*", "**", "0"):
+            continue
+        text = html_mod.unescape(re.sub(r"<[^>]+>", "", om.group(2))).strip()
+        pm = _WIZ_OPT_PRICE.search(text)
+        if not pm:
+            continue
+        out.append({"name": _opt_name_clean(text[: pm.start()]),
+                    "price": int(pm.group(1).replace(",", ""))})
+    return out
+
+
+def _options_cafe24(html):
+    return [{"name": _opt_name_clean(m.group(2)), "price": int(m.group(1))}
+            for m in _C24_OPT.finditer(html)]
+
+
+def extract_options(html):
+    """상세 페이지에서 세트 옵션을 뽑는다. 못 뽑으면 빈 리스트."""
+    for parser in (_options_wiz, _options_cafe24):
+        try:
+            opts = _valid_options(parser(html))
+        except Exception:
+            continue
+        if len(opts) < 2:       # 옵션이 하나뿐이면 세트 구조가 아니라 그냥 단일 상품
+            continue
+        # 가격이 전부 같으면 세트가 아니라 색상·사이즈 변형이다. 구성표에 15줄을 늘어놓아도
+        # "어느 세트가 이득인가"라는 판단에는 아무 도움이 안 되므로 넣지 않는다.
+        if len({o["price"] for o in opts}) == 1:
+            continue
+        opts = _collapse_variants(opts)
+        if len(opts) < 2:
+            continue
+        return opts
+    return []
+
+
 # 고정 마감일 없이 "재고 떨어지면 종료"하는 판매 방식 — 추출 실패와는 구분해야 한다
 _SOLD_OUT_PATTERN = re.compile(r"소진\s*시|품절\s*시|재고\s*소진|매진\s*시")
 
@@ -567,6 +680,14 @@ def fetch_product_info(url, domain):
         if r.status_code != 200:
             debug["extraction_error"] = f"HTTP {r.status_code}"
             return {}, debug
+        # 국내 자사몰은 EUC-KR이 흔한데, HTTP 헤더에 charset이 없으면 requests가
+        # ISO-8859-1로 읽어 옵션명이 통째로 깨진다. meta 선언을 직접 보고 맞춘다.
+        if "charset" not in (r.headers.get("Content-Type") or "").lower():
+            head = r.content[:2048].decode("ascii", "replace").lower()
+            if "euc-kr" in head or "ks_c_5601" in head:
+                r.encoding = "euc-kr"
+            elif r.encoding and r.encoding.lower() == "iso-8859-1":
+                r.encoding = r.apparent_encoding or "utf-8"
         html = r.text
     except Exception as e:
         debug["extraction_error"] = str(e)[:120]
@@ -777,6 +898,17 @@ def fetch_product_info(url, domain):
     # 원래 마감일이 없는 판매 방식으로 본다
     if not result.get("deadline") and _SOLD_OUT_PATTERN.search(clean):
         result["sold_out_only"] = True
+
+    options = extract_options(html)
+    if options:
+        result["options"] = options
+        # 세트가 여러 개면 대표 가격은 가장 싼 세트여야 한다 — 화면이 "N원부터"로 쓰기 때문
+        cheapest = min(o["price"] for o in options)
+        if not result.get("price") or result["price"] > cheapest:
+            result["price"] = cheapest
+            debug["extraction_method"] = debug.get("extraction_method") or "options"
+            debug["extraction_confidence"] = "high"
+    debug["options_found"] = len(options)
 
     debug["selected_price"] = result.get("price")
     debug["selected_deadline"] = result.get("deadline")
@@ -1107,6 +1239,7 @@ def block_to_post(b, sc, ig_handle, price, domain, profile_url, purchase_url, de
         "influencer_id":   source_obj.get("id") if source_obj else None,
         "market_price":    market.get("market_price"),
         "market_source":   market.get("market_source"),
+        "options":         pi.get("options") or [],
     }
 
 

@@ -32,7 +32,7 @@ export default function DealVerdictBox({ post }: { post: Post }) {
 
       {/* 세트 옵션이 있으면 게시물 단위 비교 대신 옵션별 표를 보여준다.
           어느 구성이 얼마나 싼지가 실제로 알고 싶은 정보다. */}
-      {v.options.length > 0 ? (
+      {v.options.some(o => o.option.comparePrice) ? (
         <div className="scroller">
           <table className="verdict-table option-table">
             <thead>
@@ -89,6 +89,28 @@ export default function DealVerdictBox({ post }: { post: Post }) {
           )}
         </tbody>
       </table>
+      )}
+
+      {/* 비교가가 아직 없는 구성 목록. 수집기가 상세페이지에서 가격만 긁어온 경우인데,
+          등급 근거는 위 비교표가 대고 여기서는 "구성이 여러 개"라는 사실만 알린다.
+          "일반 구매가 —"가 줄줄이 늘어선 4열 표를 대신 보여주면 아직 못 채운 값이
+          없는 값처럼 읽힌다. */}
+      {v.options.length > 0 && !v.options.some(o => o.option.comparePrice) && (
+        <div className="scroller">
+          <table className="verdict-table option-table">
+            <thead>
+              <tr><th>구성 {v.options.length}개</th><th className="num">공구가</th></tr>
+            </thead>
+            <tbody>
+              {v.options.map((o, i) => (
+                <tr key={i}>
+                  <td className="option-name">{o.option.name || `구성 ${i + 1}`}</td>
+                  <td className="num option-price">{o.option.price.toLocaleString()}원</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       )}
 
       <p className="verdict-rate">

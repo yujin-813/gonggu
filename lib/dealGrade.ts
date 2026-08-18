@@ -175,9 +175,13 @@ function verdictFromOptions(post: Post, opts: DealOption[]): DealVerdict {
 }
 
 export function getDealVerdict(post: Post): DealVerdict {
-  // 세트 옵션이 등록돼 있으면 그쪽이 정확하다 — 게시물 단위 비교가보다 우선한다
+  // 세트 옵션이 등록돼 있으면 그쪽이 정확하다 — 게시물 단위 비교가보다 우선한다.
+  // 단 비교가가 하나라도 있을 때만이다. 수집기가 자동으로 채운 옵션은 가격만 있고
+  // 비교가가 없는데, 그것만 보고 옵션 경로를 타면 origPrice·네이버 최저가로 잘 나오던
+  // 판정이 옵션이 붙는 순간 "판정 대기"로 후퇴한다. 그럴 땐 아래 게시물 단위 비교를
+  // 그대로 쓰고, 옵션은 구성 목록으로만 보여준다.
   const opts = (post.options || []).filter(o => o && o.price > 0)
-  if (opts.length) return verdictFromOptions(post, opts)
+  if (opts.some(o => o.comparePrice && o.comparePrice > 0)) return verdictFromOptions(post, opts)
 
   // 사람이 확인한 값과 자동으로 긁어온 값을 나눠 담는다 — 신뢰도가 다르기 때문이다
   const verified: ComparePrice[] = []
@@ -199,6 +203,10 @@ export function getDealVerdict(post: Post): DealVerdict {
   // 믿기 어려운 자동 매칭은 기준에서도 화면에서도 뺀다. 관리자가 값을 고치면 다시 들어온다.
   const trustedAuto = auto.filter(c => !post.price || c.price >= post.price * AUTO_MATCH_FLOOR)
 
+  // 판정은 게시물 단위로 하더라도 구성이 여러 개라는 사실은 알려줘야 한다
+  const displayOptions: OptionVerdict[] = opts.map(o => ({ option: o, discountRate: null, saved: null }))
+  const optionFromPrice = opts.length ? Math.min(...opts.map(o => o.price)) : null
+
   // 기준가는 믿을 수 있는 값들 중 가장 싼 것 — 이래야 할인율을 부풀리지 않는다
   const candidates: ComparePrice[] = [...verified, ...trustedAuto]
 
@@ -211,7 +219,7 @@ export function getDealVerdict(post: Post): DealVerdict {
       display: { key: 'multi', ...NON_GRADE_STATES.multi },
       grade: null, referencePrice: null, referenceLabel: '', discountRate: null,
       comparePrices: [], customLine: null, exclusive,
-      options: [], fromPrice: null, rateRange: null,
+      options: displayOptions, fromPrice: optionFromPrice, rateRange: null,
     }
   }
 
@@ -221,7 +229,7 @@ export function getDealVerdict(post: Post): DealVerdict {
       display: { key: 'pending', ...NON_GRADE_STATES.pending },
       grade: null, referencePrice: null, referenceLabel: '', discountRate: null,
       comparePrices: candidates, customLine: null, exclusive,
-      options: [], fromPrice: null, rateRange: null,
+      options: displayOptions, fromPrice: optionFromPrice, rateRange: null,
     }
   }
 
@@ -242,7 +250,7 @@ export function getDealVerdict(post: Post): DealVerdict {
       comparePrices: candidates,
       customLine: post.custom_verdict_detail || post.custom_verdict,
       exclusive,
-      options: [], fromPrice: null, rateRange: null,
+      options: displayOptions, fromPrice: optionFromPrice, rateRange: null,
     }
   }
 
@@ -252,7 +260,7 @@ export function getDealVerdict(post: Post): DealVerdict {
       display: { key, ...NON_GRADE_STATES[key] },
       grade: null, referencePrice: null, referenceLabel: '', discountRate: null,
       comparePrices: [], customLine: null, exclusive,
-      options: [], fromPrice: null, rateRange: null,
+      options: displayOptions, fromPrice: optionFromPrice, rateRange: null,
     }
   }
 
@@ -267,7 +275,7 @@ export function getDealVerdict(post: Post): DealVerdict {
     comparePrices: candidates,
     customLine: null,
     exclusive,
-    options: [], fromPrice: null, rateRange: null,
+    options: displayOptions, fromPrice: optionFromPrice, rateRange: null,
   }
 }
 
