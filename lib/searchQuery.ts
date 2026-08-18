@@ -42,3 +42,46 @@ export function partnerSearchQuery(post: { title: string; brand?: string | null 
   if (cleaned.toLowerCase().includes(brand.toLowerCase())) return cleaned
   return `${brand} ${cleaned}`.trim()
 }
+
+/**
+ * 상세페이지에서 복사한 옵션 목록을 세트 행으로 바꾼다.
+ *
+ * 구매 링크 도메인이 40종 넘게 흩어져 있어(스룩페이·스마트스토어·자사몰 제각각)
+ * 사이트마다 크롤러를 만드는 건 현실적이지 않다. 대신 관리자가 상세페이지에서
+ * 옵션 목록을 그대로 긁어 붙여넣으면 파싱해 준다 — 형식이 제각각이어도 "구성명 + 숫자"
+ * 패턴은 거의 공통이라 이 편이 훨씬 넓게 먹는다.
+ *
+ * 한 줄에 숫자가 둘이면 작은 쪽을 공구가, 큰 쪽을 비교가로 본다.
+ */
+export function parseOptionLines(text: string): { name: string; price: number; comparePrice: number | null }[] {
+  const out: { name: string; price: number; comparePrice: number | null }[] = []
+  for (const raw of (text || '').split('\n')) {
+    const line = raw.trim()
+    if (!line) continue
+    // 1,000 단위 콤마가 있는 숫자를 우선 잡고, 없으면 4자리 이상 숫자를 가격 후보로 본다
+    const nums = (line.match(/\d[\d,]{2,}/g) || [])
+      .map(n => parseInt(n.replace(/,/g, ''), 10))
+      .filter(n => n >= 500)
+    if (!nums.length) continue
+    // 구성명에서 가격과 흔한 장식 문자를 걷어낸다
+    let name = line
+    for (const n of line.match(/\d[\d,]{2,}/g) || []) name = name.replace(n, ' ')
+    name = name.replace(/원|₩/g, ' ')
+    // 가격을 걷어내면 "(정가 )"처럼 껍데기만 남는 괄호가 생긴다 — 안에 실제 내용이
+    // 없으면 통째로 버린다
+    name = name.replace(/[([{]([^)\]}]*)[)\]}]/g, (m, inner: string) =>
+      /[가-힣a-zA-Z0-9]/.test(inner.replace(/정가|소비자가|판매가|할인가|정상가/g, '')) ? m : ' ')
+    name = name
+      .replace(/^[\s\-•·▶►*]+|[\s\-•·:/]+$/g, '')
+      .replace(/\s+/g, ' ')
+      .trim()
+    if (!name) continue
+    const sorted = [...nums].sort((a, b) => a - b)
+    out.push({
+      name,
+      price: sorted[0],
+      comparePrice: sorted.length > 1 ? sorted[sorted.length - 1] : null,
+    })
+  }
+  return out
+}

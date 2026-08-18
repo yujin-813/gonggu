@@ -19,3 +19,17 @@ export function enforcePurchaseLinkRequirement(post: Post): Post {
     review_reason: reasons.includes(NO_PURCHASE_LINK_REASON) ? reasons : [...reasons, NO_PURCHASE_LINK_REASON],
   }
 }
+
+/**
+ * 세트 옵션이 있으면 게시물의 price를 가장 싼 옵션 가격에 맞춘다.
+ *
+ * 카드·상세는 옵션에서 "N원부터"를 계산해 보여주지만, 공유 문구·공유 카드 이미지·
+ * 종료 페이지의 "당시 공구가"·할인율 정렬은 여전히 post.price를 본다. 둘이 어긋나면
+ * 같은 상품이 화면마다 다른 가격으로 보인다. 저장 시점에 한 번 맞춰 둔다.
+ */
+export function syncPriceWithOptions(post: Post): Post {
+  const prices = (post.options || []).map(o => o.price).filter(n => n > 0)
+  if (!prices.length) return post
+  const min = Math.min(...prices)
+  return post.price === min ? post : { ...post, price: min }
+}

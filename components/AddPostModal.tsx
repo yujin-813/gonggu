@@ -1,7 +1,8 @@
 'use client'
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useMemo } from 'react'
 import type { Post, Category, PurchaseLink, DealOption } from '@/lib/types'
 import { normalizePurchaseLinks } from '@/lib/purchaseLinks'
+import { parseOptionLines } from '@/lib/searchQuery'
 
 const CATEGORIES = [
   { value: 'kids',   label: '유아동' },
@@ -83,6 +84,9 @@ export default function AddPostModal({ onClose, onSubmit, editPost, existingGrou
   const [purchaseLinks, setPurchaseLinks] = useState<PurchaseLink[]>([])
   const [marketPrice, setMarketPrice] = useState('')
   const [options, setOptions] = useState<DealOption[]>([])
+  const [pasteOpen, setPasteOpen] = useState(false)
+  const [pasteText, setPasteText] = useState('')
+  const pastePreview = useMemo(() => parseOptionLines(pasteText), [pasteText])
 
   const [imgFile,    setImgFile]    = useState<File | null>(null)
   const [imgPreview, setImgPreview] = useState('')   // blob URL or existing img URL
@@ -621,11 +625,53 @@ export default function AddPostModal({ onClose, onSubmit, editPost, existingGrou
           )
         })}
 
-        <button type="button"
-          onClick={() => setOptions(prev => [...prev, { name: '', price: 0, comparePrice: null, gift: null }])}
-          style={{ padding: '7px 12px', background: '#eef2ff', color: '#4338ca', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 12, fontWeight: 700, marginBottom: 4 }}>
-          + 세트 추가
-        </button>
+        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 4 }}>
+          <button type="button"
+            onClick={() => setOptions(prev => [...prev, { name: '', price: 0, comparePrice: null, gift: null }])}
+            style={{ padding: '7px 12px', background: '#eef2ff', color: '#4338ca', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 12, fontWeight: 700 }}>
+            + 세트 추가
+          </button>
+          <button type="button" onClick={() => setPasteOpen(v => !v)}
+            style={{ padding: '7px 12px', background: pasteOpen ? '#4338ca' : '#f1f5f9', color: pasteOpen ? '#fff' : '#475569', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 12, fontWeight: 700 }}>
+            붙여넣기로 한 번에
+          </button>
+        </div>
+
+        {/* 세트가 7~8개인 공구를 손으로 한 줄씩 치는 건 오래 걸린다. 그렇다고 상세페이지를
+            자동으로 긁기도 어렵다 — 구매 링크 도메인이 40종 넘게 흩어져 있어(자사몰 제각각)
+            사이트별 크롤러를 만들 수가 없다. 대신 상세페이지에서 옵션 목록을 그대로 복사해
+            붙여넣으면 파싱해 준다. 형식이 달라도 "구성명 + 숫자" 패턴은 거의 공통이다. */}
+        {pasteOpen && (
+          <div style={{ border: '1px dashed #c7d2fe', borderRadius: 10, padding: 10, marginBottom: 8, background: '#f8faff' }}>
+            <p style={{ fontSize: 11, color: '#64748b', margin: '0 0 6px' }}>
+              상세페이지의 옵션 목록을 그대로 복사해서 붙여넣으세요. 한 줄에 숫자가 둘이면 작은 쪽을 공구가, 큰 쪽을 비교가로 잡습니다.
+            </p>
+            <textarea value={pasteText} onChange={e => setPasteText(e.target.value)} rows={5}
+              placeholder={'위시 1개 + 칫솔 6개  32,780원  45,000원\n위시 2개 + 칫솔 6개 + 치약 3개  65,780원  90,000원'}
+              style={{ width: '100%', fontSize: 12, fontFamily: 'inherit', padding: 8, border: '1px solid #e2e8f0', borderRadius: 8, resize: 'vertical' }} />
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 6, flexWrap: 'wrap' }}>
+              <button type="button"
+                onClick={() => {
+                  const parsed = parseOptionLines(pasteText)
+                  if (!parsed.length) return
+                  setOptions(prev => [...prev, ...parsed.map(p => ({ ...p, gift: null }))])
+                  setPasteText('')
+                  setPasteOpen(false)
+                }}
+                disabled={pastePreview.length === 0}
+                style={{ padding: '6px 12px', background: pastePreview.length ? '#4338ca' : '#cbd5e1', color: '#fff', border: 'none', borderRadius: 8, cursor: pastePreview.length ? 'pointer' : 'default', fontSize: 12, fontWeight: 700 }}>
+                {pastePreview.length ? `${pastePreview.length}개 세트로 넣기` : '세트로 넣기'}
+              </button>
+              {pasteText.trim() && (
+                <span style={{ fontSize: 11, color: pastePreview.length ? '#15803d' : '#dc2626' }}>
+                  {pastePreview.length
+                    ? `미리보기: ${pastePreview[0].name} · ${pastePreview[0].price.toLocaleString()}원${pastePreview[0].comparePrice ? ` ← ${pastePreview[0].comparePrice.toLocaleString()}원` : ''}${pastePreview.length > 1 ? ` 외 ${pastePreview.length - 1}개` : ''}`
+                    : '가격을 읽지 못했어요. 줄마다 구성명과 가격이 함께 있어야 해요.'}
+                </span>
+              )}
+            </div>
+          </div>
+        )}
 
         {options.length > 0 && (
           <p style={{ fontSize: 11, color: '#94a3b8', margin: '6px 0 0' }}>
