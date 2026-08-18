@@ -71,7 +71,7 @@ def main():
             failed += 1
             continue
 
-        opts = extract_options(html)
+        opts = extract_options(html, url)
         if not opts:
             skipped += 1
             continue

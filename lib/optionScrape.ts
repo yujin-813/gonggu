@@ -83,15 +83,73 @@ function fromCafe24(html: string): DealOption[] {
   return out
 }
 
+
+/**
+ * 아임웹 — 옵션이 상세 페이지가 아니라 /shop/load_option.cm 응답에 들어 있다.
+ *
+ * 한 상품만 보고 "아임웹은 장바구니에 담아야 가격이 나온다"고 단정했다가 틀렸다. 옵션이
+ * 2단계인 상품(단계를 고르면 그다음 목록이 뜨는 구조)만 1단계 응답에 가격이 없는 것이고,
+ * 대부분은 옵션명 옆에 "₩65,780"이 그대로 붙어 나온다. 그런 상품은 여기서 다 가져온다.
+ * 2단계 상품은 빈 배열을 돌려주고 붙여넣기로 넘긴다 — 남의 쇼핑몰 장바구니에 담아가며
+ * 긁을 일은 아니다.
+ */
+const IMWEB_MARK = /SITE_SHOP_DETAIL|\/shop_view\?idx=/
+const IMWEB_OPT = /selectRequireOption\([^)]*?,\s*'([^']*)'\s*,\s*function[\s\S]{0,400}?<strong>\s*₩\s*([\d,]+)\s*<\/strong>/g
+
+function imwebProdIdx(url: string, html: string): string | null {
+  const fromUrl = /[?&]idx=(\d+)/.exec(url)
+  if (fromUrl) return fromUrl[1]
+  const fromHtml = /"prod_idx"\s*:\s*(\d+)|iProductNo\s*=\s*(\d+)/.exec(html)
+  return fromHtml ? (fromHtml[1] || fromHtml[2]) : null
+}
+
+async function optionsFromImweb(finalUrl: string, html: string): Promise<DealOption[]> {
+  if (!IMWEB_MARK.test(html)) return []
+  const idx = imwebProdIdx(finalUrl, html)
+  if (!idx) return []
+  const origin = new URL(finalUrl).origin
+  let json: { option_html?: string }
+  try {
+    const res = await fetch(`${origin}/shop/load_option.cm`, {
+      method: 'POST',
+      headers: {
+        'User-Agent': UA,
+        'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
+        'X-Requested-With': 'XMLHttpRequest',
+        Referer: finalUrl,
+      },
+      body: new URLSearchParams({ type: 'prod', prod_idx: idx, selected_require_options: '', __: '' }),
+      signal: AbortSignal.timeout(12000),
+    })
+    if (!res.ok) return []
+    json = await res.json()
+  } catch {
+    return []
+  }
+  const optHtml = json.option_html || ''
+  const out: DealOption[] = []
+  for (const m of optHtml.matchAll(IMWEB_OPT)) {
+    out.push({ name: cleanName(m[1]), price: parseInt(m[2].replace(/,/g, ''), 10) })
+  }
+  return out
+}
+
+/** 파서가 뽑아온 원본 목록에 공통 규칙(부속품 제외·색상 변형 접기 등)을 적용한다 */
+function finalizeOptions(raw: DealOption[]): DealOption[] {
+  let opts: DealOption[]
+  try { opts = validate(raw) } catch { return [] }
+  if (opts.length < 2) return []          // 하나뿐이면 세트 구조가 아니라 단일 상품
+  if (new Set(opts.map(o => o.price)).size === 1) return []  // 전부 같은 가격이면 색상 변형
+  const collapsed = collapseVariants(opts)
+  return collapsed.length < 2 ? [] : collapsed
+}
+
 export function extractOptionsFromHtml(html: string): DealOption[] {
   for (const parser of [fromWiz, fromCafe24]) {
-    let opts: DealOption[]
-    try { opts = validate(parser(html)) } catch { continue }
-    if (opts.length < 2) continue          // 하나뿐이면 세트 구조가 아니라 단일 상품
-    if (new Set(opts.map(o => o.price)).size === 1) continue  // 전부 같은 가격이면 색상 변형
-    const collapsed = collapseVariants(opts)
-    if (collapsed.length < 2) continue
-    return collapsed
+    let raw: DealOption[]
+    try { raw = parser(html) } catch { continue }
+    const opts = finalizeOptions(raw)
+    if (opts.length) return opts
   }
   return []
 }
@@ -109,9 +167,6 @@ const KNOWN_BLOCKED: [RegExp, string][] = [
   [/smartstore\.naver|brand\.naver|shopping\.naver/, '네이버는 자동 조회를 차단해요. 옵션 목록을 복사해서 붙여넣어 주세요.'],
   [/srookpay/, '스룩페이는 옵션을 자바스크립트로 그려서 못 읽어요. 복사해서 붙여넣어 주세요.'],
   [/coupang\.com/, '쿠팡은 자동 조회를 차단해요. 복사해서 붙여넣어 주세요.'],
-  // 아임웹은 옵션을 단계별로 나눠 불러오는데, 마지막 단계까지 고르고 장바구니에 담아야
-  // 가격이 나온다. 남의 쇼핑몰 장바구니에 상품을 담아가며 긁을 수는 없으므로 시도하지 않는다.
-  [/\/shop_view\?|imweb\.me/, '이 쇼핑몰은 옵션 가격을 단계별로만 보여줘서 자동으로 못 읽어요. 목록을 복사해서 붙여넣어 주세요.'],
 ]
 
 // 인증서 체인이 불완전해서 생긴 실패인지 — 그 외의 네트워크 오류까지 검증을 끄고
@@ -204,9 +259,13 @@ export async function scrapeOptions(url: string): Promise<ScrapeResult> {
   let status: number
   let buf: Buffer
   let ctype: string
+  // 인포크처럼 중간 링크를 거치면 최종 주소가 달라진다. 아임웹 옵션 요청은 그 최종
+  // 도메인으로 보내야 하므로 리다이렉트 후 주소를 들고 있는다.
+  let finalUrl = url
   try {
     const res = await fetch(url, init)
     status = res.status
+    finalUrl = res.url || url
     buf = Buffer.from(await res.arrayBuffer())
     ctype = (res.headers.get('content-type') || '').toLowerCase()
   } catch (e) {
@@ -246,6 +305,13 @@ export async function scrapeOptions(url: string): Promise<ScrapeResult> {
 
   const options = extractOptionsFromHtml(html)
   if (options.length) return { options, reason: null }
+
+  // 아임웹은 옵션을 별도 요청으로 내려주므로 본문만 봐서는 절대 못 찾는다
+  const viaImweb = finalizeOptions(await optionsFromImweb(finalUrl, html))
+  if (viaImweb.length) return { options: viaImweb, reason: null }
+  if (IMWEB_MARK.test(html)) {
+    return { options: [], reason: '이 상품은 옵션을 단계별로 나눠 보여줘서 가격을 자동으로 못 읽어요. 목록을 복사해서 붙여넣어 주세요.' }
+  }
 
   if (looksSoldEnded(html)) {
     return { options: [], reason: '판매가 끝난 페이지예요. 옵션이 남아 있지 않아요.' }

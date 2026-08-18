@@ -644,9 +644,57 @@ def _options_cafe24(html):
             for m in _C24_OPT.finditer(html)]
 
 
-def extract_options(html):
-    """상세 페이지에서 세트 옵션을 뽑는다. 못 뽑으면 빈 리스트."""
-    for parser in (_options_wiz, _options_cafe24):
+# 아임웹은 옵션을 상세 페이지가 아니라 /shop/load_option.cm 응답으로 내려준다.
+# 옵션이 2단계인 상품(단계를 고르면 다음 목록이 뜨는 구조)은 1단계 응답에 가격이 없어서
+# 못 가져오지만, 대부분은 옵션명 옆에 "₩65,780"이 그대로 붙어 나온다.
+_IMWEB_MARK = re.compile(r"SITE_SHOP_DETAIL|/shop_view\?idx=")
+_IMWEB_OPT = re.compile(
+    r"selectRequireOption\([^)]*?,\s*'([^']*)'\s*,\s*function[\s\S]{0,400}?<strong>\s*₩\s*([\d,]+)\s*</strong>"
+)
+
+
+def _imweb_prod_idx(url, html):
+    m = re.search(r"[?&]idx=(\d+)", url or "")
+    if m:
+        return m.group(1)
+    m = re.search(r'"prod_idx"\s*:\s*(\d+)|iProductNo\s*=\s*(\d+)', html)
+    return (m.group(1) or m.group(2)) if m else None
+
+
+def _options_imweb(html, url):
+    if not url or not _IMWEB_MARK.search(html):
+        return []
+    idx = _imweb_prod_idx(url, html)
+    if not idx:
+        return []
+    from urllib.parse import urlsplit
+    parts = urlsplit(url)
+    origin = f"{parts.scheme}://{parts.netloc}"
+    try:
+        r = requests.post(
+            f"{origin}/shop/load_option.cm",
+            data={"type": "prod", "prod_idx": idx, "selected_require_options": "", "__": ""},
+            headers={"User-Agent": UA, "X-Requested-With": "XMLHttpRequest", "Referer": url},
+            timeout=10,
+        )
+        if r.status_code != 200:
+            return []
+        opt_html = r.json().get("option_html") or ""
+    except Exception:
+        return []
+    return [{"name": _opt_name_clean(m.group(1)), "price": int(m.group(2).replace(",", ""))}
+            for m in _IMWEB_OPT.finditer(opt_html)]
+
+
+def extract_options(html, url=None):
+    """상세 페이지에서 세트 옵션을 뽑는다. 못 뽑으면 빈 리스트.
+
+    url을 주면 아임웹처럼 옵션을 별도 요청으로 내려주는 쇼핑몰까지 시도한다.
+    """
+    parsers = [lambda h: _options_wiz(h), lambda h: _options_cafe24(h)]
+    if url:
+        parsers.append(lambda h: _options_imweb(h, url))
+    for parser in parsers:
         try:
             opts = _valid_options(parser(html))
         except Exception:
@@ -922,7 +970,7 @@ def fetch_product_info(url, domain):
     if not result.get("deadline") and _SOLD_OUT_PATTERN.search(clean):
         result["sold_out_only"] = True
 
-    options = extract_options(html)
+    options = extract_options(html, url)
     if options:
         result["options"] = options
         # 여기서 대표가를 옵션 최저가로 낮추면 안 된다. 옵션 목록에는 "[단품] 마우스피스
