@@ -53,13 +53,6 @@ export default function PostCard({
   // 애매한 걸 확인됐다고 하면 나중에 신뢰만 잃으므로, 확실할 때만 긍정 신호를 준다
   const extractionConfidence = (post.extraction_debug as Record<string, unknown> | null)?.extraction_confidence as string | undefined
   const isVerified = post.source === 'manual' || extractionConfidence === 'high'
-  // 절약 금액은 원화로(체감이 잘 옴), 퍼센트도 괄호로 같이 보여준다 — "네이버보다 8,300원(15%) 저렴"
-  const savedAmount =
-    post.origPrice && post.origPrice > post.price
-      ? post.origPrice - post.price
-      : 0
-  const savedRate = savedAmount > 0 && post.origPrice ? Math.round((savedAmount / post.origPrice) * 100) : 0
-  const savedLabel = post.market_url ? '네이버' : '정가'
 
   const profileUrl = post.account
     ? `https://instagram.com/${post.account.replace('@', '')}`
@@ -70,6 +63,29 @@ export default function PostCard({
   // 판정 결과는 배지·공유 문구 양쪽에서 쓴다 — 공유되는 건 "상품"이 아니라 "가격 판정"이라,
   // 받는 사람이 링크를 누르기 전에 이미 싼지 알 수 있어야 열어볼 이유가 생긴다
   const verdict = getDealVerdict(post)
+
+  // 할인율은 반드시 판정(getDealVerdict)에서 가져온다.
+  //
+  // 예전에는 카드가 origPrice로 따로 계산했는데, 판정 쪽에만 있는 안전장치(믿기 어려운
+  // 자동매칭 배제, 여러 상품 공구 제외, 옵션 비교가 우선)를 전부 건너뛰는 셈이라 값이
+  // 갈렸다. 공개 247건 중 33건이 어긋났고, 그중에는 실제로는 더 비싼 공구를 "20% 저렴"으로
+  // 표시하던 것도 있었다. 가격을 검증해 주겠다는 서비스에서 이건 치명적이라, 화면에 나가는
+  // 숫자는 한 곳에서만 나오게 한다.
+  const savedChip: string | null = (() => {
+    if (verdict.rateRange) {
+      const lo = Math.round(verdict.rateRange.min * 100)
+      const hi = Math.round(verdict.rateRange.max * 100)
+      if (hi <= 0) return null
+      return lo === hi ? `약 ${hi}% 저렴` : `구성별 ${Math.max(lo, 0)}~${hi}% 저렴`
+    }
+    if (verdict.discountRate === null || verdict.discountRate <= 0) return null
+    const rate = Math.round(verdict.discountRate * 100)
+    if (rate <= 0) return null
+    const saved = verdict.referencePrice ? verdict.referencePrice - post.price : 0
+    return saved > 0
+      ? `${verdict.referenceLabel}보다 ${saved.toLocaleString()}원(${rate}%) 저렴`
+      : `${verdict.referenceLabel}보다 ${rate}% 저렴`
+  })()
   const altLinks = closed ? [] : visiblePurchaseLinks(post)
   const purchaseLink = post.purchase_url || post.url
   const canOpenPurchase = !closed && !isUpcoming && !!purchaseLink
@@ -194,9 +210,7 @@ export default function PostCard({
           <span className="price-sale-big">
             {verdict.fromPrice ? `${verdict.fromPrice.toLocaleString()}원부터` : `${post.price.toLocaleString()}원`}
           </span>
-          {savedAmount > 0 && (
-            <span className="discount-chip">{savedLabel}보다 {savedAmount.toLocaleString()}원({savedRate}%) 저렴</span>
-          )}
+          {savedChip && <span className="discount-chip">{savedChip}</span>}
         </div>
         {verdict.options.length > 1 && (
           <div className="price-from-note">
@@ -204,12 +218,14 @@ export default function PostCard({
             {verdict.rateRange && ` · 최대 ${Math.round(verdict.rateRange.max * 100)}% 저렴`}
           </div>
         )}
-        {!verdict.options.length && post.origPrice && post.origPrice > post.price && (
+        {/* 취소선 가격도 판정이 실제로 기준으로 삼은 값만 쓴다 — origPrice가 신뢰도 검사에서
+            빠진 값이면 화면에만 남아 할인율과 어긋난다 */}
+        {!verdict.options.length && verdict.referencePrice && verdict.referencePrice > post.price && (
           post.market_url
             ? <a href={post.market_url} target="_blank" rel="noopener noreferrer" className="price-orig" style={{ textDecoration: 'none', display: 'inline-block', marginBottom: post.market_price ? 2 : 8 }}>
-                네이버쇼핑 {post.origPrice.toLocaleString()}원 →
+                {verdict.referenceLabel} {verdict.referencePrice.toLocaleString()}원 →
               </a>
-            : <span className="price-orig" style={{ display: 'inline-block', marginBottom: 8 }}>정가 {post.origPrice.toLocaleString()}원</span>
+            : <span className="price-orig" style={{ display: 'inline-block', marginBottom: 8 }}>{verdict.referenceLabel} {verdict.referencePrice.toLocaleString()}원</span>
         )}
         {post.market_price && (
           <div style={{ fontSize: 10, color: 'var(--gray-3)', marginBottom: 8 }}>네이버 최저가 기준 비교</div>
