@@ -203,9 +203,13 @@ export function getDealVerdict(post: Post): DealVerdict {
   // 믿기 어려운 자동 매칭은 기준에서도 화면에서도 뺀다. 관리자가 값을 고치면 다시 들어온다.
   const trustedAuto = auto.filter(c => !post.price || c.price >= post.price * AUTO_MATCH_FLOOR)
 
-  // 판정은 게시물 단위로 하더라도 구성이 여러 개라는 사실은 알려줘야 한다
+  // 판정은 게시물 단위로 하더라도 구성이 여러 개라는 사실은 알려줘야 한다.
+  // 다만 fromPrice("N원부터")는 여기서 만들지 않는다 — 수집기가 자동으로 긁은 옵션에는
+  // "[단품] 마우스피스 19,000원"처럼 본품이 아닌 부속품이 섞여 있어서, 최저가를 그대로
+  // 쓰면 15만원짜리 치아미백기 공구가 "19,000원부터"로 보인다. 사람이 비교가까지
+  // 확인한 옵션(verdictFromOptions 경로)일 때만 "N원부터"를 쓴다.
   const displayOptions: OptionVerdict[] = opts.map(o => ({ option: o, discountRate: null, saved: null }))
-  const optionFromPrice = opts.length ? Math.min(...opts.map(o => o.price)) : null
+  const optionFromPrice = null
 
   // 기준가는 믿을 수 있는 값들 중 가장 싼 것 — 이래야 할인율을 부풀리지 않는다
   const candidates: ComparePrice[] = [...verified, ...trustedAuto]

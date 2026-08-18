@@ -564,12 +564,19 @@ def _opt_name_clean(raw):
     return re.sub(r"\s+", " ", n).strip(" .·-")
 
 
+# "(추가옵션) 코튼스왑 1개 2,700원"처럼 본품에 얹는 부속품은 구성이 아니다.
+# 이걸 구성으로 세면 가장 싼 값이 2,700원이 되어 "2,700원부터"라는 거짓말이 나온다.
+_ADDON_NAME = re.compile(r"추가\s*(옵션|구성|선택|상품)|옵션\s*추가|사은품만|쇼핑백")
+
+
 def _valid_options(opts):
     """세트 옵션으로 쓸 만한지 — 가격 범위와 개수로 거른다."""
     out, seen = [], set()
     for o in opts:
         name, price = o.get("name"), o.get("price")
         if not name or not price:
+            continue
+        if _ADDON_NAME.search(name):
             continue
         if not (_OPT_MIN_PRICE <= price <= _OPT_MAX_PRICE):
             continue
@@ -902,12 +909,10 @@ def fetch_product_info(url, domain):
     options = extract_options(html)
     if options:
         result["options"] = options
-        # 세트가 여러 개면 대표 가격은 가장 싼 세트여야 한다 — 화면이 "N원부터"로 쓰기 때문
-        cheapest = min(o["price"] for o in options)
-        if not result.get("price") or result["price"] > cheapest:
-            result["price"] = cheapest
-            debug["extraction_method"] = debug.get("extraction_method") or "options"
-            debug["extraction_confidence"] = "high"
+        # 여기서 대표가를 옵션 최저가로 낮추면 안 된다. 옵션 목록에는 "[단품] 마우스피스
+        # 19,000원"처럼 본품이 아닌 부속품이 섞여 있어서, 최저가를 대표가로 쓰면 15만원짜리
+        # 치아미백기 공구가 "19,000원부터"로 보인다. 대표가는 페이지가 내세운 값을 그대로 두고,
+        # 옵션은 구성 목록으로만 쓴다. "N원부터"는 관리자가 비교가까지 확인한 뒤에 쓴다.
     debug["options_found"] = len(options)
 
     debug["selected_price"] = result.get("price")
