@@ -47,14 +47,31 @@
 
 set -e
 
+# 무엇이 바뀌었는지 비교하려면 당겨오기 전 커밋을 기억해 둬야 한다
+PREV_REV=$(git rev-parse HEAD 2>/dev/null || echo "")
+
 echo "▶ 코드 업데이트..."
 git pull origin main
 
-echo "▶ 의존성 설치..."
-npm ci --production=false
+# npm ci는 node_modules를 통째로 지웠다 다시 깐다. 돌아가는 서버가 그 밑에서 모듈을
+# 읽다 죽으므로, 잠금 파일이 실제로 바뀌었을 때만 돈다.
+echo "▶ 의존성 확인..."
+if [ -n "$PREV_REV" ] && git diff --quiet "$PREV_REV" HEAD -- package-lock.json package.json; then
+  echo "  · 변경 없음 — 설치 건너뜀"
+else
+  npm ci --production=false
+fi
 
-echo "▶ 빌드..."
-npm run build
+# 빌드는 예전 .next를 그대로 둔 채 딴 데서 한다. 이 동안 사이트는 멀쩡히 서비스된다.
+echo "▶ 빌드 (별도 디렉터리)..."
+rm -rf .next-build
+NEXT_DIST_DIR=.next-build npm run build
+
+# 다 만들어진 뒤에야 바꿔치기 — mv라서 순식간이고, 실패하면 .next-old로 되돌릴 수 있다
+echo "▶ 새 빌드로 교체..."
+rm -rf .next-old
+if [ -d .next ]; then mv .next .next-old; fi
+mv .next-build .next
 
 echo "▶ 파이썬 스크래퍼 환경 구성..."
 if [ ! -d venv ]; then
@@ -71,4 +88,23 @@ mkdir -p public/uploads public/scraped data
 echo "▶ PM2 재시작..."
 pm2 reload gonggu || pm2 start ecosystem.config.js
 
-echo "✅ 배포 완료 → https://gonggu.asknuggetdata.com"
+# 되살아났는지 확인하고, 안 되면 직전 빌드로 되돌린다
+echo "▶ 기동 확인..."
+for i in $(seq 1 20); do
+  if curl -fsS -o /dev/null http://localhost:3002/; then
+    echo "  ✓ 정상 응답 (${i}회 시도)"
+    rm -rf .next-old
+    echo "✅ 배포 완료 → https://gonggu.asknuggetdata.com"
+    exit 0
+  fi
+  sleep 1
+done
+
+echo "❌ 새 빌드가 응답하지 않습니다 — 직전 빌드로 되돌립니다"
+if [ -d .next-old ]; then
+  rm -rf .next
+  mv .next-old .next
+  pm2 reload gonggu
+  echo "  ↩ 롤백 완료"
+fi
+exit 1

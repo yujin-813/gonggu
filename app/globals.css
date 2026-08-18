@@ -1487,3 +1487,22 @@ header {
 
 /* 카드에서 "N원부터"로 보일 때의 보조 문구 */
 .price-from-note { font-size: 12px; color: var(--gray-3); margin-top: 2px; }
+
+/* ── 인플루언서 목록 ──
+   헤더·검색·카테고리는 .header-inner/.hero-search-wrap/.category-wrap 이 이미 680px로
+   묶는데 본문만 빠져 있어서, 화면이 넓어지면 목록만 끝까지 늘어났다. 같은 폭으로 맞춘다. */
+.influencer-intro,
+.influencer-list {
+  max-width: 680px;
+  margin: 0 auto;
+}
+.influencer-intro {
+  padding: 16px 20px 4px;
+  text-align: center;
+}
+.influencer-list {
+  padding: 12px 20px 100px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}

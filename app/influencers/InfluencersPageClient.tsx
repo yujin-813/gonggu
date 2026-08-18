@@ -61,7 +61,7 @@ export default function InfluencersPage() {
         </div>
       </div>
 
-      <div style={{ padding: '16px 16px 4px', textAlign: 'center' }}>
+      <div className="influencer-intro">
         <p style={{ fontSize: 13, color: '#64748b', margin: 0 }}>
           인플루언서를 골라 그 사람이 올린 상품(공구 아닌 추천템 포함)을 볼 수 있어요
         </p>
@@ -83,7 +83,7 @@ export default function InfluencersPage() {
         })}
       </div>
 
-      <div style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 10, paddingBottom: 100 }}>
+      <div className="influencer-list">
         {loading ? (
           <div className="empty"><p>불러오는 중...</p></div>
         ) : filtered.length === 0 ? (
