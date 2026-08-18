@@ -109,6 +109,9 @@ const KNOWN_BLOCKED: [RegExp, string][] = [
   [/smartstore\.naver|brand\.naver|shopping\.naver/, '네이버는 자동 조회를 차단해요. 옵션 목록을 복사해서 붙여넣어 주세요.'],
   [/srookpay/, '스룩페이는 옵션을 자바스크립트로 그려서 못 읽어요. 복사해서 붙여넣어 주세요.'],
   [/coupang\.com/, '쿠팡은 자동 조회를 차단해요. 복사해서 붙여넣어 주세요.'],
+  // 아임웹은 옵션을 단계별로 나눠 불러오는데, 마지막 단계까지 고르고 장바구니에 담아야
+  // 가격이 나온다. 남의 쇼핑몰 장바구니에 상품을 담아가며 긁을 수는 없으므로 시도하지 않는다.
+  [/\/shop_view\?|imweb\.me/, '이 쇼핑몰은 옵션 가격을 단계별로만 보여줘서 자동으로 못 읽어요. 목록을 복사해서 붙여넣어 주세요.'],
 ]
 
 // 인증서 체인이 불완전해서 생긴 실패인지 — 그 외의 네트워크 오류까지 검증을 끄고
@@ -161,6 +164,30 @@ function fetchInsecure(url: string, depth = 0): Promise<{ status: number; body: 
     req.on('timeout', () => req.destroy(new Error('시간 초과')))
     req.on('error', reject)
   })
+}
+
+/**
+ * 정말 판매가 끝난 페이지인지.
+ *
+ * 예전에는 본문 아무 데서나 "품절"이 보이면 끝난 걸로 봤는데, 쇼핑몰 솔루션이 한국어 UI
+ * 문자열 사전을 자바스크립트로 통째로 심어두는 경우가 있다(아임웹의 LOCALIZE에 "상품 품절",
+ * "존재하지 않거나"가 들어 있다). 그래서 멀쩡히 파는 닥터노아 페이지가 "판매가 끝났다"로
+ * 잘못 안내됐다. 스크립트·스타일을 걷어낸 본문만 보고, 표현도 오해의 여지가 적은 것만 센다.
+ *
+ * 애매하면 끝났다고 단정하지 않는다 — 틀린 단정이 "못 읽었어요"보다 더 사람을 헷갈리게 한다.
+ */
+function looksSoldEnded(html: string): boolean {
+  const body = html
+    .replace(/<script[\s\S]*?<\/script>/gi, ' ')
+    .replace(/<style[\s\S]*?<\/style>/gi, ' ')
+    .replace(/<!--[\s\S]*?-->/g, ' ')
+  if (/판매\s*(가\s*)?(종료|중지)(되었|됐|된|입니다)|일시\s*품절|품절된\s*상품|삭제되었거나\s*존재하지\s*않/.test(body)) {
+    return true
+  }
+  // 내린 상품에 텅 빈 응답을 주는 쇼핑몰이 있다(마리에뜰은 133바이트짜리 빈 문서를 준다).
+  // 문구가 없어도 사실상 사라진 페이지이므로 같이 묶는다.
+  const text = body.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim()
+  return text.length < 200
 }
 
 export async function scrapeOptions(url: string): Promise<ScrapeResult> {
@@ -220,7 +247,7 @@ export async function scrapeOptions(url: string): Promise<ScrapeResult> {
   const options = extractOptionsFromHtml(html)
   if (options.length) return { options, reason: null }
 
-  if (/판매\s*(종료|중지)|품절|존재하지 않/.test(html)) {
+  if (looksSoldEnded(html)) {
     return { options: [], reason: '판매가 끝난 페이지예요. 옵션이 남아 있지 않아요.' }
   }
   return { options: [], reason: '이 쇼핑몰에서는 옵션을 못 읽었어요. 목록을 복사해서 붙여넣어 주세요.' }
