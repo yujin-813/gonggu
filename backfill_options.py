@@ -78,10 +78,10 @@ def main():
 
         filled += 1
         by_domain[domain] = by_domain.get(domain, 0) + 1
-        cheapest = min(o["price"] for o in opts)
-        old_price = p.get("price")
-        print(f"  [{i}/{len(targets)}] {p['title'][:34]:34} 구성 {len(opts)}개 · 최저 {cheapest:,}원"
-              + (f" (기존 {old_price:,}원)" if old_price and old_price != cheapest else ""))
+        lo = min(o["price"] for o in opts)
+        hi = max(o["price"] for o in opts)
+        print(f"  [{i}/{len(targets)}] {p['title'][:34]:34} 구성 {len(opts)}개 "
+              f"({lo:,}~{hi:,}원) · 대표가 {p.get('price') or 0:,}원 유지")
         for o in opts[:3]:
             print(f"        · {o['name'][:44]:44} {o['price']:,}원")
 
