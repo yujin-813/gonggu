@@ -98,7 +98,7 @@ export default function AdminPage() {
   const [showAddModal, setShowAddModal] = useState(false)
   const [editingPost, setEditingPost]   = useState<Post | null>(null)
   const [loading, setLoading]         = useState(true)
-  const [filter, setFilter]           = useState<'all' | 'candidate' | 'needs_review' | 'ready' | 'published' | 'expired' | 'excluded' | 'upcoming' | 'featured' | 'no_link' | 'pending'>('all')
+  const [filter, setFilter]           = useState<'all' | 'candidate' | 'needs_review' | 'ready' | 'published' | 'expired' | 'excluded' | 'upcoming' | 'featured'>('all')
   const [searchQ, setSearchQ]         = useState('')
   const [analytics, setAnalytics]     = useState<DayStat[]>([])
   const [topPosts, setTopPosts]       = useState<TopPost[]>([])
@@ -430,11 +430,6 @@ export default function AdminPage() {
       filter === 'published' ? isPublishedLive(p) :
       filter === 'expired'   ? isPublishedExpired(p) :
       filter === 'featured'  ? !!p.is_featured :
-      // 종료 페이지에 검색 유입은 계속 들어오는데 대체 구매 링크가 없으면 보낼 곳이 없다 —
-      // 그런 상품을 찾아 링크를 채우기 위한 필터
-      filter === 'no_link'   ? isPublishedExpired(p) && !hasPurchaseLink(p) :
-      // 비교 가격이 없어 등급을 못 매기는 상품 — 판정기의 신뢰도가 여기서 갈린다
-      filter === 'pending'   ? !getDealVerdict(p).grade :
       st === filter
     const q = searchQ.toLowerCase()
     const matchQ = !q || p.title.toLowerCase().includes(q) || p.account.toLowerCase().includes(q)
@@ -450,8 +445,6 @@ export default function AdminPage() {
   const excludedCount    = countBy('excluded')
   const upcomingCount    = countBy('upcoming')
   const featuredCount    = posts.filter(p => p.is_featured).length
-  const noLinkCount      = posts.filter(p => isPublishedExpired(p) && !hasPurchaseLink(p)).length
-  const pendingCount     = posts.filter(p => !getDealVerdict(p).grade).length
 
   // 인증 확인 중 (hydration 전)
   if (authed === null) return null
@@ -551,18 +544,22 @@ export default function AdminPage() {
             <div className="admin-filter">
               <div className="admin-filter-chips">
                 {([
-                  { key: 'all',          label: '전체',                       color: '#6366f1' },
-                  { key: 'candidate',    label: `공구 후보 ${candidateCount}`,   color: '#eab308' },
-                  { key: 'needs_review', label: `검수 필요 ${needsReviewCount}`, color: '#f97316' },
-                  { key: 'ready',        label: `공개 가능 ${readyCount}`,       color: '#22c55e' },
-                  { key: 'published',    label: `공개됨 ${publishedCount}`,      color: '#0ea5e9' },
-                  { key: 'expired',      label: `마감됨 ${expiredCount}`,        color: '#94a3b8' },
-                  { key: 'excluded',     label: `제외 ${excludedCount}`,         color: '#94a3b8' },
-                  { key: 'upcoming',     label: `오픈예정 ${upcomingCount}`,      color: '#7c3aed' },
-                  { key: 'featured',     label: `추천 ${featuredCount}`,       color: '#f59e0b' },
-                  { key: 'pending',      label: `판정 대기 ${pendingCount}`,      color: '#475569' },
-                  { key: 'no_link',      label: `종료·링크없음 ${noLinkCount}`,   color: '#dc2626' },
-                ] as const).map(({ key, label, color }) => (
+                  // 탭이 열한 개까지 늘어나 정작 매일 쓰는 게 묻혔다. 두 가지로 줄인다.
+                  //  - 판정 대기·종료 링크없음은 '채우기' 탭이 같은 일을 더 잘 한다 → 뺐다
+                  //  - 나머지는 개수가 0이면 숨긴다. 안 쓰는 상태가 자리만 차지하지 않고,
+                  //    쓰기 시작하면 자동으로 다시 나타난다
+                  { key: 'all',          label: '전체',                       color: '#6366f1', count: -1 },
+                  { key: 'needs_review', label: `검수 필요 ${needsReviewCount}`, color: '#f97316', count: -1 },
+                  { key: 'ready',        label: `공개 가능 ${readyCount}`,       color: '#22c55e', count: readyCount },
+                  { key: 'published',    label: `공개됨 ${publishedCount}`,      color: '#0ea5e9', count: publishedCount },
+                  { key: 'upcoming',     label: `오픈예정 ${upcomingCount}`,      color: '#7c3aed', count: upcomingCount },
+                  { key: 'expired',      label: `마감됨 ${expiredCount}`,        color: '#94a3b8', count: expiredCount },
+                  { key: 'featured',     label: `추천 ${featuredCount}`,         color: '#f59e0b', count: featuredCount },
+                  { key: 'candidate',    label: `공구 후보 ${candidateCount}`,   color: '#eab308', count: candidateCount },
+                  { key: 'excluded',     label: `제외 ${excludedCount}`,         color: '#94a3b8', count: excludedCount },
+                ] as const)
+                  .filter(t => t.count !== 0 || filter === t.key)
+                  .map(({ key, label, color }) => (
                   <button key={key} onClick={() => setFilter(key)} className="admin-chip"
                     style={{
                       background: filter === key ? color : '#e2e8f0',
@@ -1690,7 +1687,9 @@ function VerdictFiller({ posts, onSaved }: { posts: Post[]; onSaved: () => void 
         </div>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-          {list.map(p => <VerdictFillRow key={p.id} post={p} mode={mode} onSaved={onSaved} />)}
+          {list.map(p => mode === 'pending'
+            ? <PendingFillRow key={p.id} post={p} onSaved={onSaved} />
+            : <EndedFillRow key={p.id} post={p} onSaved={onSaved} />)}
         </div>
       )}
     </div>
@@ -1702,144 +1701,169 @@ const fillInput: React.CSSProperties = {
   outline: 'none', width: '100%', boxSizing: 'border-box',
 }
 
-function VerdictFillRow({ post, mode, onSaved }: { post: Post; mode: 'pending' | 'ended'; onSaved: () => void }) {
-  const existing = normalizePurchaseLinks(post)
-  const [coupang, setCoupang] = useState(String(existing.find(l => l.platform === 'coupang')?.price ?? ''))
-  const [naver, setNaver]     = useState(String(existing.find(l => l.platform === 'naver')?.price ?? ''))
-  const [coupangUrl, setCoupangUrl] = useState(existing.find(l => l.platform === 'coupang')?.url ?? '')
-  const [naverUrl, setNaverUrl]     = useState(existing.find(l => l.platform === 'naver')?.url ?? '')
+// 목적이 다른 두 가지를 한 필드에 담으면 안 된다.
+//
+//   판정용 비교가  → origPrice(정가) · market_price(네이버 최저가) · market_url(근거 링크)
+//                   가격만 보여주고 제휴 고지 문구는 붙지 않는다.
+//   대체 구매 링크 → purchase_links (쿠팡·네이버 파트너스 등 제휴 링크 전용)
+//                   고객 화면에 버튼으로 뜨고 제휴 고지 문구가 반드시 함께 붙는다.
+//
+// 처음엔 채우기에서 비교가도 purchase_links에 넣었는데, 그러면 제휴가 아닌 네이버쇼핑
+// 링크에 "네이버 파트너스 활동의 일환으로 수수료를 받습니다"가 붙어 허위 고지가 된다.
+
+/** 검색어 한 줄 — 눌러서 복사. 파트너스는 검색어를 직접 입력해야 한다. */
+function SearchQueryBar({ post }: { post: Post }) {
+  const [copied, setCopied] = useState(false)
+  const q = partnerSearchQuery(post)
+  return (
+    <button type="button"
+      onClick={() => { navigator.clipboard?.writeText(q).catch(() => {}); setCopied(true); setTimeout(() => setCopied(false), 1400) }}
+      title="검색어를 복사합니다 — 검색창에 붙여넣으세요"
+      style={{ display: 'flex', alignItems: 'center', gap: 6, width: '100%', textAlign: 'left', marginBottom: 8,
+        padding: '7px 10px', borderRadius: 8, border: '1px dashed #cbd5e1', background: copied ? '#dcfce7' : '#f8fafc',
+        cursor: 'pointer', fontSize: 12.5, color: '#475569' }}>
+      <Copy size={13} strokeWidth={2.5} style={{ flexShrink: 0 }} />
+      <span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontWeight: 600 }}>{q}</span>
+      <span style={{ flexShrink: 0, color: copied ? '#15803d' : '#94a3b8', fontWeight: 700 }}>{copied ? '복사됨' : '복사'}</span>
+    </button>
+  )
+}
+
+function FillRowHead({ post, mode, badge }: { post: Post; mode: 'pending' | 'ended'; badge?: React.ReactNode }) {
+  return (
+    <div style={{ display: 'flex', gap: 10, alignItems: 'flex-start', marginBottom: 10 }}>
+      <div style={{ width: 44, height: 44, borderRadius: 8, background: '#f1f5f9', flexShrink: 0, overflow: 'hidden' }}>
+        {post.img
+          ? <img src={post.img} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+          : <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: '#cbd5e1' }}><ImageOff size={18} /></div>}
+      </div>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ fontSize: 13.5, fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{post.title}</div>
+        <div style={{ fontSize: 12, color: '#64748b', marginTop: 2, display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+          <span>{mode === 'ended' ? '당시 공구가' : '공구가'} <strong style={{ color: '#0f172a' }}>{post.price?.toLocaleString()}원</strong></span>
+          {mode === 'ended' && post.deadline && <span style={{ color: '#dc2626' }}>{fmtDate(post.deadline)} 마감</span>}
+          {mode === 'pending'
+            ? <a href={`https://search.shopping.naver.com/search/all?query=${encodeURIComponent(partnerSearchQuery(post))}`}
+                target="_blank" rel="noreferrer" style={{ color: '#16a34a', fontWeight: 600 }}>네이버쇼핑에서 최저가 찾기 →</a>
+            : <a href="https://partners.coupang.com/#/product/search" target="_blank" rel="noreferrer"
+                onClick={() => navigator.clipboard?.writeText(partnerSearchQuery(post)).catch(() => {})}
+                style={{ color: '#dc2626', fontWeight: 600 }}>쿠팡 파트너스에서 링크 만들기 →</a>}
+        </div>
+      </div>
+      {badge}
+    </div>
+  )
+}
+
+function SaveButton({ canSave, saving, done, onClick }: { canSave: boolean; saving: boolean; done: boolean; onClick: () => void }) {
+  return (
+    <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 8 }}>
+      <button onClick={onClick} disabled={!canSave || saving}
+        style={{ padding: '7px 16px', borderRadius: 8, border: 'none', fontSize: 13, fontWeight: 700,
+          cursor: canSave && !saving ? 'pointer' : 'not-allowed',
+          background: done ? '#dcfce7' : canSave ? '#6366f1' : '#e2e8f0',
+          color: done ? '#15803d' : canSave ? '#fff' : '#94a3b8' }}>
+        {saving ? '저장 중…' : done ? '저장됨' : '저장'}
+      </button>
+    </div>
+  )
+}
+
+/** 판정 대기 — 비교 가격만 채운다. 제휴 링크가 아니므로 고객 화면에 버튼으로 뜨지 않는다. */
+function PendingFillRow({ post, onSaved }: { post: Post; onSaved: () => void }) {
+  const [orig, setOrig] = useState(String(post.origPrice ?? ''))
+  const [market, setMarket] = useState(String(post.market_price ?? ''))
+  const [marketUrl, setMarketUrl] = useState(post.market_url ?? '')
   const [saving, setSaving] = useState(false)
   const [done, setDone] = useState(false)
-  const [copied, setCopied] = useState(false)
-  const [orig, setOrig] = useState(String(post.origPrice ?? ''))
-  const searchQuery = partnerSearchQuery(post)
 
-  // 입력하는 동안 등급이 어떻게 나올지 바로 보여준다 — 저장하고 목록에서 다시 찾아
-  // 확인하는 왕복을 없애기 위함
+  // 저장하고 목록에서 다시 찾아 확인하는 왕복을 없애기 위해 입력하는 동안 등급을 보여준다
   const preview = (() => {
-    const prices = [parseInt(coupang) || 0, parseInt(naver) || 0].filter(n => n > 0)
-    const origNum = parseInt(orig) || 0
-    if ((!prices.length && !origNum) || !post.price) return null
-    return getDealVerdict({
-      ...post,
-      origPrice: origNum || null,
-      purchase_links: prices.map((price, i) => ({ platform: i === 0 ? 'coupang' : 'naver', url: 'x', price, visible: true })),
-    } as Post).display
+    if (!post.price) return null
+    const o = parseInt(orig) || 0, m = parseInt(market) || 0
+    if (!o && !m) return null
+    return getDealVerdict({ ...post, origPrice: o || null, market_price: m || null } as Post).display
   })()
 
+  const canSave = parseInt(orig) > 0 || parseInt(market) > 0
   async function save() {
     setSaving(true)
-    const links = []
-    const now = new Date().toISOString()
-    if (coupangUrl.trim() || parseInt(coupang) > 0)
-      links.push({ platform: 'coupang' as const, url: coupangUrl.trim(), price: parseInt(coupang) || null, visible: true, checked_at: now })
-    if (naverUrl.trim() || parseInt(naver) > 0)
-      links.push({ platform: 'naver' as const, url: naverUrl.trim(), price: parseInt(naver) || null, visible: true, checked_at: now })
     await fetch(`/api/posts/${post.id}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      // url 없이 가격만 넣어도 판정에는 쓰인다 (고객 화면 링크 노출은 url이 있을 때만)
-      body: JSON.stringify({ purchase_links: links, origPrice: parseInt(orig) || null }),
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        origPrice: parseInt(orig) || null,
+        market_price: parseInt(market) || null,
+        market_url: marketUrl.trim() || null,
+      }),
     })
-    setSaving(false)
-    setDone(true)
-    onSaved()
+    setSaving(false); setDone(true); onSaved()
   }
-
-  // 종료 공구는 링크만 있어도 "지금 살 수 있는 곳"을 안내할 수 있다 (가격은 선택)
-  const canSave = mode === 'ended'
-    ? !!(coupangUrl.trim() || naverUrl.trim() || parseInt(coupang) > 0 || parseInt(naver) > 0)
-    : parseInt(coupang) > 0 || parseInt(naver) > 0 || parseInt(orig) > 0
 
   return (
     <div style={{ border: '1px solid #e2e8f0', borderRadius: 10, padding: 12, background: done ? '#f0fdf4' : '#fff' }}>
-      <div style={{ display: 'flex', gap: 10, alignItems: 'flex-start', marginBottom: 10 }}>
-        <div style={{ width: 44, height: 44, borderRadius: 8, background: '#f1f5f9', flexShrink: 0, overflow: 'hidden' }}>
-          {post.img
-            ? <img src={post.img} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-            : <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: '#cbd5e1' }}><ImageOff size={18} /></div>}
-        </div>
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontSize: 13.5, fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{post.title}</div>
-          <div style={{ fontSize: 12, color: '#64748b', marginTop: 2, display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-            {/* 종료 공구는 "당시" 가격이라는 걸 분명히 한다 — 지금 쿠팡 가격과 헷갈리면 안 된다 */}
-            <span>{mode === 'ended' ? '당시 공구가' : '공구가'} <strong style={{ color: '#0f172a' }}>{post.price?.toLocaleString()}원</strong></span>
-            {mode === 'ended' && post.deadline && <span style={{ color: '#dc2626' }}>{fmtDate(post.deadline)} 마감</span>}
-            {/* 파트너스는 검색어를 직접 입력해야 하고, 인포크 제목엔 인플루언서명·프로모션
-                문구·기간이 섞여 있어 그대로 넣으면 안 나온다. 정리한 검색어를 보여주고
-                누르면 복사되게 해서 붙여넣기만 하면 되게 한다. (완벽하진 않으니 원본도 남긴다) */}
-            <a href="https://partners.coupang.com/#/product/search" target="_blank" rel="noreferrer"
-              onClick={() => navigator.clipboard?.writeText(searchQuery).catch(() => {})}
-              title="파트너스를 새 탭으로 열고 아래 검색어를 복사합니다"
-              style={{ color: '#dc2626', fontWeight: 600 }}>쿠팡 파트너스 →</a>
-            <a href={`https://search.shopping.naver.com/search/all?query=${encodeURIComponent(searchQuery)}`}
-              target="_blank" rel="noreferrer" style={{ color: '#16a34a', fontWeight: 600 }}>네이버쇼핑 →</a>
-          </div>
-        </div>
-        {mode === 'pending' && preview && <GradeBadge display={preview} size="sm" />}
-      </div>
-
-      {/* 판정 대기는 '가격'이, 종료 공구는 '링크'가 핵심이라 중요한 칸을 위에 둔다 */}
-      {/* 검색어 — 눌러서 복사. 브랜드가 확인돼 있으면 앞에 붙는다 */}
-      <button type="button" onClick={() => { navigator.clipboard?.writeText(searchQuery).catch(() => {}); setCopied(true); setTimeout(() => setCopied(false), 1400) }}
-        title="검색어를 복사합니다 — 파트너스 검색창에 붙여넣으세요"
-        style={{ display: 'flex', alignItems: 'center', gap: 6, width: '100%', textAlign: 'left', marginBottom: 8,
-          padding: '7px 10px', borderRadius: 8, border: '1px dashed #cbd5e1', background: copied ? '#dcfce7' : '#f8fafc',
-          cursor: 'pointer', fontSize: 12.5, color: '#475569' }}>
-        <Copy size={13} strokeWidth={2.5} style={{ flexShrink: 0 }} />
-        <span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontWeight: 600 }}>
-          {searchQuery}
-        </span>
-        <span style={{ flexShrink: 0, color: copied ? '#15803d' : '#94a3b8', fontWeight: 700 }}>
-          {copied ? '복사됨' : '복사'}
-        </span>
-      </button>
-
-      {mode === 'pending' && (
-        // 정가는 공구 게시물에 대부분 적혀 있어서 파트너스를 거치지 않고도 바로 판정이 붙는다.
-        // 판정 대기를 가장 빨리 줄이는 길이라 맨 위에 둔다.
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
-          <input type="number" value={orig} onChange={e => { setOrig(e.target.value); setDone(false) }}
-            placeholder="정가 (가장 빠른 방법)"
-            style={{ ...fillInput, fontSize: 13, flex: 1, borderColor: orig ? '#c7d2fe' : '#e2e8f0' }} />
-          <span style={{ fontSize: 11.5, color: '#94a3b8', whiteSpace: 'nowrap' }}>공구 게시물에 적힌 값</span>
-        </div>
-      )}
-
+      <FillRowHead post={post} mode="pending" badge={preview ? <GradeBadge display={preview} size="sm" /> : undefined} />
+      <SearchQueryBar post={post} />
       <div className="admin-2col" style={{ gap: 8 }}>
-        <input type={mode === 'ended' ? 'url' : 'number'}
-          value={mode === 'ended' ? coupangUrl : coupang}
-          onChange={e => { mode === 'ended' ? setCoupangUrl(e.target.value) : setCoupang(e.target.value); setDone(false) }}
-          placeholder={mode === 'ended' ? '쿠팡 링크' : '쿠팡 가격'}
-          style={{ ...fillInput, fontSize: 13 }} />
-        <input type={mode === 'ended' ? 'url' : 'number'}
-          value={mode === 'ended' ? naverUrl : naver}
-          onChange={e => { mode === 'ended' ? setNaverUrl(e.target.value) : setNaver(e.target.value); setDone(false) }}
-          placeholder={mode === 'ended' ? '네이버 링크' : '네이버 가격'}
-          style={{ ...fillInput, fontSize: 13 }} />
+        <input type="number" value={orig} onChange={e => { setOrig(e.target.value); setDone(false) }}
+          placeholder="정가 (공구 게시물에 적힌 값)" style={{ ...fillInput, fontSize: 13 }} />
+        <input type="number" value={market} onChange={e => { setMarket(e.target.value); setDone(false) }}
+          placeholder="네이버 최저가" style={{ ...fillInput, fontSize: 13 }} />
+      </div>
+      <input type="url" value={marketUrl} onChange={e => setMarketUrl(e.target.value)}
+        placeholder="네이버쇼핑 링크 (선택 — 근거로 보여줄 때만)" style={{ ...fillInput, fontSize: 12, marginTop: 6 }} />
+      <p style={{ fontSize: 11, color: '#94a3b8', margin: '6px 0 0' }}>
+        비교용 값이라 고객 화면에 구매 버튼으로는 안 뜨고, 제휴 고지 문구도 붙지 않아요.
+      </p>
+      <SaveButton canSave={canSave} saving={saving} done={done} onClick={save} />
+    </div>
+  )
+}
+
+/** 종료·링크없음 — 제휴 대체 구매 링크를 채운다. 고객 화면에 버튼 + 고지 문구로 뜬다. */
+function EndedFillRow({ post, onSaved }: { post: Post; onSaved: () => void }) {
+  const existing = normalizePurchaseLinks(post)
+  const [coupangUrl, setCoupangUrl] = useState(existing.find(l => l.platform === 'coupang')?.url ?? '')
+  const [coupang, setCoupang] = useState(String(existing.find(l => l.platform === 'coupang')?.price ?? ''))
+  const [naverUrl, setNaverUrl] = useState(existing.find(l => l.platform === 'naver')?.url ?? '')
+  const [naver, setNaver] = useState(String(existing.find(l => l.platform === 'naver')?.price ?? ''))
+  const [saving, setSaving] = useState(false)
+  const [done, setDone] = useState(false)
+
+  const canSave = !!(coupangUrl.trim() || naverUrl.trim())
+  async function save() {
+    setSaving(true)
+    const now = new Date().toISOString()
+    const links = []
+    if (coupangUrl.trim()) links.push({ platform: 'coupang' as const, url: coupangUrl.trim(), price: parseInt(coupang) || null, visible: true, checked_at: now })
+    if (naverUrl.trim())   links.push({ platform: 'naver' as const, url: naverUrl.trim(), price: parseInt(naver) || null, visible: true, checked_at: now })
+    await fetch(`/api/posts/${post.id}`, {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ purchase_links: links }),
+    })
+    setSaving(false); setDone(true); onSaved()
+  }
+
+  return (
+    <div style={{ border: '1px solid #e2e8f0', borderRadius: 10, padding: 12, background: done ? '#f0fdf4' : '#fff' }}>
+      <FillRowHead post={post} mode="ended" />
+      <SearchQueryBar post={post} />
+      <div className="admin-2col" style={{ gap: 8 }}>
+        <input type="url" value={coupangUrl} onChange={e => { setCoupangUrl(e.target.value); setDone(false) }}
+          placeholder="쿠팡 파트너스 링크" style={{ ...fillInput, fontSize: 13 }} />
+        <input type="url" value={naverUrl} onChange={e => { setNaverUrl(e.target.value); setDone(false) }}
+          placeholder="네이버 제휴 링크" style={{ ...fillInput, fontSize: 13 }} />
       </div>
       <div className="admin-2col" style={{ gap: 8, marginTop: 6 }}>
-        <input type={mode === 'ended' ? 'number' : 'url'}
-          value={mode === 'ended' ? coupang : coupangUrl}
-          onChange={e => mode === 'ended' ? setCoupang(e.target.value) : setCoupangUrl(e.target.value)}
-          placeholder={mode === 'ended' ? '쿠팡 가격 (선택)' : '쿠팡 링크 (선택)'}
-          style={{ ...fillInput, fontSize: 12 }} />
-        <input type={mode === 'ended' ? 'number' : 'url'}
-          value={mode === 'ended' ? naver : naverUrl}
-          onChange={e => mode === 'ended' ? setNaver(e.target.value) : setNaverUrl(e.target.value)}
-          placeholder={mode === 'ended' ? '네이버 가격 (선택)' : '네이버 링크 (선택)'}
-          style={{ ...fillInput, fontSize: 12 }} />
+        <input type="number" value={coupang} onChange={e => setCoupang(e.target.value)}
+          placeholder="쿠팡 가격 (선택)" style={{ ...fillInput, fontSize: 12 }} />
+        <input type="number" value={naver} onChange={e => setNaver(e.target.value)}
+          placeholder="네이버 가격 (선택)" style={{ ...fillInput, fontSize: 12 }} />
       </div>
-
-      <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 8 }}>
-        <button onClick={save} disabled={!canSave || saving}
-          style={{ padding: '7px 16px', borderRadius: 8, border: 'none', fontSize: 13, fontWeight: 700,
-            cursor: canSave && !saving ? 'pointer' : 'not-allowed',
-            background: done ? '#dcfce7' : canSave ? '#6366f1' : '#e2e8f0',
-            color: done ? '#15803d' : canSave ? '#fff' : '#94a3b8' }}>
-          {saving ? '저장 중…' : done ? '저장됨' : '저장'}
-        </button>
-      </div>
+      <p style={{ fontSize: 11, color: '#94a3b8', margin: '6px 0 0' }}>
+        제휴 링크만 넣어주세요 — 고객 화면에 구매 버튼으로 뜨고 파트너스 고지 문구가 함께 붙습니다.
+        가격을 모르면 비워두면 &quot;가격 확인하기&quot;로 보냅니다.
+      </p>
+      <SaveButton canSave={canSave} saving={saving} done={done} onClick={save} />
     </div>
   )
 }
