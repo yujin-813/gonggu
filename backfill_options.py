@@ -23,11 +23,11 @@ from urllib.parse import urlparse
 
 import requests
 
-from inpock import UA, load_posts, save_posts, extract_options
+from inpock import UA, load_posts, save_posts, extract_options, _get_with_cert_fallback
 
 
 def fetch_html(url):
-    r = requests.get(url, headers={"User-Agent": UA}, timeout=12)
+    r = _get_with_cert_fallback(url, timeout=12)
     if r.status_code != 200:
         return None, f"HTTP {r.status_code}"
     # 국내 자사몰은 EUC-KR이 흔한데 헤더에 charset이 없으면 requests가 ISO-8859-1로

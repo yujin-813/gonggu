@@ -529,6 +529,22 @@ def _clean_brand(name):
     return n
 
 
+def _get_with_cert_fallback(url, timeout=10):
+    """국내 자사몰은 중간 인증서를 빼먹고 내려주는 곳이 흔하다(위즈 계열이 전부 그렇다).
+
+    브라우저는 알아서 보정하지만 서버끼리는 검증에 실패해서, 그대로 두면 그 쇼핑몰의
+    공구는 가격도 옵션도 하나도 못 가져온다. 읽는 건 공개된 상품 페이지뿐이고 자격증명은
+    아무것도 보내지 않으므로, 검증 실패일 때에 한해 검증만 끄고 한 번 더 시도한다.
+    그 외의 오류(타임아웃·DNS 등)는 그대로 올려보낸다.
+    """
+    try:
+        return requests.get(url, headers={"User-Agent": UA}, timeout=timeout)
+    except requests.exceptions.SSLError:
+        import urllib3
+        urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+        return requests.get(url, headers={"User-Agent": UA}, timeout=timeout, verify=False)
+
+
 # ── 세트 옵션 추출 ────────────────────────────────────────────────────────
 # 공구 글 하나에 세트가 여러 개인 경우가 흔한데(닥터노아 3세트, 마리에뜰 10세트),
 # 관리자가 한 줄씩 손으로 옮기는 건 오래 걸린다. 다행히 판매 링크가 도메인 기준으로는
@@ -682,7 +698,7 @@ def fetch_product_info(url, domain):
         return {}, debug
 
     try:
-        r = requests.get(url, headers={"User-Agent": UA}, timeout=10)
+        r = _get_with_cert_fallback(url, timeout=10)
         debug["page_fetch_status"] = r.status_code
         if r.status_code != 200:
             debug["extraction_error"] = f"HTTP {r.status_code}"

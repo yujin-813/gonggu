@@ -87,6 +87,46 @@ export default function AddPostModal({ onClose, onSubmit, editPost, existingGrou
   const [pasteOpen, setPasteOpen] = useState(false)
   const [pasteText, setPasteText] = useState('')
   const pastePreview = useMemo(() => parseOptionLines(pasteText), [pasteText])
+  const [optFetching, setOptFetching] = useState(false)
+  const [optMessage, setOptMessage] = useState<{ ok: boolean; text: string } | null>(null)
+
+  // 판매 페이지에서 세트 구성을 즉시 긁어온다. 수집기는 새 글에만 돌기 때문에
+  // 이미 등록된 공구는 이 버튼이 유일한 자동 수집 경로다.
+  async function fetchOptions() {
+    const url = purchaseUrl.trim()
+    if (!url) return
+    setOptFetching(true)
+    setOptMessage(null)
+    try {
+      const res = await fetch('/api/options', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url }),
+      })
+      const data = await res.json()
+      const found: DealOption[] = data.options || []
+      if (!found.length) {
+        setOptMessage({ ok: false, text: data.reason || data.error || '옵션을 찾지 못했어요.' })
+        return
+      }
+      // 이미 넣어둔 구성은 남긴다 — 손으로 비교가까지 채워둔 걸 덮어쓰면 안 된다
+      const seen = new Set(options.map(o => `${o.name}|${o.price}`))
+      const fresh = found.filter(o => !seen.has(`${o.name}|${o.price}`))
+      if (fresh.length) {
+        setOptions(prev => [...prev, ...fresh.map(o => ({ ...o, comparePrice: null, gift: null }))])
+      }
+      setOptMessage({
+        ok: true,
+        text: fresh.length
+          ? `구성 ${fresh.length}개를 가져왔어요. 비교가는 직접 채워야 판정에 들어가요.`
+          : '이미 들어 있는 구성이라 새로 추가한 건 없어요.',
+      })
+    } catch {
+      setOptMessage({ ok: false, text: '가져오지 못했어요. 잠시 후 다시 시도해 주세요.' })
+    } finally {
+      setOptFetching(false)
+    }
+  }
 
   const [imgFile,    setImgFile]    = useState<File | null>(null)
   const [imgPreview, setImgPreview] = useState('')   // blob URL or existing img URL
@@ -635,7 +675,18 @@ export default function AddPostModal({ onClose, onSubmit, editPost, existingGrou
             style={{ padding: '7px 12px', background: pasteOpen ? '#4338ca' : '#f1f5f9', color: pasteOpen ? '#fff' : '#475569', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 12, fontWeight: 700 }}>
             붙여넣기로 한 번에
           </button>
+          <button type="button" onClick={fetchOptions} disabled={optFetching || !purchaseUrl.trim()}
+            title={purchaseUrl.trim() ? '판매 페이지에서 세트 구성을 읽어옵니다' : '구매 링크를 먼저 입력해 주세요'}
+            style={{ padding: '7px 12px', background: optFetching ? '#e2e8f0' : '#dcfce7', color: optFetching ? '#64748b' : '#15803d', border: 'none', borderRadius: 8, cursor: (optFetching || !purchaseUrl.trim()) ? 'default' : 'pointer', fontSize: 12, fontWeight: 700, opacity: purchaseUrl.trim() ? 1 : 0.5 }}>
+            {optFetching ? '가져오는 중…' : '옵션 가져오기'}
+          </button>
         </div>
+
+        {optMessage && (
+          <p style={{ fontSize: 11, margin: '0 0 8px', color: optMessage.ok ? '#15803d' : '#b45309' }}>
+            {optMessage.text}
+          </p>
+        )}
 
         {/* 세트가 7~8개인 공구를 손으로 한 줄씩 치는 건 오래 걸린다. 그렇다고 상세페이지를
             자동으로 긁기도 어렵다 — 구매 링크 도메인이 40종 넘게 흩어져 있어(자사몰 제각각)

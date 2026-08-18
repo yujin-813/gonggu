@@ -50,6 +50,9 @@ function isProtected(req: NextRequest): boolean {
   // 관리자 IP 목록 (관리자 전용)
   if (pathname === '/api/admin-ips') return true
 
+  // 옵션 가져오기 — 임의 URL을 서버가 대신 요청해 주는 창구라 반드시 막아야 한다
+  if (pathname === '/api/options') return true
+
   return false
 }
 
@@ -91,5 +94,6 @@ export const config = {
     '/api/upload',
     '/api/analytics',
     '/api/admin-ips',
+    '/api/options',
   ],
 }
