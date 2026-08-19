@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { recordEvent, getSummary, getTopPosts, getTopSharedPosts, CLICK_TYPES } from '@/lib/analytics'
+import { recordEvent, getSummary, getTopPosts, getTopSharedPosts, getSourceCounts, classifySource, CLICK_TYPES } from '@/lib/analytics'
 import { loadPosts } from '@/lib/store'
 import { AUTH_COOKIE, computeToken, safeEqual } from '@/lib/auth'
 import { ADMIN_SEEN_COOKIE, isAdminIp, clientIp, isBotRequest } from '@/lib/adminTrace'
@@ -21,7 +21,7 @@ async function isAdminRequest(request: NextRequest): Promise<boolean> {
 
 export async function POST(request: NextRequest) {
   try {
-    const { type, sessionId, visitorId, postId, clickType } = await request.json()
+    const { type, sessionId, visitorId, postId, clickType, referrer, utmSource } = await request.json()
     if (!type || !sessionId) return NextResponse.json({ error: 'missing' }, { status: 400 })
     const allowed = new Set(['view', 'bookmark', 'join', 'category', 'search', 'share', 'click'])
     if (!allowed.has(type)) return NextResponse.json({ error: 'invalid type' }, { status: 400 })
@@ -31,7 +31,14 @@ export async function POST(request: NextRequest) {
     // 크롤러가 JS를 실행해 찍는 이벤트를 걸러낸다 — 안 걸러내면 방문자 수가 봇으로 채워진다
     if (isBotRequest(request)) return NextResponse.json({ ok: true, skipped: 'bot' })
     if (await isAdminRequest(request)) return NextResponse.json({ ok: true, skipped: 'admin' })
-    recordEvent(type, sessionId, { visitorId, postId, clickType: safeClickType })
+    // 유입 경로 판정. 리퍼러는 브라우저의 document.referrer를 클라이언트가 보내주고,
+    // 그게 없을 때를 대비해 User-Agent의 인앱 브라우저 표식까지 함께 본다.
+    const { source } = classifySource({
+      utmSource: typeof utmSource === 'string' ? utmSource.slice(0, 60) : null,
+      referrer: typeof referrer === 'string' ? referrer.slice(0, 300) : null,
+      userAgent: request.headers.get('user-agent'),
+    })
+    recordEvent(type, sessionId, { visitorId, postId, clickType: safeClickType, source })
     return NextResponse.json({ ok: true })
   } catch {
     return NextResponse.json({ error: 'server error' }, { status: 500 })
@@ -52,5 +59,6 @@ export async function GET() {
     .filter(Boolean)
   const topPosts = withPostInfo(top)
   const topSharedPosts = withPostInfo(topShared)
-  return NextResponse.json({ summary, topPosts, topSharedPosts })
+  const sources = getSourceCounts(14)
+  return NextResponse.json({ summary, topPosts, topSharedPosts, sources })
 }

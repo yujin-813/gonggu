@@ -43,9 +43,32 @@ function isAdminSession(): Promise<boolean> {
 // "공구는 끝났는데 구매 수요는 남아 있다"를 데이터로 확인할 수 있다
 export type ClickType = 'groupbuy' | 'coupang' | 'naver' | 'other' | 'detail'
 
+// 유입 경로는 "이 방문의 첫 진입"에서만 의미가 있다. 사이트 안을 돌아다니면 referrer가
+// 우리 도메인으로 바뀌고 URL의 utm도 사라지므로, 처음 들어온 순간 값을 세션에 넣어 두고
+// 그 방문 내내 같은 값을 쓴다.
+const ENTRY_KEY = '_dj_entry'
+
+function entryInfo(): { referrer: string | null; utmSource: string | null } {
+  try {
+    const saved = sessionStorage.getItem(ENTRY_KEY)
+    if (saved) return JSON.parse(saved)
+    const utm = new URLSearchParams(location.search).get('utm_source')
+    const ref = document.referrer || null
+    const info = {
+      referrer: ref && !ref.includes(location.host) ? ref : null,
+      utmSource: utm,
+    }
+    sessionStorage.setItem(ENTRY_KEY, JSON.stringify(info))
+    return info
+  } catch {
+    return { referrer: null, utmSource: null }
+  }
+}
+
 export async function track(type: string, extra?: { postId?: number; clickType?: ClickType }) {
   if (isTrackingDisabled()) return
   if (await isAdminSession()) return
+  const entry = entryInfo()
   fetch('/api/analytics', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -55,6 +78,8 @@ export async function track(type: string, extra?: { postId?: number; clickType?:
       visitorId: getVisitorId(),
       postId: extra?.postId,
       clickType: extra?.clickType,
+      referrer: entry.referrer,
+      utmSource: entry.utmSource,
     }),
   }).catch(() => {})
 }

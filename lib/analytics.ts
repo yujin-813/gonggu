@@ -11,6 +11,9 @@ interface DayData {
   visitorIds?: string[]       // 그 날 집계된 persistent visitorId (탭/세션과 무관하게 브라우저당 하나)
   newVisitors?: number        // 그 날 처음 방문한 visitorId 수
   returningVisitors?: number  // 그 날 이전에도 방문했던 visitorId 수
+  // 유입 경로별 방문 수 — sources[TrafficSource] = 방문 수.
+  // 어디서 오는지 몰라 nginx 로그를 뒤져야 했고, 그 로그는 2주면 지워진다. 여기 쌓아 둔다.
+  sources?: Record<string, number>
 }
 
 // 클릭 종류 — 어떤 버튼을 눌렀는지 구분해야 "공구는 끝났는데 쿠팡으로는 계속 나간다"
@@ -55,7 +58,90 @@ function save(data: AnalyticsData) {
   fs.renameSync(tmp, FILE)
 }
 
-export function recordEvent(type: string, sessionId: string, opts?: { visitorId?: string; postId?: number; clickType?: ClickType }) {
+
+/**
+ * 유입 경로 분류.
+ *
+ * 리퍼러만으로는 절반을 놓친다 — 인스타그램·카카오톡 인앱 브라우저는 리퍼러를 아예
+ * 안 보내서, 우리 주력 유입이 "직접 방문"에 뭉쳐 버린다. 그래서 세 가지를 함께 본다.
+ *   1) utm_source — 우리가 붙인 링크면 이게 가장 정확하다
+ *   2) 리퍼러 도메인 — 검색·외부 사이트 유입
+ *   3) 인앱 브라우저 표식(User-Agent의 "; wv)") — 리퍼러가 없어도 앱에서 왔다는 건 안다
+ */
+export type TrafficSource =
+  | 'instagram' | 'kakao' | 'naver_search' | 'google_search' | 'other_search'
+  | 'inapp' | 'external' | 'direct'
+
+const SOURCE_LABEL: Record<TrafficSource, string> = {
+  instagram: '인스타그램',
+  kakao: '카카오톡',
+  naver_search: '네이버 검색',
+  google_search: '구글 검색',
+  other_search: '기타 검색',
+  inapp: '앱 내 브라우저(경로 미상)',
+  external: '외부 사이트',
+  direct: '직접 방문·북마크',
+}
+
+export function sourceLabel(s: string): string {
+  return SOURCE_LABEL[s as TrafficSource] || s
+}
+
+export function classifySource(opts: {
+  utmSource?: string | null
+  referrer?: string | null
+  userAgent?: string | null
+}): { source: TrafficSource; detail: string | null } {
+  const utm = (opts.utmSource || '').toLowerCase().trim()
+  if (utm) {
+    if (utm.includes('insta')) return { source: 'instagram', detail: utm }
+    if (utm.includes('kakao') || utm.includes('talk')) return { source: 'kakao', detail: utm }
+    if (utm.includes('naver')) return { source: 'naver_search', detail: utm }
+    if (utm.includes('google')) return { source: 'google_search', detail: utm }
+    return { source: 'external', detail: utm }
+  }
+
+  const ref = (opts.referrer || '').trim()
+  let host = ''
+  if (ref) {
+    try { host = new URL(ref).hostname.replace(/^www\./, '') } catch { host = '' }
+  }
+  if (host && !host.endsWith('asknuggetdata.com')) {
+    if (/instagram|cdninstagram|l\.facebook|fb\./.test(host)) return { source: 'instagram', detail: host }
+    if (/kakao|daum/.test(host)) return { source: 'kakao', detail: host }
+    if (/naver/.test(host)) return { source: 'naver_search', detail: host }
+    if (/google/.test(host)) return { source: 'google_search', detail: host }
+    if (/bing|duckduckgo|yahoo|zum\.com/.test(host)) return { source: 'other_search', detail: host }
+    return { source: 'external', detail: host }
+  }
+
+  // 리퍼러가 없을 때 — 인앱 브라우저면 최소한 "앱에서 왔다"까지는 말할 수 있다
+  const ua = opts.userAgent || ''
+  if (/; wv\)|Instagram|KAKAOTALK|FBAN|FBAV|NAVER\(inapp/i.test(ua)) {
+    if (/Instagram/i.test(ua)) return { source: 'instagram', detail: 'ua' }
+    if (/KAKAOTALK/i.test(ua)) return { source: 'kakao', detail: 'ua' }
+    return { source: 'inapp', detail: 'wv' }
+  }
+  return { source: 'direct', detail: null }
+}
+
+/** 최근 N일 유입 경로 집계 — 많은 순으로 */
+export function getSourceCounts(days = 14): { source: string; label: string; count: number }[] {
+  const data = load()
+  const cutoff = new Date(Date.now() - days * 86400000).toISOString().split('T')[0]
+  const total: Record<string, number> = {}
+  for (const [date, day] of Object.entries(data.daily)) {
+    if (date < cutoff) continue
+    for (const [src, n] of Object.entries(day.sources || {})) {
+      total[src] = (total[src] || 0) + n
+    }
+  }
+  return Object.entries(total)
+    .map(([source, count]) => ({ source, label: sourceLabel(source), count }))
+    .sort((a, b) => b.count - a.count)
+}
+
+export function recordEvent(type: string, sessionId: string, opts?: { visitorId?: string; postId?: number; clickType?: ClickType; source?: string }) {
   const data = load()
   const today = new Date().toISOString().split('T')[0]
   if (!data.daily[today]) data.daily[today] = { visitors: 0, sessions: [], events: {} }
@@ -64,6 +150,11 @@ export function recordEvent(type: string, sessionId: string, opts?: { visitorId?
   if (type === 'view' && !day.sessions.includes(sessionId)) {
     day.sessions.push(sessionId)
     day.visitors = day.sessions.length
+    // 유입 경로는 방문 1건당 한 번만 센다 — 같은 사람이 여러 페이지를 봐도 경로는 하나다
+    if (opts?.source) {
+      if (!day.sources) day.sources = {}
+      day.sources[opts.source] = (day.sources[opts.source] || 0) + 1
+    }
   }
 
   // 신규/재방문 판별 — sessionStorage 기반 sessionId는 탭마다 새로 생기므로, 브라우저에

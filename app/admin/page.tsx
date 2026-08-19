@@ -103,6 +103,7 @@ export default function AdminPage() {
   const [analytics, setAnalytics]     = useState<DayStat[]>([])
   const [topPosts, setTopPosts]       = useState<TopPost[]>([])
   const [topSharedPosts, setTopSharedPosts] = useState<TopPost[]>([])
+  const [sources, setSources] = useState<{ source: string; label: string; count: number }[]>([])
   const [influencerSources, setInfluencerSources] = useState<InfluencerSource[]>([])
   const [newSourceUrl, setNewSourceUrl] = useState('')
   const [newSourceName, setNewSourceName] = useState('')
@@ -144,6 +145,7 @@ export default function AdminPage() {
       setAnalytics(d.summary || [])
       setTopPosts(d.topPosts || [])
       setTopSharedPosts(d.topSharedPosts || [])
+      setSources(d.sources || [])
     }
   }, [])
 
@@ -485,7 +487,7 @@ export default function AdminPage() {
         </div>
 
         {/* 방문자 분석 */}
-        <AnalyticsSection data={analytics} topPosts={topPosts} topSharedPosts={topSharedPosts} />
+        <AnalyticsSection data={analytics} topPosts={topPosts} topSharedPosts={topSharedPosts} sources={sources} />
 
         {/* 탭 메뉴 */}
         <div style={{ display: 'flex', gap: 4, marginBottom: 20, borderBottom: '2px solid #e2e8f0', paddingBottom: 0 }}>
@@ -684,7 +686,7 @@ function StatCard({ label, value, Icon, color }: { label: string; value: number;
   )
 }
 
-function AnalyticsSection({ data, topPosts, topSharedPosts }: { data: DayStat[]; topPosts: TopPost[]; topSharedPosts: TopPost[] }) {
+function AnalyticsSection({ data, topPosts, topSharedPosts, sources }: { data: DayStat[]; topPosts: TopPost[]; topSharedPosts: TopPost[]; sources: { source: string; label: string; count: number }[] }) {
   const last7 = data.slice(-7)
   const today = last7[last7.length - 1]
   const total7 = last7.reduce((s, d) => s + d.visitors, 0)
@@ -755,6 +757,31 @@ function AnalyticsSection({ data, topPosts, topSharedPosts }: { data: DayStat[];
               {e.icon} {e.label} <strong>{today.events[e.key]}</strong>회
             </div>
           ))}
+        </div>
+      )}
+
+      {/* 어디서 들어왔는지 — 최근 14일.
+          인스타·카톡 인앱 브라우저는 리퍼러를 안 보내므로, 공유 링크에 utm_source가 붙어
+          있어야 정확히 갈린다. 안 붙은 방문은 "앱 내 브라우저(경로 미상)"으로 모인다. */}
+      {sources.length > 0 && (
+        <div style={{ marginTop: 20, paddingTop: 16, borderTop: '1px solid #f1f5f9' }}>
+          <h4 style={{ margin: '0 0 10px', fontSize: 13, fontWeight: 700, color: '#1e293b' }}>유입 경로 (최근 14일)</h4>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            {(() => {
+              const total = sources.reduce((sum, s) => sum + s.count, 0) || 1
+              return sources.map((s, i) => (
+                <div key={s.source} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '6px 8px', background: i === 0 ? '#f0fdf4' : '#f8fafc', borderRadius: 8 }}>
+                  <span style={{ fontSize: 12, color: '#0f172a', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{s.label}</span>
+                  <span style={{ position: 'relative', width: 90, height: 6, background: '#e2e8f0', borderRadius: 3, flexShrink: 0 }}>
+                    <span style={{ position: 'absolute', inset: 0, width: `${Math.round((s.count / total) * 100)}%`, background: '#16a34a', borderRadius: 3 }} />
+                  </span>
+                  <span style={{ fontSize: 12, fontWeight: 700, color: '#16a34a', flexShrink: 0, minWidth: 62, textAlign: 'right' }}>
+                    {s.count}명 · {Math.round((s.count / total) * 100)}%
+                  </span>
+                </div>
+              ))
+            })()}
+          </div>
         </div>
       )}
 
@@ -837,6 +864,7 @@ function AdminPostRow({ post: p, onToggle, onDelete, onEdit, onToggleAlwaysOn, o
   // 상시딜/소진시/제외/삭제는 매번 다 보일 필요 없는 부가 액션이라 접어둔다 —
   // 항상 보이는 건 링크/수정/공개토글 정도로만 줄여서 한 줄에 스캔하기 쉽게 함
   const [showMore, setShowMore] = useState(false)
+  const [copied, setCopied] = useState(false)
 
   return (
     <div style={{
@@ -1001,6 +1029,20 @@ function AdminPostRow({ post: p, onToggle, onDelete, onEdit, onToggleAlwaysOn, o
 
         {showMore && (
           <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 8, paddingTop: 8, borderTop: '1px solid #e2e8f0' }}>
+            {/* 인스타에 올릴 링크. utm_source가 붙어 있어야 인스타 유입이 "직접 방문"에
+                섞이지 않는다 — 인앱 브라우저는 리퍼러를 안 보내기 때문이다. */}
+            <button onClick={() => {
+                const url = `https://gonggu.asknuggetdata.com/post/${p.id}?utm_source=instagram&utm_medium=bio`
+                navigator.clipboard.writeText(url)
+                  .then(() => setCopied(true))
+                  .catch(() => {})
+                setTimeout(() => setCopied(false), 1600)
+              }}
+              title="인스타 프로필·스토리에 올릴 링크를 복사합니다 (유입 경로가 인스타로 잡힙니다)"
+              style={{ padding: '6px 10px', borderRadius: 8, border: 'none', cursor: 'pointer', fontSize: 11, fontWeight: 600, whiteSpace: 'nowrap',
+                background: copied ? '#dcfce7' : '#f1f5f9', color: copied ? '#16a34a' : '#475569' }}>
+              {copied ? '복사됨' : '인스타용 링크 복사'}
+            </button>
             {/* 홈 "이번 주 우리가 고른 공구" — 운영자가 직접 고르는 유일한 영역 */}
             <button onClick={() => onToggleFeatured(p)}
               title="켜면 홈 상단 '이번 주 우리가 고른 공구'에 노출됩니다"

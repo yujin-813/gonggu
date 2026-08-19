@@ -107,6 +107,10 @@ export function isBotRequest(request: NextRequest): boolean {
   const ua = request.headers.get('user-agent') || ''
   if (!ua) return true                       // UA 없는 요청은 사람이 아니다
   if (BOT_UA.test(ua)) return true
+  // 인터넷 전체를 훑는 스캐너는 UA에 봇 단어를 안 넣는다. nginx 로그를 보면 Censys·zgrab·
+  // Go-http-client 같은 것들이 하루 수천 건씩 들어온다. 진짜 브라우저는 예외 없이
+  // "Mozilla/5.0 (" 형태로 시작하므로, 그 모양이 아니면 사람이 아니라고 본다.
+  if (!ua.startsWith('Mozilla/5.0 (')) return true
   const ip = clientIp(request)
   return !!ip && BOT_IP_PREFIX.some(pre => ip.startsWith(pre))
 }
