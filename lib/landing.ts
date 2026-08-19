@@ -129,7 +129,8 @@ export function landingCopy(key: LandingKey, count: number): LandingCopy {
 
 export const LANDING_KEYS: LandingKey[] = ['today', 'deadline', 'monthly']
 
-export const CATEGORY_KEYS: Category[] = ['kids', 'life', 'food', 'health', 'beauty']
+import { CATEGORY_KEYS } from './types'
+export { CATEGORY_KEYS }
 
 export function categoryCopy(cat: Category, count: number): LandingCopy {
   const label = CATEGORY_LABEL[cat]

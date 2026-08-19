@@ -243,6 +243,8 @@ header {
   align-items: center;
   gap: 5px;
 }
+/* 실제 카테고리 버튼은 <a>라서 기본 밑줄이 생긴다 — 버튼과 같은 모양으로 맞춘다 */
+.cat-btn { text-decoration: none; }
 .cat-btn:hover { border-color: var(--gray-3); color: var(--text); }
 .cat-btn.active { background: var(--brand); border-color: var(--brand); color: white; }
 

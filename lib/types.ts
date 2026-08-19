@@ -1,4 +1,12 @@
 export type Category = 'kids' | 'life' | 'food' | 'health' | 'beauty'
+
+/**
+ * 전용 페이지(/category/[cat])가 있는 카테고리.
+ *
+ * lib/landing은 fs를 읽어서 클라이언트 컴포넌트가 가져다 쓸 수 없다. 카테고리 버튼이
+ * 링크가 되면서 이 목록이 양쪽 모두에 필요해졌기에, 의존성 없는 여기에 둔다.
+ */
+export const CATEGORY_KEYS: Category[] = ['kids', 'life', 'food', 'health', 'beauty']
 export type SortOrder = 'latest' | 'deadline' | 'discount' | 'popular'
 export type LinkSourceType = 'inpock' | 'linktree' | 'littly' | 'smartstore' | 'instagram' | 'custom' | 'unknown'
 
