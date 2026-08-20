@@ -53,9 +53,12 @@ export default function DealStrip({ title, icon, moreHref, posts, highlight }: P
                   : <div className="strip-thumb-empty"><CatIcon size={22} strokeWidth={1.5} /></div>}
                 {/* 좌상단은 판정이 차지한다 — 홈을 훑을 때 판정 배지가 반복해서 보여야
                     "가격을 판정해주는 곳"이라는 게 전달된다. 마감은 아래 작은 칩으로 내린다. */}
-                <span className={`strip-grade grade-solid-${display.key}`}>
-                  <GradeIcon state={display.key} size={11} />{display.label}
-                </span>
+                {/* 판정 대기는 목록에 안 띄운다 — 이유는 PostCard 쪽 주석 참고 */}
+                {display.key !== 'pending' && (
+                  <span className={`strip-grade grade-solid-${display.key}`}>
+                    <GradeIcon state={display.key} size={11} />{display.label}
+                  </span>
+                )}
                 {badge && <span className={`strip-badge ${badge.cls}`}>{badge.txt}</span>}
               </div>
               <p className="strip-name">{p.title}</p>

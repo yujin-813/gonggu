@@ -141,10 +141,17 @@ export default function PostCard({
         {/* 시각적 우선순위: ① 판정 ② 마감 ③ 상품명·가격.
             "여기는 가격을 판정해주는 곳"이라는 신호가 스크롤할 때 반복해서 눈에 들어와야
             하므로, 가장 잘 보이는 좌상단은 마감이 아니라 판정 배지가 차지한다. */}
-        <div className={`badge-verdict grade-solid-${verdict.display.key}`}>
-          <GradeIcon state={verdict.display.key} size={14} />
-          {verdict.display.label}
-        </div>
+        {/* 판정 대기는 목록에서 빼둔다. 다른 배지는 "사도 된다·다른 데 봐라"처럼 읽는
+            즉시 쓸모가 있는데, 판정 대기만 우리 사정을 적어둔 말이라 읽어도 아무 판단을
+            못 하게 한다. "대기"라는 말은 곧 나온다는 약속처럼 읽혀서 다시 와도 그대로면
+            신뢰만 깎인다. 목록에서는 조용히 비우고, 이유는 상세에서 설명한다.
+            덤으로 4장 중 1장이 달고 있던 배지가 사라져 꿀딜이 더 도드라진다. */}
+        {verdict.display.key !== 'pending' && (
+          <div className={`badge-verdict grade-solid-${verdict.display.key}`}>
+            <GradeIcon state={verdict.display.key} size={14} />
+            {verdict.display.label}
+          </div>
+        )}
         {badge && BadgeIconEl && (
           <div className={`badge-deadline ${badge.cls}`}>
             <BadgeIconEl size={11} strokeWidth={2.5} /> {badge.txt}
@@ -197,8 +204,10 @@ export default function PostCard({
           </span>
         </div>
 
+        {/* 브랜드명은 상품을 찾는 단서지 강조 대상이 아니다. 보라색을 쓰면 목록에
+            제5의 색이 늘어나 판정 배지와 시선을 나눠 갖는다 — 회색 눈금으로 물린다. */}
         {post.brand && (
-          <div style={{ fontSize: 11, fontWeight: 700, color: '#6366f1', letterSpacing: '0.04em', marginBottom: 2 }}>
+          <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--gray-3)', letterSpacing: '0.06em', marginBottom: 3 }}>
             {post.brand.toUpperCase()}
           </div>
         )}
