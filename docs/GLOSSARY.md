@@ -1,0 +1,143 @@
+# 용어사전
+
+> 화면에 쓰는 말 ↔ 코드·데이터 이름의 대응표. 마지막 갱신: 2026-08-20
+
+---
+
+## 핵심 용어
+
+| 화면에 쓰는 말 | 코드·DB 이름 | 뜻 |
+|---|---|---|
+| 공구 | `Post` | 인플루언서가 여는 공동구매 게시물 하나 |
+| 공구가 | `post.price` | 이 공구의 **대표가**. 최저가가 아닐 수 있다 |
+| 정가 | `post.origPrice` | 관리자가 직접 확인해 넣은 비교 기준가 |
+| 네이버 최저가 | `post.market_price` | 네이버쇼핑 API가 자동으로 찾은 값 |
+| 판정 | `getDealVerdict()` / `DealVerdict` | 이 공구가 싼지에 대한 결론 |
+| 구성 / 세트 | `post.options[]` / `DealOption` | 한 공구 안의 세트 옵션 |
+| 대체 구매 링크 | `post.purchase_links[]` | 공구 종료 후 살 수 있는 제휴 링크 |
+| 꿀픽 | `post.is_featured` / `featured_order` | 관리자가 직접 고른 추천 공구 |
+| 상시딜 | `is_evergreen_deal` / `is_always_on` | 기간 없이 계속 파는 것 |
+| 소진시 마감 | `sale_until_sold_out` | 고정 마감일 없이 재고 소진 시 종료 |
+| 단독 공구 | `is_exclusive_deal` | 다른 곳에서 안 파는 상품 (관리자가 확인) |
+| 여러 상품 | `is_multi_option` | 골라담기·모음전처럼 상품마다 가격이 다른 공구 |
+
+---
+
+## 쓰지 않는 말
+
+| 쓰지 않음 | 대신 | 이유 |
+|---|---|---|
+| 최저가 | 공구가 / 대표가 | `price`가 최저가라는 보장이 없다 |
+| 할인율 (카드에서 단독으로) | "정가보다 N원(M%) 저렴" | 무엇 대비인지 밝히지 않으면 오해를 준다 |
+| 판정 대기 | **가격 비교 전** | 우리 사정이 아니라 고객이 알 수 있는 사실로 (`D-018`) |
+| 보통딜 | 괜찮딜 / 고민딜 | 4단계로 나눌 때 폐기 (`D-004`) |
+| 상품 | 공구 | 우리가 파는 게 아니다 |
+| 회원 / 유저 | 방문자 | 로그인 개념이 없다 (관리자 제외) |
+
+---
+
+## 헷갈리는 쌍 — 실수의 근원지
+
+### `status` vs `published`
+
+**같은 게 아니다.** 공개 여부의 실질 판정은 `published`가 한다. `status`는 관리 상태 라벨이다.
+현재 운영 데이터에 둘이 어긋난 건이 16건 있다.
+
+### `origPrice` vs `market_price`
+
+| | `origPrice` | `market_price` |
+|---|---|---|
+| 출처 | 관리자가 직접 입력 | 네이버 API 자동 |
+| 신뢰도 | `verified` | `auto` — 공구가의 50% 미만이면 버림 |
+| 자동 채우기 | **절대 안 함** | 수집기가 채움 |
+
+자동값을 `origPrice`에 넣으면 저장 한 번에 영구 고정된다. 절대 하지 말 것.
+
+### `purchase_links` vs `market_url`
+
+| | `purchase_links[]` | `market_url` |
+|---|---|---|
+| 목적 | 대체 **구매** (제휴) | 가격 **비교** |
+| 공정위 고지 | **항상 붙는다** | 안 붙는다 |
+
+섞으면 제휴가 아닌 링크에 "수수료를 제공받습니다"가 붙어 거짓 고지가 된다 (`D-003`).
+
+### `purchase_url` vs `url` vs `store_url`
+
+| 필드 | 가리키는 곳 |
+|---|---|
+| `purchase_url` | 실제 구매 페이지. **이게 없으면 공개 불가** |
+| `url` | 인플루언서 인스타 프로필 |
+| `store_url` | 원래 "구매처 보존용"으로 만든 필드. 현재 `inpock.py`가 `purchase_url`과 **같은 값을 넣는다** (inpock.py:1284). 읽는 쪽은 `purchase_url`만 쓴다 |
+
+### `isCustomerVisible()` vs `isPagePublic()` vs `isStillUpcoming()`
+
+| 함수 | 쓰는 곳 | 마감 처리 |
+|---|---|---|
+| `isCustomerVisible()` | 목록 | 마감 **제외** |
+| `isPagePublic()` | 상세 페이지 존재 여부·사이트맵 | 마감 **포함** |
+| `isStillUpcoming()` | 오픈 예정 판단 | 오픈일이 지나면 false |
+
+목록용을 상세에 쓰면 마감 공구가 404난다 (`D-002`).
+
+### 등급 vs 상태
+
+`honey`/`good`/`hmm`/`meh`는 **등급**이고 `pending`/`exclusive`/`multi`는 **상태**다.
+`DealVerdict.grade`는 등급일 때만 값이 있고 상태일 때는 `null`이다. `display`는 둘 다 있다.
+
+### 오늘의 공구 vs 마감 임박
+
+| | 기준 |
+|---|---|
+| 오늘의 공구 | 오늘 **오픈**했거나 오늘 **수집**된 것 |
+| 마감 임박 | 48시간 안에 **마감**되는 것 |
+
+예전에 "오늘 마감"을 오늘의 공구에 넣었더니 두 섹션이 100% 겹쳤다.
+
+### `_dj_sid` vs `_dj_vid`
+
+| | 저장소 | 수명 |
+|---|---|---|
+| `_dj_sid` (세션) | sessionStorage | 탭 단위 |
+| `_dj_vid` (방문자) | localStorage | 브라우저 단위 — 신규/재방문 판별용 |
+
+---
+
+## 상태값 목록
+
+**`Post.status`** — `needs_review`(검수 필요) · `excluded`(제외) · `published`(공개 중) · `upcoming`(오픈 예정) · `ready`(공개 가능) · `candidate`(공구 후보)
+
+**`VerdictState`** — `honey`(꿀딜) · `good`(괜찮딜) · `hmm`(고민딜) · `meh`(아쉽딜) · `pending`(가격 비교 전) · `exclusive`(단독 공구) · `multi`(여러 상품)
+
+**`Category`** — `kids`(유아동) · `life`(생활) · `food`(식품) · `health`(건강) · `beauty`(뷰티)
+
+**`ClickType`** — `groupbuy`(공구 보기) · `coupang` · `naver` · `other` · `detail`
+
+**`TrafficSource`** — `instagram`(인스타그램) · `kakao`(카카오톡) · `naver_search`(네이버 검색) · `google_search`(구글 검색) · `other_search`(기타 검색) · `inapp`(앱 내 브라우저·경로 미상) · `external`(외부 사이트) · `direct`(직접 방문·북마크)
+
+---
+
+## 화면 라벨 ↔ 코드 값 대응
+
+| 화면 | 코드 |
+|---|---|
+| 꿀딜 / 괜찮딜 / 고민딜 / 아쉽딜 | `honey` / `good` / `hmm` / `meh` |
+| 가격 비교 전 | `pending` |
+| 단독 공구 | `exclusive` |
+| 여러 상품 | `multi` |
+| 유아동 / 생활 / 식품 / 건강 / 뷰티 | `kids` / `life` / `food` / `health` / `beauty` |
+| 전체 / 상시딜 | `all` / `evergreen` — **`Category`가 아니다.** 전용 페이지도 없다 |
+| 검수 필요 / 공개 가능 / 공개됨 / 마감됨 / 제외 | `needs_review` / `ready` / `published` / (마감은 상태가 아니라 날짜 계산) / `excluded` |
+
+---
+
+## 외부 데이터 용어
+
+| 외부 | 우리 쪽 |
+|---|---|
+| 인포크 링크페이지의 `block` | 공구 후보 1건 |
+| 인포크 `calendar` 블록의 `schedule_list` | 오픈 예정(`upcoming`) 공구 |
+| 카페24 `option_value` / `option_price` | `DealOption.name` / `.price` |
+| 위즈 계열 `od_option1` select | `DealOption` 목록 |
+| 아임웹 `load_option.cm`의 `option_html` | `DealOption` 목록 |
+| 네이버쇼핑 API `lprice` | `market_price` |

@@ -1,0 +1,342 @@
+# 03 · 시스템 — 지금 상태
+
+> **"지금"만 쓴다.** 변경 이력과 "예전에는 ○○였다"는 여기 쓰지 않는다. 과거는 `02-DECISIONS.md`에 있다.
+> 마지막 갱신: 2026-08-20
+
+---
+
+## 한눈에 보기
+
+| | |
+|---|---|
+| 단계 | 운영 중 · 실사용자 있음 (2026-08-19 기준 사람 방문 고유 IP 163명/2일) |
+| 스택 | Next.js 14 (App Router) · React 18 · TypeScript · 파이썬 수집기 |
+| 저장소 | **파일 기반** — `data/*.json`. DB 없음 |
+| 코드 규모 | `lib/` 2,249줄 · `app/admin` + `components/` 4,161줄 · 파이썬 2,968줄 |
+| 데이터 규모 | 게시물 2,317건 (공개 277건) · 인플루언서 소스 58개 · analytics 31일치 |
+| 배포 | EC2 `13.125.121.62` · PM2(fork, 포트 3002) + nginx · `bash deploy.sh` |
+| 도메인 | https://gonggu.asknuggetdata.com |
+
+---
+
+## 기능
+
+### 있는 것
+
+**고객 화면**
+- 홈 큐레이션 — 꿀픽(관리자 선정), 오늘의 공구, 마감 임박, 이달의 공구, 카테고리별, 인플루언서별, 많이 보는 공구, 종료됐지만 살 수 있는 공구
+- 공구 판정 — 4단계 등급 + 비등급 3상태, 판정 근거 표, 세트 옵션 표
+- 상세 페이지 `/post/[id]` — 마감돼도 URL이 살아 있고 종료 안내·대체 구매처를 보여준다
+- 랜딩 페이지 — `/today`, `/deadline`, `/monthly`, `/category/[cat]`, `/influencer/[account]`, `/influencers`, `/collection/[id]`
+- 검색 (마감 공구 포함), 찜, 공유(카카오/네이티브/복사 — utm 자동 부착)
+- 공유 카드 이미지 `/api/og/deal/[id]` — 판정 결과를 그린 800×400 PNG
+- SEO — JSON-LD(WebSite/ItemList/Product·Offer/BreadcrumbList), sitemap.xml(329 URL), robots.txt, 네이버·구글 소유확인
+
+**관리자 `/admin`**
+- 공구 목록·검수·공개/숨김·수정·삭제, 필터 탭(개수 0이면 자동 숨김)
+- 판정 채우기 화면 — 판정용(비교가) / 종료 공구용(제휴 링크) 두 모드
+- 옵션 관리 — 수동 입력, **붙여넣기 파서**, **옵션 가져오기**(자동 수집)
+- 꿀픽 선정·순서, 상시딜·소진시마감 토글, 여러상품 토글
+- 인플루언서 소스 관리·개별 수집, 컬렉션 관리
+- 방문자 분석 — 일자별 방문/재방문, **유입 경로**, 많이 본 상품, 많이 공유된 상품
+- 관리자 IP 관리, 인스타용 링크 복사(utm 부착)
+
+**수집 (파이썬)**
+- `collector.py` — 소스 타입에 따라 수집기 라우팅. cron 하루 2회(09:00, 14:00)
+- `inpock.py` — 인포크 링크페이지 파싱, 가격·마감일·브랜드·카테고리 추출, 네이버쇼핑 비교가 조회, **세트 옵션 자동 수집**, 상태 자동 분류
+- `backfill_options.py` / `backfill_market_price.py` / `backfill_brand.py` / `backfill_category.py` — 기존 데이터 보강
+- `check_links.py` — cron 매일 20:00
+
+### 만들다 만 것
+
+| | 상태 |
+|---|---|
+| 푸시 알림 | `lib/push.ts`, `/api/push/subscribe`, `scripts/send-deadline-alerts.js`가 있고 cron이 매시 15분에 돈다. **구독자 2명**이라 사실상 미가동 ⚠️ |
+| `scraper.py` (인스타 직접 수집) | 2026-06-30 이후 미사용. `npm run scrape`로만 호출됨 |
+| 컬렉션 | 기능은 있으나 운영 데이터에 `collections.json` 360바이트 — 거의 안 씀 ⚠️ |
+| 꿀픽 | 기능 완성. 현재 `is_featured` **0건** — 아무것도 선정돼 있지 않다 |
+| `group_key` (같은 상품 공구 묶기) | 필드와 API(`/api/posts/group-history`)는 있으나 실제 데이터 0건 |
+
+### 다음에 만들 것
+
+- 판정 커버리지 올리기 — 비교가 없는 공구 채우기 (가장 큰 병목)
+- ⚠️ 그 외는 사장님이 정할 것. `01-CONSTITUTION.md`의 "지금 집중하는 것" 참고
+
+---
+
+## 도메인 모델
+
+### Post (`lib/types.ts`)
+
+핵심 필드만. 전체는 `lib/types.ts` 참고.
+
+```
+id, shortcode, title, account, cat, price, origPrice, deadline, start_date, img, url
+brand, purchase_url, market_url, market_price, market_price_note
+options[], is_multi_option, purchase_links[]
+status, published, review_reason[], is_featured, featured_order
+is_always_on, is_evergreen_deal, sale_until_sold_out, is_exclusive_deal
+custom_verdict, custom_verdict_detail, custom_verdict_cls
+influencer_name, influencer_handle, influencer_id, source, source_type
+extraction_debug, scraped_at, collection_status, collection_error
+```
+
+### 상태값 전체
+
+**`Post.status`** — 관리 상태
+| 값 | 의미 | 현재 건수 |
+|---|---|---|
+| `needs_review` | 검수 필요 | 1,047 |
+| `excluded` | 제외됨 (비공구 등) | 899 |
+| `published` | 공개 중 | 261 |
+| `upcoming` | 오픈 예정 | 52 |
+| `ready` | 공개 가능 | 42 |
+| `candidate` | 공구 후보 | 0 |
+| (없음) | 옛 데이터 | 16 ⚠️ |
+
+> `status`와 `published`는 **별개 필드**다. 공개 여부의 실질 판정은 `published`가 한다.
+> 현재 `published: true`가 277건인데 `status: 'published'`는 261건 — 16건 차이가 있다 ⚠️
+
+**`VerdictState`** (`lib/dealGrade.ts`) — 화면에 보이는 판정
+| 값 | 라벨 | 조건 |
+|---|---|---|
+| `honey` | 꿀딜 | 할인율 15% 이상 |
+| `good` | 괜찮딜 | 5% 이상 15% 미만 |
+| `hmm` | 고민딜 | −5% 초과 5% 미만 |
+| `meh` | 아쉽딜 | −5% 이하 (더 비쌈) |
+| `pending` | 가격 비교 전 | 믿을 만한 비교가가 없음 |
+| `exclusive` | 단독 공구 | 관리자가 `is_exclusive_deal` 확인 |
+| `multi` | 여러 상품 | 골라담기·모음전 등 판정 불가 유형 |
+
+**`ClickType`** (`lib/analytics.ts`) — `groupbuy` / `coupang` / `naver` / `other` / `detail`
+
+**`TrafficSource`** (`lib/analytics.ts`) — `instagram` / `kakao` / `naver_search` / `google_search` / `other_search` / `inapp` / `external` / `direct`
+
+**`Category`** — `kids` / `life` / `food` / `health` / `beauty`
+> 화면 카테고리 바에는 `all`·`evergreen`이 더 있지만 이 둘은 `Category`가 아니고 전용 페이지도 없다.
+
+---
+
+## 데이터 구조
+
+```
+data/
+  posts.json                2,317건 · 6.4MB   ← 전부 메모리에 올렸다 저장한다
+  analytics.json            31일치 (30일 초과분 자동 정리)
+  admin_ips.json            관리자 IP (14일 TTL)
+  influencer_sources.json   58개
+  collections.json          거의 비어 있음
+  inpock_status.json        마지막 수집 결과
+public/uploads/   업로드 이미지 78MB
+public/scraped/   수집 이미지 431MB
+```
+
+### 손대면 위험한 곳
+
+| 위치 | 위험 |
+|---|---|
+| `lib/store.ts`의 `savePosts()` | **전체 배열을 통째로 다시 쓴다.** 동시에 두 요청이 저장하면 나중 것이 먼저 것을 덮는다. 락이 없다 ⚠️ |
+| `lib/dealGrade.ts` `getDealVerdict()` | 화면의 모든 숫자가 여기서 나온다. 여기를 고치면 카드·상세·공유카드·정렬이 전부 바뀐다 |
+| `AUTO_MATCH_FLOOR = 0.5` | 낮추면 잘못된 자동 매칭이 판정을 뒤집는다 (`D-006`) |
+| `lib/postGuards.ts` | 구매 링크 없는 공구의 공개를 막는 유일한 장치 |
+| `app/api/posts/[id]/route.ts`의 필드 allowlist | 여기 없는 필드는 관리자가 저장해도 **조용히 무시된다.** 새 필드를 추가하면 PATCH·PUT 양쪽에 넣어야 한다 |
+| `middleware.ts`의 `config.matcher` | 새 관리자 API를 만들면 `isProtected()`와 `matcher` **양쪽**에 등록해야 한다. 한쪽만 하면 무방비 |
+| `data/posts.json` 직접 편집 | 서버에서 스크립트로 고칠 때는 반드시 백업부터. 저장은 스크립트 끝에서 한 번만 일어난다 |
+| 마감일 형식 | `YYYY-MM-DD` 문자열 비교로 판단한다. 시각이 섞이면 표시와 비교가 동시에 깨진다. `lib/period.ts`의 `dateOnly()`, `inpock.py`의 `_date_only()`가 방어한다 |
+
+---
+
+## 시스템 구성
+
+```
+[인스타 인플루언서 링크페이지]
+        │  cron 09:00 / 14:00
+        ▼
+   collector.py ─→ inpock.py ─→ 네이버쇼핑 API (비교가)
+        │                   └─→ 쇼핑몰 상세페이지 (가격·마감일·옵션)
+        ▼
+   data/posts.json  ←──────  관리자 화면 (/admin)
+        │
+        ▼
+   Next.js (PM2 :3002) ←── nginx ←── https://gonggu.asknuggetdata.com
+```
+
+### 외부 의존성
+
+| 대상 | 용도 | 실패 시 |
+|---|---|---|
+| 네이버 쇼핑 API | 비교가(`market_price`) 조회 | 판정 대기가 늘어난다 |
+| 인포크(link.inpock.co.kr) | 공구 링크 수집 | 신규 수집이 멈춘다. **과도한 요청 시 400으로 일시 차단됨** ⚠️ |
+| 쇼핑몰 상세페이지 | 가격·옵션 추출 | 해당 건만 실패 |
+| 카카오 JS SDK | 공유 | 네이티브 공유로 폴백 |
+| Let's Encrypt | HTTPS | certbot 자동 갱신 |
+
+---
+
+## 주요 흐름
+
+### 1. 수집 → 공개
+
+```
+cron → collector.py → inpock.py
+  링크페이지 파싱 → 구매링크 추출 → 상세페이지 fetch
+  → 가격·마감일·브랜드 추출 → 세트 옵션 추출 → 네이버 비교가 조회
+  → classify_status()로 상태 결정 → posts.json 앞에 추가
+        ↓
+관리자가 검수 → 공개하기
+  → enforcePurchaseLinkRequirement() 통과해야 published
+```
+
+### 2. 판정
+
+```
+getDealVerdict(post)
+ ├ 옵션에 비교가가 하나라도 있으면 → verdictFromOptions()
+ │    세트별 할인율 → 중앙값으로 등급, 범위는 rateRange
+ └ 아니면 단일 경로
+      verified = purchase_links 가격 + origPrice   (사람이 확인)
+      auto     = market_price                       (자동 매칭)
+      trustedAuto = auto 중 공구가의 50% 이상만
+      기준가 = [verified, trustedAuto] 중 최솟값
+      → gradeFromRate()로 등급
+```
+
+### 3. 유입 경로 기록
+
+```
+첫 진입 → track.ts가 utm_source·document.referrer를 sessionStorage에 고정
+       → /api/analytics POST (referrer, utmSource 동봉)
+       → 봇 판정 → 관리자 판정 → classifySource()
+       → daily[날짜].sources[경로]++  (view 이벤트당 1회)
+```
+
+---
+
+## 코드를 읽어도 모르는 규칙
+
+- **`price`는 최저가가 아니라 "대표가"다.** 수집기가 페이지에서 가져온 값이며, 보통 최저가지만 항상은 아니다.
+- **`origPrice`에는 자동 수집값을 절대 넣지 않는다.** 관리자가 직접 입력한 값만. 자동값을 넣으면 저장 버튼만 눌러도 그 시점 값이 영구 고정된다.
+- **`purchase_links`에는 공정위 제휴 고지가 항상 따라붙는다.** 제휴가 아닌 링크를 넣으면 거짓 고지가 된다 (`D-003`).
+- **URL에 `?notrack=1`을 한 번 붙이면** 그 브라우저는 이후 통계에서 계속 제외된다. 해제는 `?notrack=0`.
+- **관리자 페이지를 한 번이라도 연 브라우저**는 흔적 쿠키(1년)로 통계에서 제외된다.
+- **옵션 이름의 `[87%]` 같은 표기는 판매자가 쓴 것**이고 우리 판정과 무관하다.
+- 배포는 `deploy.sh`가 별도 디렉터리에 빌드 후 교체한다. 실패하면 `.next-old`로 자동 롤백한다.
+- 서버에서 파이썬을 돌릴 때는 `venv/bin/python`을 쓴다.
+- 긴 스크립트는 SSH가 끊기면 같이 죽는다. `nohup ... &`로 분리 실행할 것.
+
+---
+
+## 알려진 문제 / 기술 부채
+
+우선순위 순. 근거를 함께 적는다.
+
+### 1. 저장에 락이 없다 — 데이터 유실 가능 ⚠️
+
+`lib/store.ts`의 `savePosts()`가 2,317건 배열을 통째로 덮어쓴다. 관리자가 저장하는 동시에 파이썬 수집기가 저장하면 한쪽이 통째로 사라진다. 지금은 사용자가 한 명이라 드러나지 않았을 뿐이다.
+
+**근거:** `lib/store.ts` · `backfill_options.py`가 끝에서 `save_posts(posts)` 한 번 호출 · cron이 하루 2회 수집 실행
+
+### 2. 판정 대기가 26% ⚠️
+
+고객에게 보이는 공구의 4분의 1이 판정을 못 받는다. 판정기를 표방하는 제품의 핵심 지표다.
+
+**근거:** 2026-08-19 측정 — 공개 86건 중 pending 22건. `market_price` 보유 711건 / 전체 2,317건
+
+### 3. 검수 필요가 1,047건 — 사실상 방치
+
+전체의 45%가 검수 대기다. 사람이 처리할 수 있는 양을 넘었다.
+
+**근거:** `status` 분포. 자동 분류(`classify_status()`)의 기준이 보수적이라 대부분이 여기로 온다
+
+### 4. 구매 링크 필수 규칙이 두 곳에 따로 있다
+
+TypeScript(`lib/postGuards.ts`)와 파이썬(`inpock.py`의 `classify_status()`)이 같은 규칙을 각자 구현한다. 한쪽만 고치면 갈라진다.
+
+**근거:** `lib/postGuards.ts` 주석에 "파이썬 수집기는 자체 classify_status()에서 이미 같은 규칙을 적용 중"이라고 명시돼 있음
+
+### 5. `status`와 `published`가 어긋난 데이터 16건
+
+`published: true`인데 `status`가 `published`가 아니거나 아예 없는 건이 있다.
+
+**근거:** 운영 데이터 집계 — `status: None` 16건, `published: true` 277건 vs `status: 'published'` 261건
+
+### 6. 색 원칙을 강제하는 장치가 없다
+
+`01-CONSTITUTION.md`의 원칙 5는 CSS 컨벤션일 뿐이다. 새 컴포넌트에서 인라인 스타일로 임의의 색을 쓰면 막을 방법이 없다. 실제로 관리자 화면은 대부분 인라인 스타일이다.
+
+**근거:** `app/admin/page.tsx`가 인라인 `style={{ background: '#ede9fe', ... }}` 다수 사용
+
+### 7. 인포크가 과도한 요청에 400으로 차단한다
+
+조사 중 100회 가까이 요청했더니 차단됐고 하루 뒤 풀렸다. 수집 주기를 늘리거나 재시도를 촘촘히 하면 다시 걸릴 수 있다.
+
+**근거:** 2026-08-19 실측 — 차단 시 400, 해제 후 302
+
+### 8. 이미지 431MB가 정리 없이 쌓인다
+
+`public/scraped/`가 431MB. 제외된 공구(899건)의 이미지도 남아 있다. 삭제 로직이 없다 ⚠️
+
+### 9. 마감된 공구 페이지가 계속 늘어난다
+
+`isPagePublic`이 마감을 따지지 않아 사이트맵이 329 URL까지 왔다. 의도된 동작(`D-002`)이지만 상한이 없다.
+
+### 10. `data/posts.json` 백업이 수동으로 쌓여 있다
+
+서버에 `posts.json.bak-*` 6개(약 38MB). 정리 규칙이 없다.
+
+---
+
+## 운영
+
+### 명령어
+
+```bash
+# 배포 (로컬에서)
+git push origin main
+ssh -i ~/.ssh/gonggu_ec2 ubuntu@13.125.121.62 'cd ~/gonggu && bash deploy.sh'
+
+# 로컬 개발
+node node_modules/.bin/next dev -p 3210     # 3000·3100은 다른 프로젝트가 쓸 수 있음
+
+# 검증
+npx tsc --noEmit
+npm run build
+
+# 서버 수집 (분리 실행 — SSH 끊겨도 살아남음)
+cd ~/gonggu && nohup venv/bin/python collector.py > logs/collector.log 2>&1 &
+cd ~/gonggu && nohup venv/bin/python backfill_options.py > logs/backfill-options.log 2>&1 &
+```
+
+### 환경변수 (`.env.local` — git에 없음)
+
+서버 `.env.local`의 전체 항목 (2026-08-20 확인, 값은 제외).
+
+| 이름 | 용도 | 없으면 |
+|---|---|---|
+| `ADMIN_PASSWORD` | 관리자 인증 | **관리자 API가 500** |
+| `NAVER_CLIENT_ID` / `NAVER_CLIENT_SECRET` | 네이버 쇼핑 API — 비교가 조회 | 비교가 수집 중단 → 판정 대기 증가 |
+| `NAVER_SITE_VERIFICATION` | 네이버 소유확인 (쉼표로 여러 개 가능) | 메타태그 생략 |
+| `GOOGLE_SITE_VERIFICATION` | 구글 소유확인 | 메타태그 생략 |
+| `NEXT_PUBLIC_KAKAO_JS_KEY` | 카카오 공유 | 네이티브 공유로 폴백 |
+| `NEXT_PUBLIC_VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY` / `VAPID_SUBJECT` | 웹 푸시 | 알림 발송 불가 (구독자 2명이라 영향 미미) |
+| `INSTAGRAM_USERNAME` / `INSTAGRAM_PASSWORD` | `scraper.py`용 | 현재 미사용 |
+
+> cron으로 파이썬을 돌릴 때 `.env.local`이 자동 로드되지 않아, 스크립트가 직접 읽어 주입한다
+> (`backfill_market_price.py` 상단). 새 스크립트를 만들 때 같은 처리가 필요하다.
+
+### cron (서버)
+
+```
+0  9 * * *  collector.py
+0 14 * * *  collector.py
+15 * * * *  scripts/send-deadline-alerts.js
+0 20 * * *  check_links.py
+```
+
+### 배포 전 체크리스트
+
+1. `npx tsc --noEmit` 통과
+2. `npm run build` 통과
+3. 로컬(`:3210`)에서 바뀐 화면 확인 — **클라이언트 컴포넌트가 `lib/landing`·`lib/store`를 import하면 `fs` 때문에 전 페이지가 500난다**
+4. 데이터를 건드리는 스크립트는 `--dry-run` 먼저, `data/posts.json` 백업 후 실행
+5. 배포 후 홈·관리자·바뀐 페이지 상태 코드 확인
