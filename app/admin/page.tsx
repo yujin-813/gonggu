@@ -92,6 +92,29 @@ const CAT_LABEL: Record<string, string> = {
   health: '건강', beauty: '뷰티',
 }
 
+
+/**
+ * 비교가가 새 공구에 계속 안 붙고 있는지 본다.
+ *
+ * 네이버가 쇼핑 검색 API를 없앤 걸 3주 동안 아무도 몰랐다. 그 사이 수집된 656건이 전부
+ * 판정 없이 쌓였다. 조용히 망가지는 게 가장 나쁜 고장이라, 새로 들어온 공구에 비교가가
+ * 계속 안 붙으면 화면에 띄운다.
+ *
+ * 관리자 목록이 이미 전체 게시물을 들고 있으므로 새 API를 만들지 않고 여기서 센다.
+ */
+function comparePriceStall(posts: Post[]): { days: number; since: string; collected: number } | null {
+  const withPrice = posts.filter(p => p.market_price && p.scraped_at)
+  if (!withPrice.length) return null
+  const last = withPrice.reduce((m, p) => (p.scraped_at! > m ? p.scraped_at! : m), '').slice(0, 10)
+  if (!last) return null
+  // 그 이후로 새로 들어온 공구가 몇 건인데 하나도 안 붙었는지
+  const collected = posts.filter(p => (p.scraped_at || '').slice(0, 10) > last).length
+  const days = Math.floor((Date.now() - new Date(last + 'T00:00:00+09:00').getTime()) / 86400000)
+  // 하루 이틀 비는 건 정상(수집이 없는 날도 있다). 사흘 넘게 + 새 공구가 쌓였을 때만 알린다
+  if (days < 3 || collected < 10) return null
+  return { days, since: last, collected }
+}
+
 export default function AdminPage() {
   const [authed, setAuthed]           = useState<boolean | null>(null)  // null = 확인 중
   const [posts, setPosts]             = useState<Post[]>([])
@@ -485,6 +508,28 @@ export default function AdminPage() {
           <StatCard label="검수 필요" value={needsReviewCount}  Icon={TriangleAlert} color="#f97316" />
           <StatCard label="공구 후보" value={candidateCount}    Icon={FileEdit}      color="#eab308" />
         </div>
+
+        {/* 자동 비교가가 멎으면 알린다 — 조용히 망가지는 걸 막는 유일한 장치 */}
+        {(() => {
+          const stall = comparePriceStall(posts)
+          if (!stall) return null
+          return (
+            <div style={{
+              display: 'flex', alignItems: 'flex-start', gap: 10, marginBottom: 20,
+              padding: '12px 14px', background: '#FEF2F2', border: '1px solid #FECACA',
+              borderRadius: 10,
+            }}>
+              <TriangleAlert size={18} strokeWidth={2.5} style={{ color: '#DC2626', flexShrink: 0, marginTop: 1 }} />
+              <div style={{ fontSize: 13, lineHeight: 1.6, color: '#7F1D1D' }}>
+                <strong>비교가가 {stall.days}일째 안 붙고 있어요.</strong>
+                <br />
+                마지막으로 붙은 날이 {stall.since}이고, 그 뒤로 들어온 {stall.collected}건에 비교가가 하나도 없어요.
+                이 상태로는 새 공구가 계속 판정 없이 쌓입니다.
+                {/* 직접 입력한 값도 함께 세므로 "자동 수집"이라 단정하지 않는다 */}
+              </div>
+            </div>
+          )
+        })()}
 
         {/* 방문자 분석 */}
         <AnalyticsSection data={analytics} topPosts={topPosts} topSharedPosts={topSharedPosts} sources={sources} />
