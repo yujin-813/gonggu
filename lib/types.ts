@@ -72,6 +72,16 @@ export interface Post {
   // 부정확할 수 있을 때 관리자가 남기는 짧은 참고 문구 — 자동 계산은 그대로 두고 판단 문구
   // 뒤에 덧붙여서 보여준다 (custom_verdict처럼 전체를 덮어쓰지 않음)
   market_price_note?: string | null
+  // 관리자가 실제로 찾아본 뒤 "비교할 동일상품이 없다"고 확인한 흔적.
+  //
+  // 값이 없는 것(=아직 아무도 안 봄)과 사람이 확인한 것을 구분하지 못하면, 판정이 안 붙은
+  // 공구가 전부 한 자리에 섞여서 같은 공구를 몇 번씩 다시 뒤지게 된다. 확인한 시점을
+  // 남기는 것이 곧 "비교불가" 표시다 — 자세한 건 lib/compareState.ts.
+  //
+  // 고객 화면은 이 값을 쓰지 않는다. 검수 상태는 우리 사정이다(원칙 3).
+  compare_none_at?: string | null
+  compare_none_reason?: CompareNoneReason | null
+  compare_none_note?: string | null
   // 관리자가 자동 판단(dealJudgment) 대신 직접 입력한 구매 판단 문구 — 값이 있으면 이걸 우선 사용
   custom_verdict?: string | null
   custom_verdict_detail?: string | null
@@ -126,6 +136,22 @@ export interface DealOption {
   comparePrice?: number | null
   /** 사은품 — 가격 비교에는 안 넣고 표시만 한다 */
   gift?: string | null
+}
+
+/**
+ * 비교할 동일상품이 없다고 판단한 이유.
+ *
+ * 자유 입력이 아니라 목록으로 받는 이유는, 나중에 세어 보면 다음에 뭘 자동화할지 알 수
+ * 있기 때문이다 — '검색해도 안 나옴'이 많으면 검색 수단이 부족한 것이고, '같은 구성이
+ * 없음'이 많으면 세트 단위 비교가 필요한 것이다.
+ */
+export type CompareNoneReason = 'exclusive' | 'no_same_set' | 'not_found' | 'other'
+
+export const COMPARE_NONE_REASON_LABEL: Record<CompareNoneReason, string> = {
+  exclusive:   '여기서만 판매하는 상품',
+  no_same_set: '같은 구성이 없음 (세트가 다름)',
+  not_found:   '검색해도 안 나옴',
+  other:       '기타',
 }
 
 export type PurchasePlatform = 'naver' | 'coupang' | 'other'

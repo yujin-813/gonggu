@@ -1,10 +1,13 @@
 'use client'
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useMemo, useCallback } from 'react'
 import type { Post, ScraperStatus, InfluencerSource, Collection } from '@/lib/types'
 import { daysLeft, periodLabel, isExpired, isCustomerVisible, isPagePublic, fmtDate } from '@/lib/period'
 import { hasPurchaseLink, normalizePurchaseLinks } from '@/lib/purchaseLinks'
 import { getDealVerdict, isMultiOption } from '@/lib/dealGrade'
 import { partnerSearchQuery } from '@/lib/searchQuery'
+import { getCompareState, COMPARE_STATE_LABEL, CLEAR_COMPARE_NONE, type CompareState } from '@/lib/compareState'
+import { findCompareCandidates, type CompareCandidate } from '@/lib/compareCandidates'
+import { COMPARE_NONE_REASON_LABEL, type CompareNoneReason } from '@/lib/types'
 import { GradeBadge } from '@/components/DealVerdictBox'
 import { CheckCircle2, CircleDot, TriangleAlert, FileEdit, Search, Flame, ImageOff, Eye, EyeOff, Package, Copy, type LucideIcon } from 'lucide-react'
 import AddPostModal from '@/components/AddPostModal'
@@ -1712,34 +1715,52 @@ function AdminIpManager() {
 //   판정 대기     — 비교 가격이 없어 등급을 못 매기는 공구. 가격이 필요하다.
 //   종료·링크없음 — 마감됐는데 지금 살 곳을 못 알려주는 공구. 링크가 필요하다.
 function VerdictFiller({ posts, onSaved }: { posts: Post[]; onSaved: () => void }) {
-  const [mode, setMode] = useState<'pending' | 'ended'>('pending')
+  const [mode, setMode] = useState<CompareState | 'ended'>('unchecked')
+  // 목록은 전체 2,300건 기준이라 그대로 펼치면 화면이 못 버티고, 고객에게 안 보이는 공구는
+  // 채워도 지금 효과가 없다. 기본은 보이는 것만 — 대신 몇 건을 뺐는지 항상 적는다
+  const [visibleOnly, setVisibleOnly] = useState(true)
 
-  // 고객 화면에 보이는 것부터 — 안 보이는 상품은 채워도 지금 효과가 없다
-  const byImpact = (a: Post, b: Post) => {
-    const av = isCustomerVisible(a) ? 0 : 1
-    const bv = isCustomerVisible(b) ? 0 : 1
-    if (av !== bv) return av - bv
-    return (b.scraped_at || '').localeCompare(a.scraped_at || '')
-  }
+  const groups = useMemo(() => {
+    const g: Record<CompareState, Post[]> = { unchecked: [], compared: [], incomparable: [] }
+    for (const p of posts) g[getCompareState(p)].push(p)
+    const byImpact = (a: Post, b: Post) => {
+      const av = isCustomerVisible(a) ? 0 : 1
+      const bv = isCustomerVisible(b) ? 0 : 1
+      if (av !== bv) return av - bv
+      return (b.scraped_at || '').localeCompare(a.scraped_at || '')
+    }
+    for (const k of Object.keys(g) as CompareState[]) g[k].sort(byImpact)
+    return g
+  }, [posts])
 
-  const pending = posts.filter(p => !getDealVerdict(p).grade).sort(byImpact)
   // 마감된 공구는 검색 유입이 계속 들어오는데 보낼 곳이 없으면 그대로 이탈한다
   const ended = posts
     .filter(p => isPagePublic(p) && isExpired(p) && !hasPurchaseLink(p))
     .sort((a, b) => (b.deadline || '').localeCompare(a.deadline || ''))
 
-  const list = mode === 'pending' ? pending : ended
+  const full = mode === 'ended' ? ended : groups[mode]
+  const list = visibleOnly && mode !== 'ended' ? full.filter(isCustomerVisible) : full
+  const hidden = full.length - list.length
 
-  const tabs = [
-    { key: 'pending' as const, label: `판정 대기 ${pending.length}`, color: '#475569' },
-    { key: 'ended'   as const, label: `종료·링크없음 ${ended.length}`, color: '#dc2626' },
+  const tabs: { key: CompareState | 'ended'; label: string; color: string }[] = [
+    { key: 'unchecked',    label: `${COMPARE_STATE_LABEL.unchecked} ${groups.unchecked.length}`,       color: '#475569' },
+    { key: 'incomparable', label: `${COMPARE_STATE_LABEL.incomparable} ${groups.incomparable.length}`, color: '#78716c' },
+    { key: 'compared',     label: `${COMPARE_STATE_LABEL.compared} ${groups.compared.length}`,         color: '#15803d' },
+    { key: 'ended',        label: `종료·링크없음 ${ended.length}`,                                       color: '#dc2626' },
   ]
+
+  const blurb: Record<CompareState | 'ended', React.ReactNode> = {
+    unchecked: <>아직 아무도 비교가를 안 본 공구예요. 후보가 있으면 골라서 저장하고, 찾아봐도 비교할 상품이 없으면 <strong>비교불가</strong>로 남겨주세요 — 그래야 이 목록에서 빠집니다.</>,
+    incomparable: <>찾아본 끝에 비교할 동일상품이 없다고 표시해 둔 공구예요. 나중에 팔기 시작했다면 <strong>다시 확인하기</strong>로 되돌릴 수 있어요.</>,
+    compared: <>비교가가 붙어 판정이 나가고 있는 공구예요. 값이 이상하면 여기서 고칠 수 있어요.</>,
+    ended: <>마감됐는데 &quot;지금 살 수 있는 곳&quot;을 못 알려주는 공구예요. 검색으로 계속 들어오는데 보낼 곳이 없으면 그대로 나갑니다.<br />링크만 넣어도 됩니다 — 가격을 모르면 &quot;가격 확인하기&quot;로 보내요.</>,
+  }
 
   return (
     <div style={{ background: '#fff', borderRadius: 12, padding: 20, border: '1px solid #e2e8f0' }}>
       <h2 style={{ fontSize: 17, fontWeight: 800, marginBottom: 12 }}>채우기</h2>
 
-      <div style={{ display: 'flex', gap: 6, marginBottom: 14 }}>
+      <div style={{ display: 'flex', gap: 6, marginBottom: 14, flexWrap: 'wrap' }}>
         {tabs.map(t => (
           <button key={t.key} onClick={() => setMode(t.key)}
             style={{ padding: '7px 14px', borderRadius: 20, border: 'none', cursor: 'pointer', fontSize: 13, fontWeight: 700, whiteSpace: 'nowrap',
@@ -1749,34 +1770,26 @@ function VerdictFiller({ posts, onSaved }: { posts: Post[]; onSaved: () => void 
         ))}
       </div>
 
-      <p style={{ fontSize: 13, color: '#64748b', lineHeight: 1.7, marginBottom: 16 }}>
-        {mode === 'pending' ? (
-          <>
-            비교 가격이 없어 등급을 못 매기는 공구예요. 쿠팡·네이버에서 같은 상품을 찾아
-            가격만 넣으면 바로 판정이 붙습니다.
-            <br />둘 중 하나만 넣어도 되고, 넣는 즉시 아래에 예상 등급이 보여요.
-          </>
-        ) : (
-          <>
-            마감됐는데 &quot;지금 살 수 있는 곳&quot;을 못 알려주는 공구예요. 검색으로 계속 들어오는데
-            보낼 곳이 없으면 그대로 나갑니다.
-            <br />링크만 넣어도 됩니다 — 가격을 모르면 &quot;가격 확인하기&quot;로 보내요.
-          </>
-        )}
-      </p>
+      <p style={{ fontSize: 13, color: '#64748b', lineHeight: 1.7, marginBottom: 12 }}>{blurb[mode]}</p>
+
+      {mode !== 'ended' && (
+        <label style={{ display: 'flex', alignItems: 'center', gap: 7, fontSize: 12.5, color: '#475569', marginBottom: 14, cursor: 'pointer' }}>
+          <input type="checkbox" checked={visibleOnly} onChange={e => setVisibleOnly(e.target.checked)} />
+          고객 화면에 보이는 것만
+          {visibleOnly && hidden > 0 && <span style={{ color: '#94a3b8' }}>— 안 보이는 {hidden.toLocaleString()}건은 뺐어요</span>}
+        </label>
+      )}
 
       {list.length === 0 ? (
         <div style={{ textAlign: 'center', padding: '24px 0' }}>
           <CheckCircle2 size={32} strokeWidth={1.75} style={{ color: '#22c55e', marginBottom: 8 }} />
-          <p style={{ fontSize: 14, fontWeight: 700 }}>
-            {mode === 'pending' ? '판정 대기 상품이 없어요' : '링크가 빠진 종료 공구가 없어요'}
-          </p>
+          <p style={{ fontSize: 14, fontWeight: 700 }}>여기 처리할 공구가 없어요</p>
         </div>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-          {list.map(p => mode === 'pending'
-            ? <PendingFillRow key={p.id} post={p} onSaved={onSaved} />
-            : <EndedFillRow key={p.id} post={p} onSaved={onSaved} />)}
+          {list.map(p => mode === 'ended'
+            ? <EndedFillRow key={p.id} post={p} onSaved={onSaved} />
+            : <CompareFillRow key={p.id} post={p} allPosts={posts} onSaved={onSaved} />)}
         </div>
       )}
     </div>
@@ -1857,12 +1870,35 @@ function SaveButton({ canSave, saving, done, onClick }: { canSave: boolean; savi
 }
 
 /** 판정 대기 — 비교 가격만 채운다. 제휴 링크가 아니므로 고객 화면에 버튼으로 뜨지 않는다. */
-function PendingFillRow({ post, onSaved }: { post: Post; onSaved: () => void }) {
-  const [orig, setOrig] = useState(String(post.origPrice ?? ''))
-  const [market, setMarket] = useState(String(post.market_price ?? ''))
+/**
+ * 비교가 채우기 한 행.
+ *
+ * 후보를 먼저 내밀고 고르게 한다 — 관리자가 매번 맨손으로 검색하는 대신, 우리가 이미 아는
+ * 값(수집해 둔 네이버 최저가, 같은 상품으로 보이는 다른 공구)을 보여주고 "이게 맞다"만
+ * 고르면 비교가로 저장된다. 후보 탐색은 lib/compareCandidates.ts가 하고, 나중에 API나
+ * 검색 서비스가 붙어도 이 화면은 그대로다.
+ *
+ * 세 상태(미확인·비교가 있음·비교불가)를 한 컴포넌트가 다룬다. 같은 공구가 상태만 오가는
+ * 것이라 화면을 나누면 같은 입력칸을 세 벌 갖게 된다.
+ */
+function CompareFillRow({ post, allPosts, onSaved }: { post: Post; allPosts: Post[]; onSaved: () => void }) {
+  const state = getCompareState(post)
+  const [orig, setOrig]           = useState(String(post.origPrice ?? ''))
+  const [market, setMarket]       = useState(String(post.market_price ?? ''))
   const [marketUrl, setMarketUrl] = useState(post.market_url ?? '')
-  const [saving, setSaving] = useState(false)
-  const [done, setDone] = useState(false)
+  const [cands, setCands]         = useState<CompareCandidate[] | null>(null)
+  const [picked, setPicked]       = useState<number | null>(null)
+  const [askNone, setAskNone]     = useState(false)
+  const [reason, setReason]       = useState<CompareNoneReason>(post.compare_none_reason ?? 'not_found')
+  const [note, setNote]           = useState(post.compare_none_note ?? '')
+  const [saving, setSaving]       = useState(false)
+  const [done, setDone]           = useState(false)
+
+  useEffect(() => {
+    let alive = true
+    findCompareCandidates({ post, allPosts }).then(c => { if (alive) setCands(c) })
+    return () => { alive = false }
+  }, [post, allPosts])
 
   // 저장하고 목록에서 다시 찾아 확인하는 왕복을 없애기 위해 입력하는 동안 등급을 보여준다
   const preview = (() => {
@@ -1872,28 +1908,99 @@ function PendingFillRow({ post, onSaved }: { post: Post; onSaved: () => void }) 
     return getDealVerdict({ ...post, origPrice: o || null, market_price: m || null } as Post).display
   })()
 
-  const canSave = parseInt(orig) > 0 || parseInt(market) > 0
-  async function save() {
+  async function patch(body: Record<string, unknown>) {
     setSaving(true)
     await fetch(`/api/posts/${post.id}`, {
-      method: 'PATCH', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        origPrice: parseInt(orig) || null,
-        market_price: parseInt(market) || null,
-        market_url: marketUrl.trim() || null,
-      }),
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
     })
     setSaving(false); setDone(true); onSaved()
+  }
+
+  const canSave = parseInt(orig) > 0 || parseInt(market) > 0
+  // 값이 실제로 붙었으면 "비교할 게 없다"는 더 이상 사실이 아니므로 표시를 함께 지운다
+  const savePrice = () => patch({
+    origPrice: parseInt(orig) || null,
+    market_price: parseInt(market) || null,
+    market_url: marketUrl.trim() || null,
+    ...CLEAR_COMPARE_NONE,
+  })
+  const saveNone = () => patch({
+    compare_none_at: new Date().toISOString(),
+    compare_none_reason: reason,
+    compare_none_note: reason === 'other' ? (note.trim() || null) : null,
+  })
+
+  function pick(i: number) {
+    const c = cands?.[i]
+    if (!c) return
+    setPicked(i)
+    setMarket(String(c.price))
+    if (c.url) setMarketUrl(c.url)
+    setDone(false)
   }
 
   return (
     <div style={{ border: '1px solid #e2e8f0', borderRadius: 10, padding: 12, background: done ? '#f0fdf4' : '#fff' }}>
       <FillRowHead post={post} mode="pending" badge={preview ? <GradeBadge display={preview} size="sm" /> : undefined} />
+
+      {isMultiOption(post) && (
+        <p style={{ fontSize: 11.5, color: '#78716c', margin: '0 0 8px' }}>
+          여러 상품을 파는 공구라 가격 하나로는 판정이 안 붙어요 — 비교불가로 남기면 됩니다.
+        </p>
+      )}
+
+      {state === 'incomparable' && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 10,
+          padding: '7px 10px', borderRadius: 8, background: '#f5f5f4', fontSize: 12.5, color: '#57534e' }}>
+          <strong style={{ fontWeight: 700 }}>비교불가</strong>
+          <span>{COMPARE_NONE_REASON_LABEL[post.compare_none_reason ?? 'other']}</span>
+          {post.compare_none_note && <span style={{ color: '#78716c' }}>· {post.compare_none_note}</span>}
+          {post.compare_none_at && <span style={{ color: '#a8a29e' }}>{fmtDate(post.compare_none_at)} 확인</span>}
+          <button onClick={() => patch({ ...CLEAR_COMPARE_NONE })} disabled={saving}
+            style={{ marginLeft: 'auto', padding: '4px 10px', borderRadius: 6, border: '1px solid #d6d3d1',
+              background: '#fff', cursor: 'pointer', fontSize: 12, fontWeight: 600, color: '#57534e' }}>
+            다시 확인하기
+          </button>
+        </div>
+      )}
+
       <SearchQueryBar post={post} />
+
+      {/* 후보 — 지금은 우리 안에 있는 값만 낸다. 외부 탐색이 붙을 자리다 */}
+      <div style={{ border: '1px solid #eef2f7', borderRadius: 8, padding: 10, marginBottom: 8, background: '#fbfdff' }}>
+        <div style={{ fontSize: 12, fontWeight: 700, color: '#475569', marginBottom: 7 }}>동일상품 후보</div>
+        {cands === null ? (
+          <p style={{ fontSize: 12, color: '#94a3b8', margin: 0 }}>찾는 중…</p>
+        ) : cands.length === 0 ? (
+          <p style={{ fontSize: 12, color: '#94a3b8', margin: 0, lineHeight: 1.6 }}>
+            자동으로 찾을 수 있는 후보가 없어요. 위 검색어를 복사해 직접 찾아 아래에 넣거나, 비교할 상품이 없으면 비교불가로 남겨주세요.
+          </p>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            {cands.map((c, i) => (
+              <label key={`${c.providerId}-${c.price}`}
+                style={{ display: 'flex', gap: 8, alignItems: 'flex-start', cursor: 'pointer',
+                  padding: '6px 8px', borderRadius: 7, background: picked === i ? '#eef2ff' : 'transparent' }}>
+                <input type="radio" name={`cand-${post.id}`} checked={picked === i} onChange={() => pick(i)} style={{ marginTop: 3 }} />
+                <span style={{ flex: 1, minWidth: 0 }}>
+                  <span style={{ fontSize: 12.5, fontWeight: 700 }}>{c.price.toLocaleString()}원</span>
+                  <span style={{ fontSize: 12, color: '#64748b' }}> · {c.label}</span>
+                  {c.note && <span style={{ display: 'block', fontSize: 11.5, color: '#94a3b8', marginTop: 2 }}>{c.note}</span>}
+                </span>
+                {c.url && (
+                  <a href={c.url} target="_blank" rel="noreferrer" onClick={e => e.stopPropagation()}
+                    style={{ flexShrink: 0, fontSize: 11.5, fontWeight: 600, color: '#6366f1' }}>열기</a>
+                )}
+              </label>
+            ))}
+          </div>
+        )}
+      </div>
+
       <div className="admin-2col" style={{ gap: 8 }}>
         <input type="number" value={orig} onChange={e => { setOrig(e.target.value); setDone(false) }}
           placeholder="정가 (공구 게시물에 적힌 값)" style={{ ...fillInput, fontSize: 13 }} />
-        <input type="number" value={market} onChange={e => { setMarket(e.target.value); setDone(false) }}
+        <input type="number" value={market} onChange={e => { setMarket(e.target.value); setPicked(null); setDone(false) }}
           placeholder="네이버 최저가" style={{ ...fillInput, fontSize: 13 }} />
       </div>
       <input type="url" value={marketUrl} onChange={e => setMarketUrl(e.target.value)}
@@ -1901,7 +2008,54 @@ function PendingFillRow({ post, onSaved }: { post: Post; onSaved: () => void }) 
       <p style={{ fontSize: 11, color: '#94a3b8', margin: '6px 0 0' }}>
         비교용 값이라 고객 화면에 구매 버튼으로는 안 뜨고, 제휴 고지 문구도 붙지 않아요.
       </p>
-      <SaveButton canSave={canSave} saving={saving} done={done} onClick={save} />
+
+      {askNone ? (
+        <div style={{ marginTop: 10, padding: 10, borderRadius: 8, background: '#fafaf9', border: '1px solid #e7e5e4' }}>
+          <div style={{ fontSize: 12.5, fontWeight: 700, color: '#44403c', marginBottom: 7 }}>왜 비교할 수 없나요?</div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+            {(Object.keys(COMPARE_NONE_REASON_LABEL) as CompareNoneReason[]).map(r => (
+              <label key={r} style={{ display: 'flex', gap: 7, alignItems: 'center', fontSize: 12.5, color: '#57534e', cursor: 'pointer' }}>
+                <input type="radio" name={`none-${post.id}`} checked={reason === r} onChange={() => setReason(r)} />
+                {COMPARE_NONE_REASON_LABEL[r]}
+              </label>
+            ))}
+          </div>
+          {reason === 'other' && (
+            <input value={note} onChange={e => setNote(e.target.value)} placeholder="한 줄로 적어주세요"
+              style={{ ...fillInput, fontSize: 12.5, marginTop: 7 }} />
+          )}
+          <p style={{ fontSize: 11, color: '#a8a29e', margin: '8px 0 0' }}>
+            고객 화면은 지금과 똑같이 보여요. 이 표시는 관리자 목록에서만 씁니다.
+          </p>
+          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 6, marginTop: 8 }}>
+            <button onClick={() => setAskNone(false)}
+              style={{ padding: '7px 14px', borderRadius: 8, border: '1px solid #d6d3d1', background: '#fff', cursor: 'pointer', fontSize: 13, fontWeight: 600, color: '#57534e' }}>
+              취소
+            </button>
+            <button onClick={() => { setAskNone(false); saveNone() }} disabled={saving}
+              style={{ padding: '7px 16px', borderRadius: 8, border: 'none', background: '#78716c', color: '#fff', cursor: 'pointer', fontSize: 13, fontWeight: 700 }}>
+              비교불가로 저장
+            </button>
+          </div>
+        </div>
+      ) : (
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, marginTop: 8 }}>
+          {state === 'incomparable' ? <span /> : (
+            <button onClick={() => setAskNone(true)}
+              style={{ padding: '7px 12px', borderRadius: 8, border: '1px solid #d6d3d1', background: '#fff',
+                cursor: 'pointer', fontSize: 12.5, fontWeight: 600, color: '#57534e' }}>
+              비교할 동일상품이 없다
+            </button>
+          )}
+          <button onClick={savePrice} disabled={!canSave || saving}
+            style={{ padding: '7px 16px', borderRadius: 8, border: 'none', fontSize: 13, fontWeight: 700,
+              cursor: canSave && !saving ? 'pointer' : 'not-allowed',
+              background: done ? '#dcfce7' : canSave ? '#6366f1' : '#e2e8f0',
+              color: done ? '#15803d' : canSave ? '#fff' : '#94a3b8' }}>
+            {saving ? '저장 중…' : done ? '저장됨' : picked !== null ? '이 상품이 맞다 → 비교가로 저장' : '저장'}
+          </button>
+        </div>
+      )}
     </div>
   )
 }

@@ -57,6 +57,9 @@
 | 조용한 고장 | 비교가가 3일·10건 넘게 안 붙으면 관리자 화면에 경고 | `D-020` |
 | 관리자 제외 | 쿠키 + 흔적 쿠키 + IP 세 겹 | `D-007` |
 | 소유확인 코드 | 교체하지 않고 쉼표로 여러 개 | `D-021` |
+| 문서 검증 | `03-SYSTEM.md`의 숫자를 스크립트가 다시 잰다 | `D-022` |
+| 비교 상태 | 미확인/비교가 있음/비교불가 3분류. **관리자 전용**이고 비교불가는 사람만 고른다 | `D-023` |
+| 동일상품 후보 | provider 목록으로 분리. 자동 적용 안 함 — 관리자가 고를 때만 저장 | `D-023` |
 
 ---
 
@@ -70,6 +73,8 @@
 | 구성 / 세트 | `post.options[]` |
 | 대체 구매 링크 (제휴 고지 대상) | `post.purchase_links[]` |
 | 가격 비교 전 | `pending` |
+
+- `CompareState`(관리자 작업 상태) ≠ `VerdictState`(고객이 보는 판정)
 
 **헷갈리는 쌍**
 - `status` ≠ `published` — 공개 판정은 `published`가 한다
@@ -154,6 +159,7 @@ lib/          도메인 로직 — 여기가 핵심
 ```bash
 npx tsc --noEmit                                  # 타입
 npm run build                                     # 빌드
+node scripts/check-docs.js                        # docs/03-SYSTEM.md의 숫자가 아직 맞는지
 node node_modules/.bin/next dev -p 3210           # 로컬 (3000·3100은 다른 프로젝트가 쓸 수 있음)
 ```
 

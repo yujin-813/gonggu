@@ -1,7 +1,7 @@
 # 03 · 시스템 — 지금 상태
 
 > **"지금"만 쓴다.** 변경 이력과 "예전에는 ○○였다"는 여기 쓰지 않는다. 과거는 `02-DECISIONS.md`에 있다.
-> 마지막 갱신: 2026-08-20
+> 마지막 갱신: 2026-08-21
 
 ---
 
@@ -12,7 +12,7 @@
 | 단계 | 운영 중 · 실사용자 있음 (2026-08-19 기준 사람 방문 고유 IP 163명/2일) |
 | 스택 | Next.js 14 (App Router) · React 18 · TypeScript · 파이썬 수집기 |
 | 저장소 | **파일 기반** — `data/*.json`. DB 없음 |
-| 코드 규모 | `lib/` 2,249줄 · `app/admin` + `components/` 4,161줄 · 파이썬 2,968줄 |
+| 코드 규모 | `lib/` 2,518줄 · `app/admin` + `components/` 4,360줄 · 파이썬 2,968줄 |
 | 데이터 규모 | 게시물 2,317건 (공개 277건) · 인플루언서 소스 58개 · analytics 31일치 |
 | 배포 | EC2 `13.125.121.62` · PM2(fork, 포트 3002) + nginx · `bash deploy.sh` |
 | 도메인 | https://gonggu.asknuggetdata.com |
@@ -30,11 +30,12 @@
 - 랜딩 페이지 — `/today`, `/deadline`, `/monthly`, `/category/[cat]`, `/influencer/[account]`, `/influencers`, `/collection/[id]`
 - 검색 (마감 공구 포함), 찜, 공유(카카오/네이티브/복사 — utm 자동 부착)
 - 공유 카드 이미지 `/api/og/deal/[id]` — 판정 결과를 그린 800×400 PNG
-- SEO — JSON-LD(WebSite/ItemList/Product·Offer/BreadcrumbList), sitemap.xml(329 URL), robots.txt, 네이버·구글 소유확인
+- SEO — JSON-LD(WebSite/ItemList/Product·Offer/BreadcrumbList), sitemap.xml(328 URL), robots.txt, 네이버·구글 소유확인
 
 **관리자 `/admin`**
 - 공구 목록·검수·공개/숨김·수정·삭제, 필터 탭(개수 0이면 자동 숨김)
-- 판정 채우기 화면 — 판정용(비교가) / 종료 공구용(제휴 링크) 두 모드
+- 채우기 화면 — **비교 상태 3분류**(미확인 / 비교불가 / 비교가 있음) + 종료 공구용(제휴 링크) 탭.
+  동일상품 후보를 내밀고 고르면 비교가로 저장하며, 찾아봐도 없으면 사유를 골라 비교불가로 남긴다
 - 옵션 관리 — 수동 입력, **붙여넣기 파서**, **옵션 가져오기**(자동 수집)
 - 꿀픽 선정·순서, 상시딜·소진시마감 토글, 여러상품 토글
 - 인플루언서 소스 관리·개별 수집, 컬렉션 관리
@@ -74,6 +75,7 @@
 id, shortcode, title, account, cat, price, origPrice, deadline, start_date, img, url
 brand, purchase_url, market_url, market_price, market_price_note
 options[], is_multi_option, purchase_links[]
+compare_none_at, compare_none_reason, compare_none_note
 status, published, review_reason[], is_featured, featured_order
 is_always_on, is_evergreen_deal, sale_until_sold_out, is_exclusive_deal
 custom_verdict, custom_verdict_detail, custom_verdict_cls
@@ -108,6 +110,17 @@ extraction_debug, scraped_at, collection_status, collection_error
 | `exclusive` | 단독 공구 | 관리자가 `is_exclusive_deal` 확인 |
 | `multi` | 여러 상품 | 골라담기·모음전 등 판정 불가 유형 |
 
+**`CompareState`** (`lib/compareState.ts`) — 비교가 작업 상태. **관리자 전용이라 고객 화면에는 안 나간다**
+| 값 | 라벨 | 조건 |
+|---|---|---|
+| `compared` | 비교가 있음 | 판정에 쓸 비교가가 실제로 붙어 있다 |
+| `incomparable` | 비교불가 | 사람이 찾아본 뒤 `compare_none_at`을 남겼다. **자동으로 되는 경로는 없다** |
+| `unchecked` | 미확인 | 둘 다 아니다 — 관리자가 처리해야 할 일감 |
+
+> 셋 중 저장되는 건 비교불가뿐이다. 나머지 둘은 값에서 파생하므로 일괄 마이그레이션이 없다.
+
+**`CompareNoneReason`** (`lib/types.ts`) — `exclusive` / `no_same_set` / `not_found` / `other`
+
 **`ClickType`** (`lib/analytics.ts`) — `groupbuy` / `coupang` / `naver` / `other` / `detail`
 
 **`TrafficSource`** (`lib/analytics.ts`) — `instagram` / `kakao` / `naver_search` / `google_search` / `other_search` / `inapp` / `external` / `direct`
@@ -121,7 +134,7 @@ extraction_debug, scraped_at, collection_status, collection_error
 
 ```
 data/
-  posts.json                2,317건 · 6.4MB   ← 전부 메모리에 올렸다 저장한다
+  posts.json                2,317건 · 6.3MB   ← 전부 메모리에 올렸다 저장한다
   analytics.json            31일치 (30일 초과분 자동 정리)
   admin_ips.json            관리자 IP (14일 TTL)
   influencer_sources.json   58개
@@ -137,7 +150,8 @@ public/scraped/   수집 이미지 431MB
 |---|---|
 | `lib/store.ts`의 `savePosts()` | **전체 배열을 통째로 다시 쓴다.** 동시에 두 요청이 저장하면 나중 것이 먼저 것을 덮는다. 락이 없다 ⚠️ |
 | `lib/dealGrade.ts` `getDealVerdict()` | 화면의 모든 숫자가 여기서 나온다. 여기를 고치면 카드·상세·공유카드·정렬이 전부 바뀐다 |
-| `AUTO_MATCH_FLOOR = 0.5` | 낮추면 잘못된 자동 매칭이 판정을 뒤집는다 (`D-006`) |
+| `AUTO_MATCH_FLOOR = 0.5` | 낮추면 잘못된 자동 매칭이 판정을 뒤집는다 (`D-006`). `lib/compareCandidates.ts`가 이 값을 읽어 "왜 후보가 판정에서 빠졌는지"를 설명한다 |
+| `lib/compareCandidates.ts`의 매칭 문턱 | 풀면 엉뚱한 상품이 후보로 뜨고, 관리자가 고르는 순간 그대로 틀린 비교가가 된다 (`D-023`) |
 | `lib/postGuards.ts` | 구매 링크 없는 공구의 공개를 막는 유일한 장치 |
 | `app/api/posts/[id]/route.ts`의 필드 allowlist | 여기 없는 필드는 관리자가 저장해도 **조용히 무시된다.** 새 필드를 추가하면 PATCH·PUT 양쪽에 넣어야 한다 |
 | `middleware.ts`의 `config.matcher` | 새 관리자 API를 만들면 `isProtected()`와 `matcher` **양쪽**에 등록해야 한다. 한쪽만 하면 무방비 |
@@ -246,11 +260,16 @@ getDealVerdict(post)
 
 **근거:** `lib/store.ts` · `backfill_options.py`가 끝에서 `save_posts(posts)` 한 번 호출 · cron이 하루 2회 수집 실행
 
-### 3. 판정 대기가 26% ⚠️
+### 3. 판정 대기가 34% ⚠️
 
-고객에게 보이는 공구의 4분의 1이 판정을 못 받는다. 판정기를 표방하는 제품의 핵심 지표다.
+고객에게 보이는 공구의 3분의 1이 판정을 못 받는다. 판정기를 표방하는 제품의 핵심 지표다.
+새로 들어오는 것일수록 나쁘다 — 8월 수집분은 절반 가까이가 판정을 못 받는다. 문제 1(비교가 수집 중단)이
+고객 화면에서 드러나는 자리다.
 
-**근거:** 2026-08-19 측정 — 공개 86건 중 pending 22건. `market_price` 보유 711건 / 전체 2,317건
+**근거:** 2026-08-21 측정(`scripts/check-docs.js`) — 보이는 공구 112건 중 pending 38건.
+그중 8월 수집분 22건(8월 수집 47건의 47%), 7월 이전 16건(65건의 25%).
+pending 38건 중 사람이 넣은 `origPrice`가 있는 건 0건, `market_price`는 있으나 `AUTO_MATCH_FLOOR`에
+걸려 버려진 건 5건. `market_price` 보유 711건 / 전체 2,317건
 
 ### 4. 검수 필요가 1,047건 — 사실상 방치
 
@@ -311,6 +330,7 @@ node node_modules/.bin/next dev -p 3210     # 3000·3100은 다른 프로젝트�
 # 검증
 npx tsc --noEmit
 npm run build
+node scripts/check-docs.js     # 이 문서의 숫자가 아직 맞는지 (어긋난 것만 출력)
 
 # 서버 수집 (분리 실행 — SSH 끊겨도 살아남음)
 cd ~/gonggu && nohup venv/bin/python collector.py > logs/collector.log 2>&1 &
@@ -346,7 +366,7 @@ cd ~/gonggu && nohup venv/bin/python backfill_options.py > logs/backfill-options
 ### 배포 전 체크리스트
 
 1. `npx tsc --noEmit` 통과
-2. `npm run build` 통과
+2. `npm run build` 통과 · `node scripts/check-docs.js` 통과 (어긋나면 이 문서를 고치고 함께 커밋)
 3. 로컬(`:3210`)에서 바뀐 화면 확인 — **클라이언트 컴포넌트가 `lib/landing`·`lib/store`를 import하면 `fs` 때문에 전 페이지가 500난다**
 4. 데이터를 건드리는 스크립트는 `--dry-run` 먼저, `data/posts.json` 백업 후 실행
 5. 배포 후 홈·관리자·바뀐 페이지 상태 코드 확인

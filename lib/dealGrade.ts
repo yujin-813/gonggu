@@ -131,7 +131,7 @@ function gradeFromRate(rate: number): DealGradeKey {
  * 19,800원으로 들어와 있었다. 40% 할인 상품이 '아쉽딜'로 판정됐다. 니치 상품이거나
  * 옵션이 다르면 엉뚱한 상품과 매칭되는데, 그 값을 그대로 믿으면 판정이 뒤집힌다.
  */
-const AUTO_MATCH_FLOOR = 0.5
+export const AUTO_MATCH_FLOOR = 0.5
 
 /** 세트 옵션이 있는 공구의 판정. 게시물 단위 비교가 대신 옵션별로 계산한다. */
 function verdictFromOptions(post: Post, opts: DealOption[]): DealVerdict {

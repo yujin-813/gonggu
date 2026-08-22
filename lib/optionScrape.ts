@@ -167,6 +167,9 @@ const KNOWN_BLOCKED: [RegExp, string][] = [
   [/smartstore\.naver|brand\.naver|shopping\.naver/, '네이버는 자동 조회를 차단해요. 옵션 목록을 복사해서 붙여넣어 주세요.'],
   [/srookpay/, '스룩페이는 옵션을 자바스크립트로 그려서 못 읽어요. 복사해서 붙여넣어 주세요.'],
   [/coupang\.com/, '쿠팡은 자동 조회를 차단해요. 복사해서 붙여넣어 주세요.'],
+  // 브라우저 헤더를 다 갖춰도 403으로 하드 차단한다(2026-08-21 실측). 12초 기다렸다
+  // 실패하느니 바로 붙여넣기로 안내한다. 등록된 공구 중 37건이 이 도메인이다
+  [/item\.gmarket\.co\.kr|gmarket\.co\.kr/, '지마켓은 자동 조회를 차단해요. 옵션 목록을 복사해서 붙여넣어 주세요.'],
 ]
 
 // 인증서 체인이 불완전해서 생긴 실패인지 — 그 외의 네트워크 오류까지 검증을 끄고
@@ -231,6 +234,27 @@ function fetchInsecure(url: string, depth = 0): Promise<{ status: number; body: 
  *
  * 애매하면 끝났다고 단정하지 않는다 — 틀린 단정이 "못 읽었어요"보다 더 사람을 헷갈리게 한다.
  */
+/**
+ * 응답 코드만 보고 "공구가 끝났다"고 말하지 않는다.
+ *
+ * 전에는 2xx가 아니면 전부 "공구가 끝났을 수 있어요"라고 했는데, 403은 쇼핑몰이 우리를
+ * 막은 것이지 판매가 끝난 게 아니다. 멀쩡히 팔고 있는 지마켓 페이지를 두고 끝났다고
+ * 말해서 관리자를 헷갈리게 했다. looksSoldEnded()가 본문을 읽고 판단할 때만 끝났다고
+ * 말할 자격이 있다 — 여기서는 무슨 일이 일어났는지만 그대로 옮긴다.
+ */
+function reasonFromStatus(status: number): string {
+  if (status === 401 || status === 403 || status === 429) {
+    return '이 쇼핑몰이 자동 조회를 막고 있어요. 옵션 목록을 복사해서 붙여넣어 주세요.'
+  }
+  if (status === 404 || status === 410) {
+    return '판매 페이지를 찾을 수 없어요. 주소가 바뀌었거나 내려간 상품일 수 있어요.'
+  }
+  if (status >= 500) {
+    return '판매 페이지 쪽에 문제가 있어요. 잠시 뒤 다시 시도해 주세요.'
+  }
+  return `판매 페이지가 ${status}로 응답했어요. 옵션 목록을 복사해서 붙여넣어 주세요.`
+}
+
 function looksSoldEnded(html: string): boolean {
   const body = html
     .replace(/<script[\s\S]*?<\/script>/gi, ' ')
@@ -286,7 +310,7 @@ export async function scrapeOptions(url: string): Promise<ScrapeResult> {
     }
   }
   if (status < 200 || status >= 300) {
-    return { options: [], reason: `판매 페이지가 ${status}로 응답했어요. 공구가 끝났을 수 있어요.` }
+    return { options: [], reason: reasonFromStatus(status) }
   }
 
   // 국내 자사몰은 EUC-KR이 흔한데 그대로 UTF-8로 읽으면 옵션명이 통째로 깨진다.
