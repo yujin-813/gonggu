@@ -24,7 +24,7 @@ export function fmtDate(dateStr?: string): string {
   return `${parseInt(m)}.${parseInt(d)}`
 }
 
-type PeriodInput = Pick<Post, 'status' | 'start_date' | 'deadline' | 'is_evergreen_deal' | 'is_always_on' | 'sale_until_sold_out' | 'scraped_at'>
+type PeriodInput = Pick<Post, 'status' | 'start_date' | 'deadline' | 'is_evergreen_deal' | 'is_always_on' | 'sale_until_sold_out' | 'scraped_at' | 'ended_at'>
 
 /**
  * 마감일을 못 찾은 공구를 언제까지 "진행 중"으로 볼 것인가.
@@ -109,6 +109,7 @@ export function isEvergreen(post: PeriodInput): boolean {
 
 /** 관리자 목록용 한 줄 텍스트 */
 export function periodLabel(post: PeriodInput): string {
+  if (post.ended_at) return `${fmtDate(post.ended_at)} 종료 확인`
   const s = getPeriodState(post)
   switch (s.kind) {
     case 'upcoming':     return s.startDate ? `${fmtDate(s.startDate)} 오픈 예정` : '오픈 예정'
@@ -125,6 +126,8 @@ export function periodLabel(post: PeriodInput): string {
 
 /** 이 공구가 지금 실제로 마감이 지나 고객 화면에서 자동 숨김되는지 (상시딜/소진시는 예외) */
 export function isExpired(post: PeriodInput): boolean {
+  // 사람이 직접 확인한 종료가 가장 정확하다 — 날짜 계산보다 먼저 본다
+  if (post.ended_at) return true
   const s = getPeriodState(post)
   if (s.kind === 'deadline_unknown') return s.daysSince !== null && s.daysSince > DEADLINE_UNKNOWN_DAYS
   return (s.kind === 'range' || s.kind === 'deadline_only') && s.daysLeft < 0
@@ -144,7 +147,7 @@ export function isPagePublic(post: Pick<Post, 'status' | 'published'>): boolean 
 }
 
 /** 고객 화면에 노출해도 되는 상품인지 — api/posts, api/collections/[id] 등에서 공통으로 쓴다 */
-export function isCustomerVisible(post: Pick<Post, 'status' | 'published' | 'is_evergreen_deal' | 'is_always_on' | 'sale_until_sold_out' | 'deadline' | 'start_date' | 'scraped_at'>): boolean {
+export function isCustomerVisible(post: Pick<Post, 'status' | 'published' | 'is_evergreen_deal' | 'is_always_on' | 'sale_until_sold_out' | 'deadline' | 'start_date' | 'scraped_at' | 'ended_at'>): boolean {
   // 아직 안 열린 공구는 마감일과 무관하게 보여준다 (오픈 예정 카드)
   if (isStillUpcoming(post)) return post.published !== false
   // 오픈일이 지난 오픈예정 글은 이제 일반 공구로 취급 — 아래 마감일 검사를 그대로 탄다.
@@ -152,6 +155,8 @@ export function isCustomerVisible(post: Pick<Post, 'status' | 'published' | 'is_
   const isPublished =
     post.status === 'published' || post.status === 'upcoming' || (!post.status && post.published !== false)
   if (!isPublished || post.published === false) return false
+  // 사람이 끝났다고 확인했으면 상시딜 표시가 붙어 있어도 내린다 — 사람 확인이 가장 정확하다
+  if (post.ended_at) return false
   // 사람이 "계속 판다"고 확인해 준 것만 마감일 없이도 계속 보여준다
   if (post.is_evergreen_deal || post.is_always_on || post.sale_until_sold_out) return true
   // 마감일을 모르는 공구는 DEADLINE_UNKNOWN_DAYS까지만 진행 중으로 본다.

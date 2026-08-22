@@ -79,6 +79,13 @@ export interface Post {
   // 남기는 것이 곧 "비교불가" 표시다 — 자세한 건 lib/compareState.ts.
   //
   // 고객 화면은 이 값을 쓰지 않는다. 검수 상태는 우리 사정이다(원칙 3).
+  // 관리자가 "이 공구는 끝났다"고 직접 확인한 시각.
+  //
+  // 마감일을 모르는 채로 끝난 걸 알게 되는 경우가 있다(판매 페이지를 열어보고 안다).
+  // 이때 오늘 날짜를 deadline에 넣으면 화면에 우리가 모르는 마감일이 적힌다. 종료 안내는
+  // 마감일이 없어도 정상으로 뜨므로(EndedDealNotice가 deadline이 있을 때만 날짜를 쓴다),
+  // 날짜를 지어내지 않고 "확인했다"는 사실만 남긴다.
+  ended_at?: string | null
   compare_none_at?: string | null
   compare_none_reason?: CompareNoneReason | null
   compare_none_note?: string | null

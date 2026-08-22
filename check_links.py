@@ -77,6 +77,9 @@ def is_customer_visible(p):
     is_published = p.get("status") == "published" or (not p.get("status") and p.get("published") is not False)
     if not is_published:
         return False
+    # 사람이 끝났다고 확인한 공구는 내린다
+    if p.get("ended_at"):
+        return False
     # 사람이 "계속 판다"고 확인해 준 것만 마감일 없이도 계속 보인다
     if p.get("is_evergreen_deal") or p.get("is_always_on") or p.get("sale_until_sold_out"):
         return True

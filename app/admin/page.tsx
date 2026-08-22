@@ -1869,6 +1869,36 @@ function linkHost(url?: string | null): string {
 }
 
 /**
+ * "이 공구는 이미 끝났다"를 한 번에 표시한다.
+ *
+ * 마감일을 모르는 채로 끝난 걸 알게 되는 일이 잦다 — 판매 페이지를 열어보고 안다. 예전에는
+ * 이럴 때 21일이 지나기를 기다리거나 없는 마감일을 지어 넣는 수밖에 없었다. ended_at은
+ * 날짜를 주장하지 않고 "확인했다"는 사실만 남긴다. 종료 안내는 마감일 없이도 정상으로 뜬다.
+ */
+function EndedNowButton({ post, onSaved }: { post: Post; onSaved: () => void }) {
+  const [busy, setBusy] = useState(false)
+  if (post.ended_at) {
+    return (
+      <button onClick={async () => { setBusy(true); await fetch(`/api/posts/${post.id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ended_at: null }) }); setBusy(false); onSaved() }}
+        disabled={busy}
+        style={{ padding: '7px 12px', borderRadius: 8, border: '1px solid #cbd5e1', background: '#fff',
+          cursor: 'pointer', fontSize: 12.5, fontWeight: 600, color: '#475569' }}>
+        {busy ? '되돌리는 중…' : '종료 표시 취소'}
+      </button>
+    )
+  }
+  return (
+    <button onClick={async () => { setBusy(true); await fetch(`/api/posts/${post.id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ended_at: new Date().toISOString() }) }); setBusy(false); onSaved() }}
+      disabled={busy}
+      title="마감일을 몰라도 됩니다 — 고객 화면은 날짜 없이 종료 안내만 보여줍니다"
+      style={{ padding: '7px 12px', borderRadius: 8, border: '1px solid #fecaca', background: '#fff',
+        cursor: 'pointer', fontSize: 12.5, fontWeight: 600, color: '#b91c1c' }}>
+      {busy ? '처리 중…' : '이 공구 끝났어요'}
+    </button>
+  )
+}
+
+/**
  * 채우기 한 줄의 작업 도구.
  *
  * 실제 작업 순서는 "공구 판매 페이지에서 구성을 확인 → 같은 구성을 네이버·쿠팡에서 찾기 →
@@ -2184,13 +2214,16 @@ function CompareFillRow({ post, allPosts, views, onSaved }: { post: Post; allPos
         </div>
       ) : (
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, marginTop: 8 }}>
-          {state === 'incomparable' ? <span /> : (
+          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+          <EndedNowButton post={post} onSaved={onSaved} />
+          {state === 'incomparable' ? null : (
             <button onClick={() => setAskNone(true)}
               style={{ padding: '7px 12px', borderRadius: 8, border: '1px solid #d6d3d1', background: '#fff',
                 cursor: 'pointer', fontSize: 12.5, fontWeight: 600, color: '#57534e' }}>
               비교할 동일상품이 없다
             </button>
           )}
+          </div>
           <button onClick={savePrice} disabled={!canSave || saving}
             style={{ padding: '7px 16px', borderRadius: 8, border: 'none', fontSize: 13, fontWeight: 700,
               cursor: canSave && !saving ? 'pointer' : 'not-allowed',
@@ -2232,6 +2265,7 @@ function DeadlineFillRow({ post, views, onSaved }: { post: Post; views: number; 
       <FillRowHead post={post} mode="pending" />
 
       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center', fontSize: 12, color: '#64748b', marginBottom: 10 }}>
+        {post.ended_at && <span style={{ color: '#b91c1c', fontWeight: 700 }}>종료 확인됨 — 고객에게 안 보임</span>}
         <span>{post.start_date ? `${fmtDate(post.start_date)} 시작` : `${fmtDate(post.scraped_at)} 수집`}</span>
         {since !== null && <span><strong style={{ color: '#0f172a' }}>{since}일째</strong></span>}
         {left !== null && (
@@ -2257,9 +2291,10 @@ function DeadlineFillRow({ post, views, onSaved }: { post: Post; views: number; 
             cursor: 'pointer', fontSize: 12.5, fontWeight: 600, color: '#475569' }}>
           상시딜이 맞다
         </button>
+        <EndedNowButton post={post} onSaved={onSaved} />
       </div>
       <p style={{ fontSize: 11, color: '#94a3b8', margin: '6px 0 0' }}>
-        마감일을 모르면 그냥 두세요 — 없는 날짜를 넣는 것보다 자동으로 내려가는 편이 정확합니다.
+        마감일을 모르는데 끝난 걸 아신다면 「이 공구 끝났어요」를 눌러주세요 — 없는 날짜를 넣지 않고 종료로만 표시합니다.
       </p>
     </div>
   )

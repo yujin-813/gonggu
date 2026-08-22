@@ -12,7 +12,7 @@
 | 단계 | 운영 중 · 실사용자 있음 (2026-08-19 기준 사람 방문 고유 IP 163명/2일) |
 | 스택 | Next.js 14 (App Router) · React 18 · TypeScript · 파이썬 수집기 |
 | 저장소 | **파일 기반** — `data/*.json`. DB 없음 |
-| 코드 규모 | `lib/` 2,567줄 · `app/admin` + `components/` 4,565줄 · 파이썬 2,983줄 |
+| 코드 규모 | `lib/` 2,579줄 · `app/admin` + `components/` 4,600줄 · 파이썬 2,986줄 |
 | 데이터 규모 | 게시물 2,317건 (공개 277건) · 인플루언서 소스 58개 · analytics 31일치 |
 | 배포 | EC2 `13.125.121.62` · PM2(fork, 포트 3002) + nginx · `bash deploy.sh` |
 | 도메인 | https://gonggu.asknuggetdata.com |
@@ -80,7 +80,7 @@
 id, shortcode, title, account, cat, price, origPrice, deadline, start_date, img, url
 brand, purchase_url, market_url, market_price, market_price_note
 options[], is_multi_option, purchase_links[]
-compare_none_at, compare_none_reason, compare_none_note
+ended_at, compare_none_at, compare_none_reason, compare_none_note
 status, published, review_reason[], is_featured, featured_order
 is_always_on, is_evergreen_deal, sale_until_sold_out, is_exclusive_deal
 custom_verdict, custom_verdict_detail, custom_verdict_cls
@@ -116,6 +116,7 @@ extraction_debug, scraped_at, collection_status, collection_error
 | `multi` | 여러 상품 | 골라담기·모음전 등 판정 불가 유형 |
 
 **`PeriodState`** (`lib/period.ts`) — 기간 상태. `upcoming` / `evergreen` / `sold_out_only` / `range` / `deadline_only` / `deadline_unknown`
+> `ended_at`(관리자가 종료를 확인한 시각)이 있으면 `PeriodState`와 무관하게 마감으로 본다 — 사람 확인이 날짜 계산보다 정확하다(`D-026`).
 > `deadline_unknown`은 **마감일을 모른다**는 뜻이다. 예전에는 `evergreen`(상시딜)과 한 덩어리였는데, 그래서 이미 끝난 공구가 무기한 노출됐다(`D-024`).
 > 상시딜은 관리자 플래그가 붙은 것만이다. `deadline_unknown`은 시작일(없으면 수집일)로부터 `DEADLINE_UNKNOWN_DAYS`(21일)가 지나면 마감으로 본다.
 
@@ -243,6 +244,8 @@ getDealVerdict(post)
 - **`purchase_links`에는 공정위 제휴 고지가 항상 따라붙는다.** 제휴가 아닌 링크를 넣으면 거짓 고지가 된다 (`D-003`).
 - **URL에 `?notrack=1`을 한 번 붙이면** 그 브라우저는 이후 통계에서 계속 제외된다. 해제는 `?notrack=0`.
 - **관리자 페이지를 한 번이라도 연 브라우저**는 흔적 쿠키(1년)로 통계에서 제외된다.
+- **끝난 걸 아는데 마감일을 모르면 `ended_at`을 쓴다.** `deadline`에 오늘 날짜를 넣으면
+  우리가 모르는 마감일이 고객 화면에 적힌다. 종료 안내는 마감일이 없어도 정상으로 뜬다.
 - **쿠팡에서 찾은 비교가는 `market_price`가 아니라 `purchase_links`에 url 없이 넣는다.**
   `market_price`는 고객 화면에 무조건 "네이버 최저가"로 표시되기 때문이다. `purchase_links`는
   url이 없으면 판정에는 '쿠팡'으로 들어가되 구매 버튼으로 안 뜨고 제휴 고지도 안 붙는다.

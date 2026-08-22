@@ -24,6 +24,7 @@
 | 비교가 있음 | `getCompareState()` → `compared` | 판정에 쓸 비교가가 붙어 있는 공구 |
 | 비교불가 | `getCompareState()` → `incomparable` · `compare_none_at` | 사람이 찾아본 끝에 비교할 동일상품이 없다고 확인한 공구 |
 | 동일상품 후보 | `CompareCandidate` / `findCompareCandidates()` | 관리자에게 내미는 비교가 후보. 고르면 비교가가 된다 |
+| 종료 확인 | `post.ended_at` | 관리자가 "이 공구 끝났다"고 직접 확인한 시각. 마감일을 몰라도 마감 처리된다 |
 | 마감일 미확인 | `PeriodState` → `deadline_unknown` | 수집기가 마감일을 못 읽은 공구. 상시딜과 다르다 — 21일 지나면 마감으로 본다 |
 
 ---
