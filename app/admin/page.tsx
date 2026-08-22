@@ -2,7 +2,7 @@
 import { useState, useEffect, useMemo, useCallback } from 'react'
 import type { Post, ScraperStatus, InfluencerSource, Collection, PurchaseLink } from '@/lib/types'
 import { daysLeft, periodLabel, isExpired, isCustomerVisible, isPagePublic, fmtDate, getPeriodState, DEADLINE_UNKNOWN_DAYS } from '@/lib/period'
-import { hasPurchaseLink, normalizePurchaseLinks } from '@/lib/purchaseLinks'
+import { hasPurchaseLink, normalizePurchaseLinks, brokenPurchaseLinks } from '@/lib/purchaseLinks'
 import { getDealVerdict, isMultiOption } from '@/lib/dealGrade'
 import { partnerSearchQuery } from '@/lib/searchQuery'
 import { getCompareState, COMPARE_STATE_LABEL, CLEAR_COMPARE_NONE, type CompareState } from '@/lib/compareState'
@@ -1809,6 +1809,7 @@ function RevenueBoard({ posts, clicks, sources, onGoFill }: {
         naver: n(p.id, 'naver'),
         search: searchIn(p.id),
         linked: hasPurchaseLink(p),
+        broken: brokenPurchaseLinks(p).length > 0,
         ended: isExpired(p),
       }))
       .filter(r => r.detail > 0 || r.groupbuy > 0)
@@ -1832,6 +1833,10 @@ function RevenueBoard({ posts, clicks, sources, onGoFill }: {
       <p style={{ fontSize: 13, color: '#64748b', lineHeight: 1.7, marginBottom: 14 }}>
         최근 14일 기준이에요. 돈이 되는 건 <strong>쿠팡·네이버 클릭</strong>뿐입니다 — 공구 클릭은 판매자 링크라 수수료가 없어요.
         {lost > 0 && <> 지금 <strong>마감됐는데 살 곳이 없는 공구</strong>가 조회 {lost}회를 받고 그대로 내보내고 있어요.</>}
+        {rows.some(r => r.broken) && (
+          <> <strong style={{ color: '#b45309' }}>링크 오류 {rows.filter(r => r.broken).length}건</strong>이 있어요 —
+          주소 자리에 상품명이 들어간 것들이라 고객에게 안 보입니다.</>
+        )}
         <br />
         <span style={{ color: '#94a3b8' }}>검색유입 열은 오늘부터 쌓입니다 — 지난 기록은 상품과 안 묶여 있어서 소급이 안 돼요.</span>
       </p>
@@ -1887,6 +1892,8 @@ function RevenueBoard({ posts, clicks, sources, onGoFill }: {
                 <td style={{ ...td, textAlign: 'center' }}>
                   {r.linked
                     ? <span style={{ fontSize: 11.5, fontWeight: 700, color: '#15803d' }}>있음</span>
+                    : r.broken
+                    ? <span style={{ fontSize: 11.5, fontWeight: 700, color: '#b45309' }} title="파트너스 링크가 아니라 고객에게 안 보입니다">링크 오류</span>
                     : <span style={{ fontSize: 11.5, fontWeight: 700, color: '#dc2626' }}>없음</span>}
                 </td>
               </tr>

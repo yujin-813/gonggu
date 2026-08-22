@@ -48,9 +48,44 @@ export function normalizePurchaseLinks(post: Pick<Post,
   return links
 }
 
-/** 고객 화면에 실제로 띄울 링크만 — 관리자가 확인해 켠 것으로 한정한다 */
+/**
+ * 플랫폼별 제휴 링크 도메인.
+ *
+ * 이 자리에는 "쿠팡 파트너스 활동의 일환으로 수수료를 제공받습니다" 고지가 항상 따라붙는다.
+ * 제휴 링크가 아닌 걸 넣으면 그 고지가 거짓말이 된다(D-003). 그래서 고객 화면에 띄우기 전에
+ * 도메인으로 한 번 더 확인한다 — 실제로 url 자리에 상품명이 그대로 들어간 건이 2건 있었다
+ * ("앱솔리 또또뻥 호라산밀 앤 파로 뻥튀기, 5개, 95g"). 파트너스에서 복사할 때 링크 대신
+ * 상품명이 붙여넣어진 것으로 보인다.
+ *
+ * ⚠️ 네이버·기타는 제휴 링크 도메인을 아직 확인하지 못했다. 그래서 유효한 URL인지까지만
+ * 본다. 현재 데이터에는 쿠팡 링크뿐이라(21건 전부 link.coupang.com) 지금은 영향이 없다.
+ */
+const AFFILIATE_HOSTS: Record<PurchasePlatform, RegExp | null> = {
+  coupang: /^(link\.coupang\.com|coupa\.ng)$/,
+  naver: null,
+  other: null,
+}
+
+/** 고객 화면에 띄워도 되는 링크인지 — 유효한 주소이고, 아는 제휴 도메인이면 */
+export function isAffiliateLink(link: Pick<PurchaseLink, 'platform' | 'url'>): boolean {
+  if (!link.url) return false
+  let host: string
+  try { host = new URL(link.url).hostname.toLowerCase() } catch { return false }
+  const pattern = AFFILIATE_HOSTS[link.platform]
+  return pattern ? pattern.test(host) : true
+}
+
+/** 고객 화면에 실제로 띄울 링크만 — 관리자가 확인해 켠 것 중, 진짜 제휴 링크만 */
 export function visiblePurchaseLinks(post: Parameters<typeof normalizePurchaseLinks>[0]): PurchaseLink[] {
-  return normalizePurchaseLinks(post).filter(l => l.visible !== false && !!l.url)
+  return normalizePurchaseLinks(post).filter(l => l.visible !== false && isAffiliateLink(l))
+}
+
+/**
+ * 값은 들어 있는데 고객에게 못 띄우는 링크 — 관리자에게 "고쳐야 한다"고 알리는 데 쓴다.
+ * 가격만 넣은 비교용 항목(url 없음)은 정상이므로 제외한다.
+ */
+export function brokenPurchaseLinks(post: Parameters<typeof normalizePurchaseLinks>[0]): PurchaseLink[] {
+  return normalizePurchaseLinks(post).filter(l => !!l.url && !isAffiliateLink(l))
 }
 
 /** 공구가 끝났을 때 보여줄 대체 구매처가 하나라도 있는지 — 관리자 필터와 홈 하단 영역에서 쓴다 */
