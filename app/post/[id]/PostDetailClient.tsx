@@ -15,11 +15,14 @@ interface Props {
   ended?: boolean
   /** 진행 중인데 다른 곳이 더 싼 공구(아쉽딜) — 공구 버튼은 그대로 두고 대체 구매처를 함께 보여준다 */
   betterPrice?: boolean
+  /** 추천 목록이 진짜 비슷한 것인지, 같은 카테고리를 채운 것인지 — 제목 문구가 달라진다 */
+  relatedKind?: 'similar' | 'influencer' | 'category'
+  categoryLabel?: string
   purchaseLinks?: PurchaseLink[]
   related?: Post[]
 }
 
-export default function PostDetailClient({ post, ended = false, betterPrice = false, purchaseLinks = [], related = [] }: Props) {
+export default function PostDetailClient({ post, ended = false, betterPrice = false, relatedKind = 'category', categoryLabel = '', purchaseLinks = [], related = [] }: Props) {
   const [bookmarks, setBookmarks] = useState<Set<number>>(new Set())
   const [toast, setToast] = useState({ message: '', visible: false })
 
@@ -65,7 +68,14 @@ export default function PostDetailClient({ post, ended = false, betterPrice = fa
 
       {/* 마감 공구는 "지금 어디서 사나"가 제일 급하다. 검색으로 들어온 사람이 공구 카드
           (제목·구성·판정)를 다 지나야 구매 버튼을 만나던 걸 위로 올렸다. */}
-      {ended && <EndedDealNotice post={post} purchaseLinks={purchaseLinks} related={related} section="buy" />}
+      {/* 살 곳이 확인된 마감 공구는 구매 영역만 위로 올리고 추천은 아래에 둔다.
+          살 곳이 없으면 위쪽 박스가 "확인되지 않았어요" 한 줄뿐이라 허전해서, 추천까지 함께
+          위로 올린다 — 그 사람에게 지금 줄 수 있는 게 그것뿐이다. */}
+      {ended && (
+        <EndedDealNotice post={post} purchaseLinks={purchaseLinks} related={related}
+          relatedKind={relatedKind} categoryLabel={categoryLabel}
+          section={purchaseLinks.length > 0 ? 'buy' : undefined} />
+      )}
 
       <div className="feed" style={{ paddingBottom: 100, paddingTop: 12 }}>
         <PostCard
@@ -80,7 +90,10 @@ export default function PostDetailClient({ post, ended = false, betterPrice = fa
         />
       </div>
 
-      {ended && <EndedDealNotice post={post} purchaseLinks={purchaseLinks} related={related} section="related" />}
+      {ended && purchaseLinks.length > 0 && (
+        <EndedDealNotice post={post} purchaseLinks={purchaseLinks} related={related}
+          relatedKind={relatedKind} categoryLabel={categoryLabel} section="related" />
+      )}
       {!ended && betterPrice && <BetterPriceNotice post={post} purchaseLinks={purchaseLinks} />}
 
       <div style={{ padding: '0 16px 24px', textAlign: 'center' }}>

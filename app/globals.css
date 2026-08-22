@@ -1049,6 +1049,12 @@ header {
 }
 .ended-related-title { font-size: 15px; font-weight: 800; margin-bottom: 14px; }
 .ended-related-empty { font-size: 13px; color: var(--gray-4); line-height: 1.6; }
+.ended-related-meta { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+/* 마감됐지만 살 곳이 확인된 공구 — 초록은 혜택에만 쓴다는 색 규칙(D-017)에 맞는 자리다 */
+.ended-related-buyable {
+  font-size: 11px; font-weight: 700; color: #15803D;
+  background: #DCFCE7; border-radius: 5px; padding: 1px 6px;
+}
 .ended-related-empty a { color: #D98E00; font-weight: 700; text-decoration: none; }
 .ended-related-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
 .ended-related-item {

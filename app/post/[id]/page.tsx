@@ -6,6 +6,7 @@ import { SITE_URL } from '@/lib/landing'
 import { CATEGORY_LABEL } from '@/lib/categoryIcons'
 import { visiblePurchaseLinks } from '@/lib/purchaseLinks'
 import { getDealVerdict } from '@/lib/dealGrade'
+import { relatedPosts, type RelatedKind } from '@/lib/relatedPosts'
 import JsonLd, { productSchema, breadcrumbSchema } from '@/components/JsonLd'
 import type { Post } from '@/lib/types'
 import PostDetailClient from './PostDetailClient'
@@ -24,11 +25,8 @@ function getPost(rawId: string) {
 }
 
 /** 종료 페이지 하단에 붙일 "비슷한 공구" — 같은 카테고리에서 진행 중인 것만 */
-function getRelated(post: Post): Post[] {
-  return loadPosts()
-    .filter(p => p.id !== post.id && p.cat === post.cat && isCustomerVisible(p))
-    .sort((a, b) => (b.scraped_at || '').localeCompare(a.scraped_at || ''))
-    .slice(0, RELATED_LIMIT)
+function getRelated(post: Post) {
+  return relatedPosts(post, loadPosts(), RELATED_LIMIT)
 }
 
 // 기존 설명은 "13,800원 — 꿀공구에서 확인해보세요"뿐이라 검색 결과에서 상품을 구분할
@@ -106,6 +104,7 @@ export default function PostPage({ params }: { params: { id: string } }) {
   // 꿀딜·괜찮딜에는 붙이지 않는다. "여기가 제일 싸다"고 해 놓고 다른 데로 보내는 모양이
   // 되기 때문이다 (D-027).
   const betterPrice = !ended && getDealVerdict(post).display.key === 'meh'
+  const related = ended ? getRelated(post) : { posts: [] as Post[], kind: 'category' as RelatedKind }
   return (
     <>
       <JsonLd data={[
@@ -121,7 +120,9 @@ export default function PostPage({ params }: { params: { id: string } }) {
         ended={ended}
         purchaseLinks={ended || betterPrice ? visiblePurchaseLinks(post) : []}
         betterPrice={betterPrice}
-        related={ended ? getRelated(post) : []}
+        related={related.posts}
+        relatedKind={related.kind}
+        categoryLabel={CATEGORY_LABEL[post.cat]}
       />
     </>
   )
