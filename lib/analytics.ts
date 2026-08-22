@@ -30,6 +30,17 @@ interface AnalyticsData {
   // 날짜별 클릭 — postViews가 날짜 없는 누적값이라 "최근 7일 인기"를 계산할 수 없었다.
   // postClicks[YYYY-MM-DD][postId][clickType] = 횟수
   postClicks?: Record<string, Record<string, Partial<Record<ClickType, number>>>>
+  /**
+   * 상품별 유입 경로 — postSources[YYYY-MM-DD][postId][TrafficSource] = 횟수.
+   *
+   * daily[날짜].sources는 방문 단위라 "이 상품을 검색으로 몇 명이 봤나"를 답하지 못한다.
+   * 관리자 수익화 화면에서 "검색으로 들어오는데 살 곳이 없는 상품"을 찾으려면 상품과 경로가
+   * 묶여 있어야 한다. 상세 페이지가 열릴 때 찍는 detail 클릭에 그 방문의 유입 경로를 함께 센다.
+   *
+   * 경로는 "그 방문이 처음 들어온 곳"이다(track.ts가 세션에 고정한다). 홈에 검색으로 들어와
+   * 상세로 넘어간 것도 검색으로 잡힌다 — 그 사람을 데려온 건 검색이 맞다.
+   */
+  postSources?: Record<string, Record<string, Record<string, number>>>
 }
 
 function load(): AnalyticsData {
@@ -50,6 +61,11 @@ function save(data: AnalyticsData) {
   if (data.postClicks) {
     for (const date of Object.keys(data.postClicks)) {
       if (date < cutoffStr) delete data.postClicks[date]
+    }
+  }
+  if (data.postSources) {
+    for (const date of Object.keys(data.postSources)) {
+      if (date < cutoffStr) delete data.postSources[date]
     }
   }
   // 임시 파일에 쓴 뒤 rename — 쓰기 도중 프로세스가 죽어도 기존 파일이 손상되지 않는다.
@@ -192,6 +208,15 @@ export function recordEvent(type: string, sessionId: string, opts?: { visitorId?
     forPost[clickType] = (forPost[clickType] || 0) + 1
   }
 
+  // 상세 페이지 조회에 유입 경로를 함께 남긴다 — 상품별로 "어디서 왔나"를 알아야
+  // 살 곳이 없는데 검색 유입만 받는 상품을 찾을 수 있다
+  if (type === 'click' && opts?.clickType === 'detail' && opts?.postId && opts?.source) {
+    if (!data.postSources) data.postSources = {}
+    const forDay = data.postSources[today] || (data.postSources[today] = {})
+    const forPost = forDay[String(opts.postId)] || (forDay[String(opts.postId)] = {})
+    forPost[opts.source] = (forPost[opts.source] || 0) + 1
+  }
+
   if (type === 'share' && opts?.postId) {
     if (!data.postShares) data.postShares = {}
     const key = String(opts.postId)
@@ -264,6 +289,46 @@ export function getClickCounts(days = 7, types?: ClickType[]): Record<number, nu
     }
   }
   return totals
+}
+
+/** 최근 N일 상품별 클릭을 종류까지 나눠서 — 관리자 수익화 화면이 한 표로 보여주는 데 쓴다 */
+export function getClickBreakdown(days = 14): Record<number, Partial<Record<ClickType, number>>> {
+  const data = load()
+  const cutoff = new Date()
+  cutoff.setDate(cutoff.getDate() - (days - 1))
+  const cutoffStr = cutoff.toISOString().split('T')[0]
+
+  const out: Record<number, Partial<Record<ClickType, number>>> = {}
+  for (const [date, byPost] of Object.entries(data.postClicks || {})) {
+    if (date < cutoffStr) continue
+    for (const [postId, byType] of Object.entries(byPost)) {
+      const id = parseInt(postId)
+      const row = out[id] || (out[id] = {})
+      for (const [t, n] of Object.entries(byType)) {
+        row[t as ClickType] = (row[t as ClickType] || 0) + (n || 0)
+      }
+    }
+  }
+  return out
+}
+
+/** 최근 N일 상품별 유입 경로 — postSources를 합산한다 */
+export function getPostSourceCounts(days = 14): Record<number, Record<string, number>> {
+  const data = load()
+  const cutoff = new Date()
+  cutoff.setDate(cutoff.getDate() - (days - 1))
+  const cutoffStr = cutoff.toISOString().split('T')[0]
+
+  const out: Record<number, Record<string, number>> = {}
+  for (const [date, byPost] of Object.entries(data.postSources || {})) {
+    if (date < cutoffStr) continue
+    for (const [postId, bySource] of Object.entries(byPost)) {
+      const id = parseInt(postId)
+      const row = out[id] || (out[id] = {})
+      for (const [src, n] of Object.entries(bySource)) row[src] = (row[src] || 0) + (n || 0)
+    }
+  }
+  return out
 }
 
 /** 최근 N일 클릭이 많은 순으로 상품 id를 돌려준다 */

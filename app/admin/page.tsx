@@ -154,6 +154,9 @@ export default function AdminPage() {
   const [sources, setSources] = useState<{ source: string; label: string; count: number }[]>([])
   // 상품별 상세 조회수(최근 14일) — 채우기 목록을 실제 유입 순으로 세우는 데 쓴다
   const [detailViews, setDetailViews] = useState<Record<string, number>>({})
+  // 상품별 클릭(종류별)과 유입 경로 — 수익화 현황 표
+  const [clickBreakdown, setClickBreakdown] = useState<Record<string, Record<string, number>>>({})
+  const [postSources, setPostSources] = useState<Record<string, Record<string, number>>>({})
   const [influencerSources, setInfluencerSources] = useState<InfluencerSource[]>([])
   const [newSourceUrl, setNewSourceUrl] = useState('')
   const [newSourceName, setNewSourceName] = useState('')
@@ -162,7 +165,7 @@ export default function AdminPage() {
   const [instPostUrl, setInstPostUrl] = useState('')
   const [instPostBusy, setInstPostBusy] = useState(false)
   const [instPostMsg, setInstPostMsg] = useState('')
-  const [adminTab, setAdminTab] = useState<'posts' | 'influencers' | 'collections' | 'verdict' | 'settings'>('posts')
+  const [adminTab, setAdminTab] = useState<'posts' | 'influencers' | 'collections' | 'verdict' | 'revenue' | 'settings'>('posts')
   const [collections, setCollections] = useState<Collection[]>([])
   const [editingInfluencer, setEditingInfluencer] = useState<string | null>(null)
   const [editInfluencerDraft, setEditInfluencerDraft] = useState<Partial<InfluencerSource>>({})
@@ -197,6 +200,8 @@ export default function AdminPage() {
       setTopSharedPosts(d.topSharedPosts || [])
       setSources(d.sources || [])
       setDetailViews(d.detailViews || {})
+      setClickBreakdown(d.clickBreakdown || {})
+      setPostSources(d.postSources || {})
     }
   }, [])
 
@@ -573,6 +578,7 @@ export default function AdminPage() {
             { key: 'influencers', label: '인플루언서 관리' },
             { key: 'collections', label: '컬렉션 관리' },
             { key: 'verdict',     label: '채우기' },
+            { key: 'revenue',     label: '수익화 현황' },
             { key: 'settings',    label: '통계 설정' },
           ] as const).map(({ key, label }) => (
             <button key={key} onClick={() => setAdminTab(key)}
@@ -710,6 +716,8 @@ export default function AdminPage() {
 
         {/* 통계 설정 탭 — 관리자 방문이 고객 통계에 섞이지 않게 관리 */}
         {adminTab === 'verdict' && <VerdictFiller posts={posts} views={detailViews} onSaved={fetchPosts} />}
+
+        {adminTab === 'revenue' && <RevenueBoard posts={posts} clicks={clickBreakdown} sources={postSources} onGoFill={() => setAdminTab('verdict')} />}
 
         {adminTab === 'settings' && <AdminIpManager />}
 
@@ -1762,6 +1770,135 @@ function AdminIpManager() {
           </tbody>
         </table></div>
       )}
+    </div>
+  )
+}
+
+/**
+ * 수익화 현황 — 상품별로 "얼마나 보고, 얼마나 나가고, 나갈 곳이 있는가"를 한 표로 본다.
+ *
+ * 이 제품에서 돈이 되는 동작은 제휴 링크 클릭뿐이다(사이트 안에서 결제하지 않는다). 그런데
+ * 제휴 클릭이 전체 기간 0회다 — 링크가 붙은 공구가 18건뿐이라 셀 게 없었다. 어디에 붙여야
+ * 하는지를 숫자로 보여주는 화면이 없어서 그렇다.
+ *
+ * "검색유입" 열은 오늘부터 쌓인다(postSources). 소급이 안 되므로 한동안 0으로 보이는 게
+ * 정상이다 — 없는 값을 있는 것처럼 보이게 하지 않는다.
+ */
+function RevenueBoard({ posts, clicks, sources, onGoFill }: {
+  posts: Post[]
+  clicks: Record<string, Record<string, number>>
+  sources: Record<string, Record<string, number>>
+  onGoFill: () => void
+}) {
+  const [needOnly, setNeedOnly] = useState(true)
+
+  const n = (id: number, k: string) => (clicks[id] || {})[k] || 0
+  const searchIn = (id: number) => {
+    const row = sources[id] || {}
+    return (row.naver_search || 0) + (row.google_search || 0) + (row.other_search || 0)
+  }
+
+  const rows = useMemo(() => {
+    return posts
+      .filter(isPagePublic)
+      .map(p => ({
+        post: p,
+        detail: n(p.id, 'detail'),
+        groupbuy: n(p.id, 'groupbuy'),
+        coupang: n(p.id, 'coupang'),
+        naver: n(p.id, 'naver'),
+        search: searchIn(p.id),
+        linked: hasPurchaseLink(p),
+        ended: isExpired(p),
+      }))
+      .filter(r => r.detail > 0 || r.groupbuy > 0)
+      .sort((a, b) => b.detail - a.detail)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [posts, clicks, sources])
+
+  // 수익화가 필요한 것 — 사람이 보고 있는데 나갈 곳이 없는 상품.
+  // 마감 공구가 먼저다. 진행 중 공구는 공구 자체가 출구라 급하지 않고, 꿀딜에 대체 구매처를
+  // 붙이는 건 "제일 싸다"고 판정해 놓고 다른 데로 보내는 모양이라 따로 판단이 필요하다.
+  const need = rows.filter(r => !r.linked && r.detail > 0)
+  const list = needOnly ? need : rows
+  const lost = need.filter(r => r.ended).reduce((s, r) => s + r.detail, 0)
+
+  const th: React.CSSProperties = { padding: '8px 10px', fontSize: 11.5, fontWeight: 700, color: '#64748b', textAlign: 'right', whiteSpace: 'nowrap' }
+  const td: React.CSSProperties = { padding: '9px 10px', fontSize: 13, textAlign: 'right', whiteSpace: 'nowrap', borderTop: '1px solid #f1f5f9' }
+
+  return (
+    <div style={{ background: '#fff', borderRadius: 12, padding: 20, border: '1px solid #e2e8f0' }}>
+      <h2 style={{ fontSize: 17, fontWeight: 800, marginBottom: 6 }}>수익화 현황</h2>
+      <p style={{ fontSize: 13, color: '#64748b', lineHeight: 1.7, marginBottom: 14 }}>
+        최근 14일 기준이에요. 돈이 되는 건 <strong>쿠팡·네이버 클릭</strong>뿐입니다 — 공구 클릭은 판매자 링크라 수수료가 없어요.
+        {lost > 0 && <> 지금 <strong>마감됐는데 살 곳이 없는 공구</strong>가 조회 {lost}회를 받고 그대로 내보내고 있어요.</>}
+        <br />
+        <span style={{ color: '#94a3b8' }}>검색유입 열은 오늘부터 쌓입니다 — 지난 기록은 상품과 안 묶여 있어서 소급이 안 돼요.</span>
+      </p>
+
+      <div style={{ display: 'flex', gap: 6, marginBottom: 14, flexWrap: 'wrap' }}>
+        <button onClick={() => setNeedOnly(true)}
+          style={{ padding: '7px 14px', borderRadius: 20, border: 'none', cursor: 'pointer', fontSize: 13, fontWeight: 700,
+            background: needOnly ? '#dc2626' : '#e2e8f0', color: needOnly ? '#fff' : '#475569' }}>
+          수익화 필요 {need.length}
+        </button>
+        <button onClick={() => setNeedOnly(false)}
+          style={{ padding: '7px 14px', borderRadius: 20, border: 'none', cursor: 'pointer', fontSize: 13, fontWeight: 700,
+            background: !needOnly ? '#475569' : '#e2e8f0', color: !needOnly ? '#fff' : '#475569' }}>
+          전체 {rows.length}
+        </button>
+        <button onClick={onGoFill}
+          style={{ marginLeft: 'auto', padding: '7px 14px', borderRadius: 8, border: '1px solid #cbd5e1',
+            background: '#fff', cursor: 'pointer', fontSize: 12.5, fontWeight: 600, color: '#475569' }}>
+          채우기 화면으로
+        </button>
+      </div>
+
+      <div style={{ overflowX: 'auto' }}>
+        <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 720 }}>
+          <thead>
+            <tr>
+              <th style={{ ...th, textAlign: 'left' }}>상품</th>
+              <th style={th}>상세조회</th>
+              <th style={th}>검색유입</th>
+              <th style={th}>공구 클릭</th>
+              <th style={th}>쿠팡</th>
+              <th style={th}>네이버</th>
+              <th style={{ ...th, textAlign: 'center' }}>제휴링크</th>
+            </tr>
+          </thead>
+          <tbody>
+            {list.map(r => (
+              <tr key={r.post.id}>
+                <td style={{ ...td, textAlign: 'left', maxWidth: 320 }}>
+                  <a href={`/post/${r.post.id}`} target="_blank" rel="noreferrer"
+                    style={{ color: '#1e293b', fontWeight: 600, textDecoration: 'none' }}>
+                    {r.post.title}
+                  </a>
+                  <span style={{ marginLeft: 6, fontSize: 11, color: r.ended ? '#dc2626' : '#22c55e', fontWeight: 700 }}>
+                    {r.ended ? '마감' : '진행'}
+                  </span>
+                </td>
+                <td style={{ ...td, fontWeight: 700 }}>{r.detail || '–'}</td>
+                <td style={td}>{r.search || '–'}</td>
+                <td style={td}>{r.groupbuy || '–'}</td>
+                <td style={{ ...td, color: r.coupang ? '#0f172a' : '#cbd5e1' }}>{r.coupang || '–'}</td>
+                <td style={{ ...td, color: r.naver ? '#0f172a' : '#cbd5e1' }}>{r.naver || '–'}</td>
+                <td style={{ ...td, textAlign: 'center' }}>
+                  {r.linked
+                    ? <span style={{ fontSize: 11.5, fontWeight: 700, color: '#15803d' }}>있음</span>
+                    : <span style={{ fontSize: 11.5, fontWeight: 700, color: '#dc2626' }}>없음</span>}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        {list.length === 0 && (
+          <p style={{ textAlign: 'center', padding: '24px 0', fontSize: 14, fontWeight: 700, color: '#64748b' }}>
+            해당하는 상품이 없어요
+          </p>
+        )}
+      </div>
     </div>
   )
 }

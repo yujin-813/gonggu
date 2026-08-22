@@ -12,7 +12,7 @@
 | 단계 | 운영 중 · 실사용자 있음 (2026-08-19 기준 사람 방문 고유 IP 163명/2일) |
 | 스택 | Next.js 14 (App Router) · React 18 · TypeScript · 파이썬 수집기 |
 | 저장소 | **파일 기반** — `data/*.json`. DB 없음 |
-| 코드 규모 | `lib/` 2,622줄 · `app/admin` + `components/` 4,648줄 · 파이썬 2,986줄 |
+| 코드 규모 | `lib/` 2,687줄 · `app/admin` + `components/` 4,785줄 · 파이썬 2,986줄 |
 | 데이터 규모 | 게시물 2,317건 (공개 277건) · 인플루언서 소스 58개 · analytics 31일치 |
 | 배포 | EC2 `13.125.121.62` · PM2(fork, 포트 3002) + nginx · `bash deploy.sh` |
 | 도메인 | https://gonggu.asknuggetdata.com |
@@ -47,6 +47,8 @@
 - 옵션 관리 — 수동 입력, **붙여넣기 파서**, **옵션 가져오기**(자동 수집)
 - 꿀픽 선정·순서, 상시딜·소진시마감 토글, 여러상품 토글
 - 인플루언서 소스 관리·개별 수집, 컬렉션 관리
+- **수익화 현황** — 상품별 `상세조회 · 검색유입 · 공구 클릭 · 쿠팡 · 네이버 · 제휴링크 유무`를
+  한 표로. 「수익화 필요」(사람이 보고 있는데 나갈 곳이 없는 상품) 필터가 기본이다
 - 방문자 분석 — 일자별 방문/재방문, **유입 경로**, 많이 본 상품, 많이 공유된 상품
 - 인플루언서 이름이 핸들 그대로인 소스를 표시하고 인스타 프로필로 바로 보낸다
   (검색 결과에 &quot;bobpro__ 공구&quot;로 나가면 안 눌린다 — 인플루언서 페이지 CTR 3.9% vs 상세 9.7~16.8%)
@@ -149,7 +151,7 @@ extraction_debug, scraped_at, collection_status, collection_error
 ```
 data/
   posts.json                2,317건 · 6.3MB   ← 전부 메모리에 올렸다 저장한다
-  analytics.json            31일치 (30일 초과분 자동 정리)
+  analytics.json            31일치 (30일 초과분 자동 정리 · postClicks·postSources 포함)
   admin_ips.json            관리자 IP (14일 TTL)
   influencer_sources.json   58개
   collections.json          거의 비어 있음
@@ -253,7 +255,10 @@ getDealVerdict(post)
   같은 계정의 게시물까지 함께 갱신한다(`posts.json`을 쓴다).
 - - **끝난 걸 아는데 마감일을 모르면 `ended_at`을 쓴다.** `deadline`에 오늘 날짜를 넣으면
   우리가 모르는 마감일이 고객 화면에 적힌다. 종료 안내는 마감일이 없어도 정상으로 뜬다.
-- **쿠팡에서 찾은 비교가는 `market_price`가 아니라 `purchase_links`에 url 없이 넣는다.**
+- **상품별 유입 경로(`postSources`)는 2026-08-23부터만 있다.** 그 전 기록은 방문 단위라
+  상품과 안 묶여 있어 소급이 안 된다. 수익화 현황의 "검색유입" 열이 한동안 비는 건 정상이다.
+- **돈이 되는 클릭은 `coupang`·`naver`·`other`뿐이다.** `groupbuy`는 판매자 링크라 수수료가 없다.
+- - **쿠팡에서 찾은 비교가는 `market_price`가 아니라 `purchase_links`에 url 없이 넣는다.**
   `market_price`는 고객 화면에 무조건 "네이버 최저가"로 표시되기 때문이다. `purchase_links`는
   url이 없으면 판정에는 '쿠팡'으로 들어가되 구매 버튼으로 안 뜨고 제휴 고지도 안 붙는다.
 - **`origPrice`는 실제로 거의 안 쓰인다** — 고객에게 보이는 미확인 34건 중 0건(2026-08-23).
