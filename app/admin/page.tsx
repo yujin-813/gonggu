@@ -1771,10 +1771,20 @@ function VerdictFiller({ posts, views, onSaved }: { posts: Post[]; views: Record
     return g
   }, [posts, views])
 
-  // 마감된 공구는 검색 유입이 계속 들어오는데 보낼 곳이 없으면 그대로 이탈한다
+  // 마감된 공구는 검색 유입이 계속 들어오는데 보낼 곳이 없으면 그대로 이탈한다.
+  //
+  // 조회 많은 순으로 세운다. 마감일 역순이면 "최근에 끝난 것"이 위로 오는데 실제로 사람이
+  // 보고 있는 건 그것과 다르다 — 40일 전에 끝난 공구가 조회 34회로 1위다. 마감 공구가 상세
+  // 조회의 56%를 받으면서 190건이 살 곳을 못 알려주고 있어서(2026-08-23 실측), 어디부터
+  // 채우냐가 그대로 손실 크기를 가른다.
   const ended = posts
     .filter(p => isPagePublic(p) && isExpired(p) && !hasPurchaseLink(p))
-    .sort((a, b) => (b.deadline || '').localeCompare(a.deadline || ''))
+    .sort((a, b) => {
+      const av = views[a.id] || 0
+      const bv = views[b.id] || 0
+      if (av !== bv) return bv - av
+      return (b.deadline || '').localeCompare(a.deadline || '')
+    })
 
   // 마감일을 못 읽은 공구. 이미 자동으로 내려간 것까지 함께 보여준다 — 진짜 상시딜이면
   // 되살려야 하는데, 보이는 것만 걸러 놓으면 되살릴 대상이 화면에서 사라진다
@@ -1802,7 +1812,7 @@ function VerdictFiller({ posts, views, onSaved }: { posts: Post[]; views: Record
     deadline: <>수집기가 <strong>마감일을 못 읽은</strong> 공구예요. 상시딜과 구분이 안 돼서 예전에는 끝난 공구가 계속 진행 중으로 남아 있었어요.
       지금은 시작일(없으면 수집일)로부터 <strong>{DEADLINE_UNKNOWN_DAYS}일</strong>이 지나면 고객 목록에서 자동으로 내려가고 상세는 종료 안내로 바뀝니다.
       마감일을 알면 넣어주시고, 정말 계속 파는 공구면 <strong>상시딜이 맞다</strong>를 눌러주세요.</>,
-    ended: <>마감됐는데 &quot;지금 살 수 있는 곳&quot;을 못 알려주는 공구예요. 검색으로 계속 들어오는데 보낼 곳이 없으면 그대로 나갑니다.<br />링크만 넣어도 됩니다 — 가격을 모르면 &quot;가격 확인하기&quot;로 보내요.</>,
+    ended: <>마감됐는데 &quot;지금 살 수 있는 곳&quot;을 못 알려주는 공구예요. 상세 조회의 절반 이상이 마감 공구에 오는데, 보낼 곳이 없으면 그대로 나갑니다. <strong>최근 14일 조회 많은 순</strong>으로 세웠어요.<br />링크만 넣어도 됩니다 — 가격을 모르면 &quot;가격 확인하기&quot;로 보내요.</>,
   }
 
   return (
@@ -1837,7 +1847,7 @@ function VerdictFiller({ posts, views, onSaved }: { posts: Post[]; views: Record
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
           {list.map(p => mode === 'ended'
-            ? <EndedFillRow key={p.id} post={p} onSaved={onSaved} />
+            ? <EndedFillRow key={p.id} post={p} views={views[p.id] || 0} onSaved={onSaved} />
             : mode === 'deadline'
             ? <DeadlineFillRow key={p.id} post={p} views={views[p.id] || 0} onSaved={onSaved} />
             : <CompareFillRow key={p.id} post={p} allPosts={posts} views={views[p.id] || 0} onSaved={onSaved} />)}
@@ -2301,7 +2311,7 @@ function DeadlineFillRow({ post, views, onSaved }: { post: Post; views: number; 
 }
 
 /** 종료·링크없음 — 제휴 대체 구매 링크를 채운다. 고객 화면에 버튼 + 고지 문구로 뜬다. */
-function EndedFillRow({ post, onSaved }: { post: Post; onSaved: () => void }) {
+function EndedFillRow({ post, views, onSaved }: { post: Post; views: number; onSaved: () => void }) {
   const existing = normalizePurchaseLinks(post)
   const [coupangUrl, setCoupangUrl] = useState(existing.find(l => l.platform === 'coupang')?.url ?? '')
   const [coupang, setCoupang] = useState(String(existing.find(l => l.platform === 'coupang')?.price ?? ''))
@@ -2327,6 +2337,11 @@ function EndedFillRow({ post, onSaved }: { post: Post; onSaved: () => void }) {
   return (
     <div style={{ border: '1px solid #e2e8f0', borderRadius: 10, padding: 12, background: done ? '#f0fdf4' : '#fff' }}>
       <FillRowHead post={post} mode="ended" />
+      {views > 0 && (
+        <p style={{ fontSize: 11.5, color: '#475569', margin: '0 0 8px' }}>
+          최근 14일 <strong style={{ color: '#0f172a' }}>{views}명</strong>이 이 페이지에 들어왔어요 — 살 곳을 못 알려주고 그대로 나갔습니다
+        </p>
+      )}
       <FillTools post={post} />
       <div className="admin-2col" style={{ gap: 8 }}>
         <input type="url" value={coupangUrl} onChange={e => { setCoupangUrl(e.target.value); setDone(false) }}
