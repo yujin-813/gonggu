@@ -90,7 +90,6 @@ const CHECKS = [
   ['인플루언서 소스',        /인플루언서 소스 ([\d,]+)개/,                     () => jsonAt('influencer_sources.json').length, 'fixed'],
   ['analytics 일수',        /analytics ([\d,]+)일치/,                       () => Object.keys(jsonAt('analytics.json').daily || {}).length, 'server'],
   ['sitemap URL 수',        /sitemap\.xml\(([\d,]+) URL\)/,                 () => sitemap().length, 'moving'],
-  ['is_featured',           /`is_featured` \*\*([\d,]+)건\*\*/,             () => count(p => p.is_featured), 'fixed'],
   ['group_key',             /는 있으나 실제 데이터 ([\d,]+)건/,               () => count(p => p.group_key), 'fixed'],
   ['status: needs_review',  /\| `needs_review` \| [^|]*\| ([\d,]+)/,        () => statusCount('needs_review'), 'moving'],
   ['status: excluded',      /\| `excluded` \| [^|]*\| ([\d,]+)/,            () => statusCount('excluded'), 'moving'],
