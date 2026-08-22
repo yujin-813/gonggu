@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { recordEvent, getSummary, getTopPosts, getTopSharedPosts, getSourceCounts, classifySource, CLICK_TYPES } from '@/lib/analytics'
+import { recordEvent, getSummary, getTopPosts, getTopSharedPosts, getSourceCounts, getClickCounts, classifySource, CLICK_TYPES } from '@/lib/analytics'
 import { loadPosts } from '@/lib/store'
 import { AUTH_COOKIE, computeToken, safeEqual } from '@/lib/auth'
 import { ADMIN_SEEN_COOKIE, isAdminIp, clientIp, isBotRequest } from '@/lib/adminTrace'
@@ -60,5 +60,9 @@ export async function GET() {
   const topPosts = withPostInfo(top)
   const topSharedPosts = withPostInfo(topShared)
   const sources = getSourceCounts(14)
-  return NextResponse.json({ summary, topPosts, topSharedPosts, sources })
+  // 상품별 상세 조회수. 상세 페이지는 열릴 때 clickType 'detail'을 찍으므로 이게 곧 조회수다.
+  // 관리자 채우기 목록을 "사람이 실제로 보고 있는 순"으로 세우는 데 쓴다 — 판정이 없는 공구가
+  // 2,300건이라 어디부터 채울지가 실제 손실을 가른다.
+  const detailViews = getClickCounts(14, ['detail'])
+  return NextResponse.json({ summary, topPosts, topSharedPosts, sources, detailViews })
 }

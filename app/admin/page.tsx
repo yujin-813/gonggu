@@ -130,6 +130,8 @@ export default function AdminPage() {
   const [topPosts, setTopPosts]       = useState<TopPost[]>([])
   const [topSharedPosts, setTopSharedPosts] = useState<TopPost[]>([])
   const [sources, setSources] = useState<{ source: string; label: string; count: number }[]>([])
+  // 상품별 상세 조회수(최근 14일) — 채우기 목록을 실제 유입 순으로 세우는 데 쓴다
+  const [detailViews, setDetailViews] = useState<Record<string, number>>({})
   const [influencerSources, setInfluencerSources] = useState<InfluencerSource[]>([])
   const [newSourceUrl, setNewSourceUrl] = useState('')
   const [newSourceName, setNewSourceName] = useState('')
@@ -172,6 +174,7 @@ export default function AdminPage() {
       setTopPosts(d.topPosts || [])
       setTopSharedPosts(d.topSharedPosts || [])
       setSources(d.sources || [])
+      setDetailViews(d.detailViews || {})
     }
   }, [])
 
@@ -680,7 +683,7 @@ export default function AdminPage() {
         )}
 
         {/* 통계 설정 탭 — 관리자 방문이 고객 통계에 섞이지 않게 관리 */}
-        {adminTab === 'verdict' && <VerdictFiller posts={posts} onSaved={fetchPosts} />}
+        {adminTab === 'verdict' && <VerdictFiller posts={posts} views={detailViews} onSaved={fetchPosts} />}
 
         {adminTab === 'settings' && <AdminIpManager />}
 
@@ -1714,24 +1717,34 @@ function AdminIpManager() {
 // 두 가지 대상이 같은 필드(purchase_links)를 채우므로 화면을 나누지 않고 여기서 전환한다.
 //   판정 대기     — 비교 가격이 없어 등급을 못 매기는 공구. 가격이 필요하다.
 //   종료·링크없음 — 마감됐는데 지금 살 곳을 못 알려주는 공구. 링크가 필요하다.
-function VerdictFiller({ posts, onSaved }: { posts: Post[]; onSaved: () => void }) {
+function VerdictFiller({ posts, views, onSaved }: { posts: Post[]; views: Record<string, number>; onSaved: () => void }) {
   const [mode, setMode] = useState<CompareState | 'ended'>('unchecked')
   // 목록은 전체 2,300건 기준이라 그대로 펼치면 화면이 못 버티고, 고객에게 안 보이는 공구는
   // 채워도 지금 효과가 없다. 기본은 보이는 것만 — 대신 몇 건을 뺐는지 항상 적는다
   const [visibleOnly, setVisibleOnly] = useState(true)
 
+  // 실제로 사람이 보고 있는 순으로 세운다.
+  //
+  // 판정이 없는 공구가 2,300건이라 "어디부터 채우나"가 실제 손실을 가른다. 최신순·상시딜순은
+  // 이론이고, 검색으로 들어와 판정 없는 상세에 착지한 사람 수가 진짜 손실이다 — 실측에서
+  // 검색 유입 146명 중 64명(44%)이 판정 없는 페이지에 떨어졌고, 1위 착지 공구 한 건만
+  // 채워도 26명이 판정을 보게 된다.
   const groups = useMemo(() => {
     const g: Record<CompareState, Post[]> = { unchecked: [], compared: [], incomparable: [] }
     for (const p of posts) g[getCompareState(p)].push(p)
-    const byImpact = (a: Post, b: Post) => {
-      const av = isCustomerVisible(a) ? 0 : 1
-      const bv = isCustomerVisible(b) ? 0 : 1
-      if (av !== bv) return av - bv
+    const byTraffic = (a: Post, b: Post) => {
+      const av = views[a.id] || 0
+      const bv = views[b.id] || 0
+      if (av !== bv) return bv - av
+      // 조회가 같으면(대부분 0) 기존 기준 — 고객에게 보이는 것 먼저, 그다음 최신
+      const ac = isCustomerVisible(a) ? 0 : 1
+      const bc = isCustomerVisible(b) ? 0 : 1
+      if (ac !== bc) return ac - bc
       return (b.scraped_at || '').localeCompare(a.scraped_at || '')
     }
-    for (const k of Object.keys(g) as CompareState[]) g[k].sort(byImpact)
+    for (const k of Object.keys(g) as CompareState[]) g[k].sort(byTraffic)
     return g
-  }, [posts])
+  }, [posts, views])
 
   // 마감된 공구는 검색 유입이 계속 들어오는데 보낼 곳이 없으면 그대로 이탈한다
   const ended = posts
@@ -1750,7 +1763,7 @@ function VerdictFiller({ posts, onSaved }: { posts: Post[]; onSaved: () => void 
   ]
 
   const blurb: Record<CompareState | 'ended', React.ReactNode> = {
-    unchecked: <>아직 아무도 비교가를 안 본 공구예요. 후보가 있으면 골라서 저장하고, 찾아봐도 비교할 상품이 없으면 <strong>비교불가</strong>로 남겨주세요 — 그래야 이 목록에서 빠집니다.</>,
+    unchecked: <>아직 아무도 비교가를 안 본 공구예요. <strong>최근 14일 조회가 많은 순</strong>으로 세웠으니 위에서부터 채우면 손실이 제일 빨리 줄어요. 찾아봐도 비교할 상품이 없으면 <strong>비교불가</strong>로 남겨주세요 — 그래야 이 목록에서 빠집니다.</>,
     incomparable: <>찾아본 끝에 비교할 동일상품이 없다고 표시해 둔 공구예요. 나중에 팔기 시작했다면 <strong>다시 확인하기</strong>로 되돌릴 수 있어요.</>,
     compared: <>비교가가 붙어 판정이 나가고 있는 공구예요. 값이 이상하면 여기서 고칠 수 있어요.</>,
     ended: <>마감됐는데 &quot;지금 살 수 있는 곳&quot;을 못 알려주는 공구예요. 검색으로 계속 들어오는데 보낼 곳이 없으면 그대로 나갑니다.<br />링크만 넣어도 됩니다 — 가격을 모르면 &quot;가격 확인하기&quot;로 보내요.</>,
@@ -1789,7 +1802,7 @@ function VerdictFiller({ posts, onSaved }: { posts: Post[]; onSaved: () => void 
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
           {list.map(p => mode === 'ended'
             ? <EndedFillRow key={p.id} post={p} onSaved={onSaved} />
-            : <CompareFillRow key={p.id} post={p} allPosts={posts} onSaved={onSaved} />)}
+            : <CompareFillRow key={p.id} post={p} allPosts={posts} views={views[p.id] || 0} onSaved={onSaved} />)}
         </div>
       )}
     </div>
@@ -1881,7 +1894,7 @@ function SaveButton({ canSave, saving, done, onClick }: { canSave: boolean; savi
  * 세 상태(미확인·비교가 있음·비교불가)를 한 컴포넌트가 다룬다. 같은 공구가 상태만 오가는
  * 것이라 화면을 나누면 같은 입력칸을 세 벌 갖게 된다.
  */
-function CompareFillRow({ post, allPosts, onSaved }: { post: Post; allPosts: Post[]; onSaved: () => void }) {
+function CompareFillRow({ post, allPosts, views, onSaved }: { post: Post; allPosts: Post[]; views: number; onSaved: () => void }) {
   const state = getCompareState(post)
   const [orig, setOrig]           = useState(String(post.origPrice ?? ''))
   const [market, setMarket]       = useState(String(post.market_price ?? ''))
@@ -1942,6 +1955,13 @@ function CompareFillRow({ post, allPosts, onSaved }: { post: Post; allPosts: Pos
   return (
     <div style={{ border: '1px solid #e2e8f0', borderRadius: 10, padding: 12, background: done ? '#f0fdf4' : '#fff' }}>
       <FillRowHead post={post} mode="pending" badge={preview ? <GradeBadge display={preview} size="sm" /> : undefined} />
+
+      {views > 0 && (
+        <p style={{ fontSize: 11.5, color: '#475569', margin: '0 0 8px' }}>
+          최근 14일 <strong style={{ color: '#0f172a' }}>{views}명</strong>이 이 공구 상세를 봤어요
+          {getCompareState(post) !== 'compared' && ' — 판정 없이 나갔습니다'}
+        </p>
+      )}
 
       {isMultiOption(post) && (
         <p style={{ fontSize: 11.5, color: '#78716c', margin: '0 0 8px' }}>
