@@ -1,7 +1,7 @@
 'use client'
 import { useState, useEffect, useMemo, useCallback } from 'react'
 import type { Post, ScraperStatus, InfluencerSource, Collection } from '@/lib/types'
-import { daysLeft, periodLabel, isExpired, isCustomerVisible, isPagePublic, fmtDate } from '@/lib/period'
+import { daysLeft, periodLabel, isExpired, isCustomerVisible, isPagePublic, fmtDate, getPeriodState, DEADLINE_UNKNOWN_DAYS } from '@/lib/period'
 import { hasPurchaseLink, normalizePurchaseLinks } from '@/lib/purchaseLinks'
 import { getDealVerdict, isMultiOption } from '@/lib/dealGrade'
 import { partnerSearchQuery } from '@/lib/searchQuery'
@@ -1718,7 +1718,7 @@ function AdminIpManager() {
 //   판정 대기     — 비교 가격이 없어 등급을 못 매기는 공구. 가격이 필요하다.
 //   종료·링크없음 — 마감됐는데 지금 살 곳을 못 알려주는 공구. 링크가 필요하다.
 function VerdictFiller({ posts, views, onSaved }: { posts: Post[]; views: Record<string, number>; onSaved: () => void }) {
-  const [mode, setMode] = useState<CompareState | 'ended'>('unchecked')
+  const [mode, setMode] = useState<CompareState | 'ended' | 'deadline'>('unchecked')
   // 목록은 전체 2,300건 기준이라 그대로 펼치면 화면이 못 버티고, 고객에게 안 보이는 공구는
   // 채워도 지금 효과가 없다. 기본은 보이는 것만 — 대신 몇 건을 뺐는지 항상 적는다
   const [visibleOnly, setVisibleOnly] = useState(true)
@@ -1751,21 +1751,32 @@ function VerdictFiller({ posts, views, onSaved }: { posts: Post[]; views: Record
     .filter(p => isPagePublic(p) && isExpired(p) && !hasPurchaseLink(p))
     .sort((a, b) => (b.deadline || '').localeCompare(a.deadline || ''))
 
-  const full = mode === 'ended' ? ended : groups[mode]
-  const list = visibleOnly && mode !== 'ended' ? full.filter(isCustomerVisible) : full
+  // 마감일을 못 읽은 공구. 이미 자동으로 내려간 것까지 함께 보여준다 — 진짜 상시딜이면
+  // 되살려야 하는데, 보이는 것만 걸러 놓으면 되살릴 대상이 화면에서 사라진다
+  const deadlineUnknown = posts
+    .filter(p => isPagePublic(p) && getPeriodState(p).kind === 'deadline_unknown')
+    .sort((a, b) => (views[b.id] || 0) - (views[a.id] || 0))
+
+  const full = mode === 'ended' ? ended : mode === 'deadline' ? deadlineUnknown : groups[mode]
+  const skipVisibleFilter = mode === 'ended' || mode === 'deadline'
+  const list = visibleOnly && !skipVisibleFilter ? full.filter(isCustomerVisible) : full
   const hidden = full.length - list.length
 
-  const tabs: { key: CompareState | 'ended'; label: string; color: string }[] = [
+  const tabs: { key: CompareState | 'ended' | 'deadline'; label: string; color: string }[] = [
     { key: 'unchecked',    label: `${COMPARE_STATE_LABEL.unchecked} ${groups.unchecked.length}`,       color: '#475569' },
     { key: 'incomparable', label: `${COMPARE_STATE_LABEL.incomparable} ${groups.incomparable.length}`, color: '#78716c' },
     { key: 'compared',     label: `${COMPARE_STATE_LABEL.compared} ${groups.compared.length}`,         color: '#15803d' },
+    { key: 'deadline',     label: `마감일 미확인 ${deadlineUnknown.length}`,                              color: '#b45309' },
     { key: 'ended',        label: `종료·링크없음 ${ended.length}`,                                       color: '#dc2626' },
   ]
 
-  const blurb: Record<CompareState | 'ended', React.ReactNode> = {
+  const blurb: Record<CompareState | 'ended' | 'deadline', React.ReactNode> = {
     unchecked: <>아직 아무도 비교가를 안 본 공구예요. <strong>최근 14일 조회가 많은 순</strong>으로 세웠으니 위에서부터 채우면 손실이 제일 빨리 줄어요. 찾아봐도 비교할 상품이 없으면 <strong>비교불가</strong>로 남겨주세요 — 그래야 이 목록에서 빠집니다.</>,
     incomparable: <>찾아본 끝에 비교할 동일상품이 없다고 표시해 둔 공구예요. 나중에 팔기 시작했다면 <strong>다시 확인하기</strong>로 되돌릴 수 있어요.</>,
     compared: <>비교가가 붙어 판정이 나가고 있는 공구예요. 값이 이상하면 여기서 고칠 수 있어요.</>,
+    deadline: <>수집기가 <strong>마감일을 못 읽은</strong> 공구예요. 상시딜과 구분이 안 돼서 예전에는 끝난 공구가 계속 진행 중으로 남아 있었어요.
+      지금은 시작일(없으면 수집일)로부터 <strong>{DEADLINE_UNKNOWN_DAYS}일</strong>이 지나면 고객 목록에서 자동으로 내려가고 상세는 종료 안내로 바뀝니다.
+      마감일을 알면 넣어주시고, 정말 계속 파는 공구면 <strong>상시딜이 맞다</strong>를 눌러주세요.</>,
     ended: <>마감됐는데 &quot;지금 살 수 있는 곳&quot;을 못 알려주는 공구예요. 검색으로 계속 들어오는데 보낼 곳이 없으면 그대로 나갑니다.<br />링크만 넣어도 됩니다 — 가격을 모르면 &quot;가격 확인하기&quot;로 보내요.</>,
   }
 
@@ -1802,6 +1813,8 @@ function VerdictFiller({ posts, views, onSaved }: { posts: Post[]; views: Record
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
           {list.map(p => mode === 'ended'
             ? <EndedFillRow key={p.id} post={p} onSaved={onSaved} />
+            : mode === 'deadline'
+            ? <DeadlineFillRow key={p.id} post={p} views={views[p.id] || 0} onSaved={onSaved} />
             : <CompareFillRow key={p.id} post={p} allPosts={posts} views={views[p.id] || 0} onSaved={onSaved} />)}
         </div>
       )}
@@ -2076,6 +2089,67 @@ function CompareFillRow({ post, allPosts, views, onSaved }: { post: Post; allPos
           </button>
         </div>
       )}
+    </div>
+  )
+}
+
+/**
+ * 마감일 미확인 한 행 — 마감일을 넣거나 "상시딜이 맞다"로 확정한다.
+ *
+ * 거짓 날짜를 만들지 않으려고 "이미 끝났다" 같은 버튼은 두지 않았다. 실제 마감일을 모르는데
+ * 오늘 날짜를 넣으면 화면에 없는 마감일이 적힌다. 모르면 그냥 두면 되고, 기간이 지나면
+ * 자동으로 내려간다.
+ */
+function DeadlineFillRow({ post, views, onSaved }: { post: Post; views: number; onSaved: () => void }) {
+  const state = getPeriodState(post)
+  const since = state.kind === 'deadline_unknown' ? state.daysSince : null
+  const left = since === null ? null : DEADLINE_UNKNOWN_DAYS - since
+  const [deadline, setDeadline] = useState('')
+  const [saving, setSaving] = useState(false)
+  const [done, setDone] = useState(false)
+
+  async function patch(body: Record<string, unknown>) {
+    setSaving(true)
+    await fetch(`/api/posts/${post.id}`, {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
+    })
+    setSaving(false); setDone(true); onSaved()
+  }
+
+  return (
+    <div style={{ border: '1px solid #e2e8f0', borderRadius: 10, padding: 12, background: done ? '#f0fdf4' : '#fff' }}>
+      <FillRowHead post={post} mode="pending" />
+
+      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center', fontSize: 12, color: '#64748b', marginBottom: 10 }}>
+        <span>{post.start_date ? `${fmtDate(post.start_date)} 시작` : `${fmtDate(post.scraped_at)} 수집`}</span>
+        {since !== null && <span><strong style={{ color: '#0f172a' }}>{since}일째</strong></span>}
+        {left !== null && (
+          left >= 0
+            ? <span style={{ color: '#b45309', fontWeight: 700 }}>{left}일 뒤 자동으로 내려감</span>
+            : <span style={{ color: '#dc2626', fontWeight: 700 }}>이미 내려감 — 고객에게 안 보임</span>
+        )}
+        {views > 0 && <span>최근 14일 <strong style={{ color: '#0f172a' }}>{views}명</strong> 조회</span>}
+      </div>
+
+      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+        <input type="date" value={deadline} onChange={e => { setDeadline(e.target.value); setDone(false) }}
+          style={{ ...fillInput, fontSize: 13, width: 'auto', flex: '1 1 160px' }} />
+        <button onClick={() => patch({ deadline })} disabled={!deadline || saving}
+          style={{ padding: '7px 14px', borderRadius: 8, border: 'none', fontSize: 13, fontWeight: 700,
+            cursor: deadline && !saving ? 'pointer' : 'not-allowed',
+            background: done ? '#dcfce7' : deadline ? '#6366f1' : '#e2e8f0',
+            color: done ? '#15803d' : deadline ? '#fff' : '#94a3b8' }}>
+          {saving ? '저장 중…' : done ? '저장됨' : '마감일 저장'}
+        </button>
+        <button onClick={() => patch({ is_evergreen_deal: true })} disabled={saving}
+          style={{ padding: '7px 14px', borderRadius: 8, border: '1px solid #cbd5e1', background: '#fff',
+            cursor: 'pointer', fontSize: 12.5, fontWeight: 600, color: '#475569' }}>
+          상시딜이 맞다
+        </button>
+      </div>
+      <p style={{ fontSize: 11, color: '#94a3b8', margin: '6px 0 0' }}>
+        마감일을 모르면 그냥 두세요 — 없는 날짜를 넣는 것보다 자동으로 내려가는 편이 정확합니다.
+      </p>
     </div>
   )
 }

@@ -1,7 +1,7 @@
 # 03 · 시스템 — 지금 상태
 
 > **"지금"만 쓴다.** 변경 이력과 "예전에는 ○○였다"는 여기 쓰지 않는다. 과거는 `02-DECISIONS.md`에 있다.
-> 마지막 갱신: 2026-08-22
+> 마지막 갱신: 2026-08-23
 
 ---
 
@@ -12,7 +12,7 @@
 | 단계 | 운영 중 · 실사용자 있음 (2026-08-19 기준 사람 방문 고유 IP 163명/2일) |
 | 스택 | Next.js 14 (App Router) · React 18 · TypeScript · 파이썬 수집기 |
 | 저장소 | **파일 기반** — `data/*.json`. DB 없음 |
-| 코드 규모 | `lib/` 2,518줄 · `app/admin` + `components/` 4,380줄 · 파이썬 2,968줄 |
+| 코드 규모 | `lib/` 2,567줄 · `app/admin` + `components/` 4,454줄 · 파이썬 2,983줄 |
 | 데이터 규모 | 게시물 2,317건 (공개 277건) · 인플루언서 소스 58개 · analytics 31일치 |
 | 배포 | EC2 `13.125.121.62` · PM2(fork, 포트 3002) + nginx · `bash deploy.sh` |
 | 도메인 | https://gonggu.asknuggetdata.com |
@@ -38,6 +38,8 @@
   동일상품 후보를 내밀고 고르면 비교가로 저장하며, 찾아봐도 없으면 사유를 골라 비교불가로 남긴다.
   목록은 **최근 14일 상세 조회 많은 순** — 상세 페이지가 열릴 때 찍는 `clickType: 'detail'`이 곧 조회수다.
   ⚠️ 갓 올라온 공구는 조회가 0이라 뒤로 밀린다 (조회 동률일 때 최신순으로 받는다)
+- **「마감일 미확인」 탭** — 수집기가 마감일을 못 읽은 공구. 마감일을 넣거나 상시딜로 확정한다.
+  이미 자동으로 내려간 것까지 함께 보여준다 (되살릴 대상이 화면에서 사라지면 안 되므로)
 - 옵션 관리 — 수동 입력, **붙여넣기 파서**, **옵션 가져오기**(자동 수집)
 - 꿀픽 선정·순서, 상시딜·소진시마감 토글, 여러상품 토글
 - 인플루언서 소스 관리·개별 수집, 컬렉션 관리
@@ -111,6 +113,10 @@ extraction_debug, scraped_at, collection_status, collection_error
 | `exclusive` | 단독 공구 | 관리자가 `is_exclusive_deal` 확인 |
 | `multi` | 여러 상품 | 골라담기·모음전 등 판정 불가 유형 |
 
+**`PeriodState`** (`lib/period.ts`) — 기간 상태. `upcoming` / `evergreen` / `sold_out_only` / `range` / `deadline_only` / `deadline_unknown`
+> `deadline_unknown`은 **마감일을 모른다**는 뜻이다. 예전에는 `evergreen`(상시딜)과 한 덩어리였는데, 그래서 이미 끝난 공구가 무기한 노출됐다(`D-024`).
+> 상시딜은 관리자 플래그가 붙은 것만이다. `deadline_unknown`은 시작일(없으면 수집일)로부터 `DEADLINE_UNKNOWN_DAYS`(21일)가 지나면 마감으로 본다.
+
 **`CompareState`** (`lib/compareState.ts`) — 비교가 작업 상태. **관리자 전용이라 고객 화면에는 안 나간다**
 | 값 | 라벨 | 조건 |
 |---|---|---|
@@ -154,6 +160,7 @@ public/scraped/   수집 이미지 431MB
 | `AUTO_MATCH_FLOOR = 0.5` | 낮추면 잘못된 자동 매칭이 판정을 뒤집는다 (`D-006`). `lib/compareCandidates.ts`가 이 값을 읽어 "왜 후보가 판정에서 빠졌는지"를 설명한다 |
 | `lib/compareCandidates.ts`의 매칭 문턱 | 풀면 엉뚱한 상품이 후보로 뜨고, 관리자가 고르는 순간 그대로 틀린 비교가가 된다 (`D-023`) |
 | `lib/postGuards.ts` | 구매 링크 없는 공구의 공개를 막는 유일한 장치 |
+| `DEADLINE_UNKNOWN_DAYS = 21` | **`lib/period.ts`와 `check_links.py` 양쪽에 있다.** 한쪽만 고치면 고객 화면과 링크 점검 대상이 갈라진다 (`D-024`) |
 | `app/api/posts/[id]/route.ts`의 필드 allowlist | 여기 없는 필드는 관리자가 저장해도 **조용히 무시된다.** 새 필드를 추가하면 PATCH·PUT 양쪽에 넣어야 한다 |
 | `middleware.ts`의 `config.matcher` | 새 관리자 API를 만들면 `isProtected()`와 `matcher` **양쪽**에 등록해야 한다. 한쪽만 하면 무방비 |
 | `data/posts.json` 직접 편집 | 서버에서 스크립트로 고칠 때는 반드시 백업부터. 저장은 스크립트 끝에서 한 번만 일어난다 |
@@ -261,13 +268,14 @@ getDealVerdict(post)
 
 **근거:** `lib/store.ts` · `backfill_options.py`가 끝에서 `save_posts(posts)` 한 번 호출 · cron이 하루 2회 수집 실행
 
-### 3. 판정 대기가 34% ⚠️
+### 3. 판정 대기가 27% ⚠️
 
-고객에게 보이는 공구의 3분의 1이 판정을 못 받는다. 판정기를 표방하는 제품의 핵심 지표다.
+고객에게 보이는 공구의 4분의 1 이상이 판정을 못 받는다. 판정기를 표방하는 제품의 핵심 지표다.
 새로 들어오는 것일수록 나쁘다 — 8월 수집분은 절반 가까이가 판정을 못 받는다. 문제 1(비교가 수집 중단)이
 고객 화면에서 드러나는 자리다.
 
-**근거:** 2026-08-21 측정(`scripts/check-docs.js`) — 보이는 공구 112건 중 pending 38건.
+**근거:** 2026-08-23 측정(`scripts/check-docs.js`) — 보이는 공구 88건 중 pending 24건.
+(`D-024`로 마감일 미확인 22건이 목록에서 내려가면서 분모와 분자가 함께 줄었다.)
 그중 8월 수집분 22건(8월 수집 47건의 47%), 7월 이전 16건(65건의 25%).
 pending 38건 중 사람이 넣은 `origPrice`가 있는 건 0건, `market_price`는 있으나 `AUTO_MATCH_FLOOR`에
 걸려 버려진 건 5건. `market_price` 보유 711건 / 전체 2,317건

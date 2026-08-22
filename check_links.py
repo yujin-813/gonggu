@@ -65,18 +65,33 @@ SOLD_OUT_REASON = "품절 감지 (자동 숨김 · 재입고 시 자동 복구)"
 UNCERTAIN_REASON = "구매링크 확인 필요"
 
 
+# lib/period.ts의 DEADLINE_UNKNOWN_DAYS와 같은 값이어야 한다.
+# 마감일을 못 읽은 공구를 언제까지 진행 중으로 볼지 — 두 곳에 있으니 함께 고칠 것.
+DEADLINE_UNKNOWN_DAYS = 21
+
+
 def is_customer_visible(p):
+    """lib/period.ts의 isCustomerVisible과 같은 규칙 — 한쪽만 고치면 갈라진다."""
     if p.get("status") == "upcoming":
         return p.get("published") is not False
     is_published = p.get("status") == "published" or (not p.get("status") and p.get("published") is not False)
     if not is_published:
         return False
-    if p.get("is_evergreen_deal") or p.get("is_always_on"):
+    # 사람이 "계속 판다"고 확인해 준 것만 마감일 없이도 계속 보인다
+    if p.get("is_evergreen_deal") or p.get("is_always_on") or p.get("sale_until_sold_out"):
         return True
     deadline = p.get("deadline")
     if not deadline:
-        return True
-    return deadline >= date.today().isoformat()
+        # 마감일 미확인 — 시작일(없으면 수집일)로부터 정해진 기간까지만 진행 중으로 본다
+        basis = (p.get("start_date") or p.get("scraped_at") or "")[:10]
+        if not basis:
+            return True
+        try:
+            since = (date.today() - date.fromisoformat(basis)).days
+        except ValueError:
+            return True
+        return since <= DEADLINE_UNKNOWN_DAYS
+    return deadline[:10] >= date.today().isoformat()
 
 
 def check_link(url):

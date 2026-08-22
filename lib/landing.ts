@@ -93,8 +93,10 @@ export function monthlyPosts(posts: Post[]): Post[] {
     if ((p.deadline || '').startsWith(month)) return true
     // 지난달에 열려 이번 달에도 계속 진행 중인 공구
     if (p.start_date && p.deadline) return p.start_date < month && p.deadline >= month
-    // 마감일이 없는 상시딜은 이번 달에도 진행 중인 것으로 본다
-    return getPeriodState(p).kind === 'evergreen'
+    // 마감일이 없는 공구는 이번 달에도 진행 중인 것으로 본다. 마감일 미확인도 포함한다 —
+    // 기간을 넘긴 건 isCustomerVisible이 이미 걸러서 여기까지 오지 않는다
+    const kind = getPeriodState(p).kind
+    return kind === 'evergreen' || kind === 'deadline_unknown'
   })
 }
 

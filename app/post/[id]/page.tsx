@@ -43,7 +43,10 @@ function buildDescription(post: Post, ended: boolean): string {
   if (post.price) detail.push(ended ? `당시 공동구매가 ${post.price.toLocaleString()}원` : `${post.price.toLocaleString()}원`)
   if (post.influencer_name) detail.push(`${post.influencer_name} 공구`)
   else if (post.account) detail.push(`${post.account.replace('@', '')} 공구`)
-  const period = getPeriodState(post).kind === 'evergreen' ? '' : periodLabel(post)
+  // periodLabel은 관리자용 문구다("마감일 미확인 (40일째)"). 기간을 단정할 수 없는 상태는
+  // 검색 결과에 나가는 설명에서 통째로 뺀다 — 우리 사정을 고객 화면에 쓰지 않는다(원칙 3)
+  const periodKind = getPeriodState(post).kind
+  const period = periodKind === 'evergreen' || periodKind === 'deadline_unknown' ? '' : periodLabel(post)
   if (period) detail.push(period)
   detail.push(`${CATEGORY_LABEL[post.cat] || ''} 카테고리`.trim())
 

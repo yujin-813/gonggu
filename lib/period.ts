@@ -24,7 +24,21 @@ export function fmtDate(dateStr?: string): string {
   return `${parseInt(m)}.${parseInt(d)}`
 }
 
-type PeriodInput = Pick<Post, 'status' | 'start_date' | 'deadline' | 'is_evergreen_deal' | 'is_always_on' | 'sale_until_sold_out'>
+type PeriodInput = Pick<Post, 'status' | 'start_date' | 'deadline' | 'is_evergreen_deal' | 'is_always_on' | 'sale_until_sold_out' | 'scraped_at'>
+
+/**
+ * 마감일을 못 찾은 공구를 언제까지 "진행 중"으로 볼 것인가.
+ *
+ * 공구는 대개 2~3일이면 끝나지만 우리가 마감일을 못 읽었을 뿐인 경우도 있어 넉넉히 잡았다.
+ * 이 기간이 지나면 고객 목록에서 내리고 상세는 종료 안내로 바꾼다 — 상세 URL은 계속
+ * 살려둔다(D-002).
+ */
+export const DEADLINE_UNKNOWN_DAYS = 21
+
+/** 마감일 미확인 공구의 기준일 — 공구 시작일이 있으면 그게 정확하고, 없으면 수집 시점 */
+function unknownBasisDate(post: PeriodInput): string {
+  return dateOnly(post.start_date) || dateOnly(post.scraped_at) || ''
+}
 
 export type PeriodState =
   | { kind: 'upcoming'; startDate: string; daysToOpen: number | null }
@@ -32,6 +46,18 @@ export type PeriodState =
   | { kind: 'sold_out_only'; startDate?: string }
   | { kind: 'range'; startDate: string; deadline: string; daysLeft: number }
   | { kind: 'deadline_only'; deadline: string; daysLeft: number }
+  /**
+   * 마감일을 모른다 — 수집기가 못 읽었고 관리자도 상시딜이라고 확인해 주지 않았다.
+   *
+   * 예전에는 이걸 evergreen(상시딜)과 한 덩어리로 봤다. "마감일이 없다 = 계속 판다"는
+   * 전제였는데, 실제로는 수집기가 **못 찾은** 경우가 훨씬 많았다. 그 결과 이미 끝난 공구가
+   * 고객 화면에 계속 진행 중으로 남았다 — 고객에게 보이는 110건 중 44건이 이 상태였고,
+   * 그중 33건은 수집한 지 15일이 넘은 것이었다(2026-08-23 실측).
+   *
+   * 확신이 없으면 말하지 않는다(원칙 2). 상시딜이라고 단정하지 않고, daysSince가
+   * DEADLINE_UNKNOWN_DAYS를 넘으면 끝난 것으로 본다.
+   */
+  | { kind: 'deadline_unknown'; startDate?: string; daysSince: number | null }
 
 /**
  * status가 upcoming이어도 오픈일이 지났으면 더 이상 "오픈 예정"이 아니다.
@@ -59,16 +85,24 @@ export function getPeriodState(post: PeriodInput): PeriodState {
       ? { kind: 'range', startDate: post.start_date, deadline: post.deadline, daysLeft: daysLeft(post.deadline) }
       : { kind: 'deadline_only', deadline: post.deadline, daysLeft: daysLeft(post.deadline) }
   }
-  // 마감일이 없을 때: "소진시 마감"으로 명시된 경우만 예외로 두고, 그 외(시작일만 있거나
-  // 기간 정보가 아예 없는 경우)는 전부 "상시딜"로 취급한다 — 마감일이 없다는 건 특정 시점에
-  // 끝나지 않고 계속 판매된다는 뜻이라, "마감일 미확인"보다 상시딜이 더 정확한 표현이다.
-  // 다만 시작일은 알고 있는 경우가 있으니(오픈일만 확인되고 마감일은 못 찾은 경우) 그 값은
-  // 버리지 않고 evergreen/sold_out_only에 실어 보내 화면에 "OO부터 진행 중"으로 보여준다
+  // 마감일이 없을 때. 예전에는 전부 "상시딜"로 취급했는데, 그건 사람이 확인해 준 경우에만
+  // 할 수 있는 말이다. 관리자 플래그(is_evergreen_deal/is_always_on/sale_until_sold_out)가
+  // 붙은 건 위에서 이미 걸렀으므로, 여기까지 온 건 "우리가 마감일을 모르는" 공구다.
   if (post.sale_until_sold_out) return { kind: 'sold_out_only', startDate: post.start_date || undefined }
-  return { kind: 'evergreen', startDate: post.start_date || undefined }
+  const basis = unknownBasisDate(post)
+  return {
+    kind: 'deadline_unknown',
+    startDate: post.start_date || undefined,
+    daysSince: basis ? -daysLeft(basis) : null,
+  }
 }
 
-/** 이 공구가 "상시딜" 탭에 노출돼야 하는지 (명시적 상시딜 플래그 + 마감일 없는 공구 전부 포함) */
+/**
+ * 이 공구가 "상시딜" 탭에 노출돼야 하는지.
+ *
+ * 마감일을 모르는 공구는 더 이상 여기 포함하지 않는다 — 상시딜이라고 말하려면 사람이
+ * 확인해 줘야 한다. 그 전에는 deadline_unknown으로 따로 센다.
+ */
 export function isEvergreen(post: PeriodInput): boolean {
   return getPeriodState(post).kind === 'evergreen'
 }
@@ -80,6 +114,10 @@ export function periodLabel(post: PeriodInput): string {
     case 'upcoming':     return s.startDate ? `${fmtDate(s.startDate)} 오픈 예정` : '오픈 예정'
     case 'evergreen':    return s.startDate ? `${fmtDate(s.startDate)}~ 상시딜` : '상시딜'
     case 'sold_out_only': return s.startDate ? `${fmtDate(s.startDate)}~ · 소진시 마감` : '한정수량 · 소진시 마감'
+    case 'deadline_unknown': {
+      const since = s.daysSince === null ? '' : ` (${s.daysSince}일째)`
+      return s.startDate ? `${fmtDate(s.startDate)}~ 마감일 미확인${since}` : `마감일 미확인${since}`
+    }
     case 'range':         return `${fmtDate(s.startDate)} ~ ${fmtDate(s.deadline)}`
     case 'deadline_only': return `~ ${fmtDate(s.deadline)}`
   }
@@ -88,6 +126,7 @@ export function periodLabel(post: PeriodInput): string {
 /** 이 공구가 지금 실제로 마감이 지나 고객 화면에서 자동 숨김되는지 (상시딜/소진시는 예외) */
 export function isExpired(post: PeriodInput): boolean {
   const s = getPeriodState(post)
+  if (s.kind === 'deadline_unknown') return s.daysSince !== null && s.daysSince > DEADLINE_UNKNOWN_DAYS
   return (s.kind === 'range' || s.kind === 'deadline_only') && s.daysLeft < 0
 }
 
@@ -105,7 +144,7 @@ export function isPagePublic(post: Pick<Post, 'status' | 'published'>): boolean 
 }
 
 /** 고객 화면에 노출해도 되는 상품인지 — api/posts, api/collections/[id] 등에서 공통으로 쓴다 */
-export function isCustomerVisible(post: Pick<Post, 'status' | 'published' | 'is_evergreen_deal' | 'is_always_on' | 'deadline' | 'start_date'>): boolean {
+export function isCustomerVisible(post: Pick<Post, 'status' | 'published' | 'is_evergreen_deal' | 'is_always_on' | 'sale_until_sold_out' | 'deadline' | 'start_date' | 'scraped_at'>): boolean {
   // 아직 안 열린 공구는 마감일과 무관하게 보여준다 (오픈 예정 카드)
   if (isStillUpcoming(post)) return post.published !== false
   // 오픈일이 지난 오픈예정 글은 이제 일반 공구로 취급 — 아래 마감일 검사를 그대로 탄다.
@@ -113,8 +152,11 @@ export function isCustomerVisible(post: Pick<Post, 'status' | 'published' | 'is_
   const isPublished =
     post.status === 'published' || post.status === 'upcoming' || (!post.status && post.published !== false)
   if (!isPublished || post.published === false) return false
-  if (post.is_evergreen_deal || post.is_always_on) return true
-  if (!post.deadline) return true
+  // 사람이 "계속 판다"고 확인해 준 것만 마감일 없이도 계속 보여준다
+  if (post.is_evergreen_deal || post.is_always_on || post.sale_until_sold_out) return true
+  // 마감일을 모르는 공구는 DEADLINE_UNKNOWN_DAYS까지만 진행 중으로 본다.
+  // 그 전에는 무기한 노출돼서, 이미 끝난 공구가 고객 화면 최상위 착지 페이지로 남아 있었다.
+  if (!post.deadline) return !isExpired(post)
   const today = new Date(); today.setHours(0, 0, 0, 0)
   return new Date(dateOnly(post.deadline)) >= today
 }
@@ -145,6 +187,10 @@ export function badgeFromState(state: PeriodState): { cls: string; icon: BadgeIc
       return { cls: 'ok', icon: 'package', txt: '상시딜' }
     case 'sold_out_only':
       return { cls: 'soon', icon: 'flame', txt: '소진시 마감' }
+    case 'deadline_unknown':
+      // 마감일을 모르면 배지를 안 붙인다. 예전엔 '상시딜'이 붙었는데, 우리가 못 읽었을 뿐인
+      // 걸 "계속 판다"고 고객에게 단정하는 말이었다
+      return null
     case 'range':
     case 'deadline_only': {
       const d = state.daysLeft
@@ -163,6 +209,7 @@ export function periodTextFromState(state: PeriodState): { cls: string; icon: Pe
     case 'upcoming':      return { cls: '', icon: 'calendar', txt: state.startDate ? `${fmtDate(state.startDate)} 오픈 예정` : '오픈일 미정' }
     case 'evergreen':     return { cls: '', icon: 'calendar', txt: state.startDate ? `${fmtDate(state.startDate)}부터 진행 중` : '상시딜' }
     case 'sold_out_only': return { cls: '', icon: 'calendar', txt: state.startDate ? `${fmtDate(state.startDate)}부터 · 한정수량 소진시 마감` : '한정수량 · 소진시 마감' }
+    case 'deadline_unknown': return { cls: '', icon: 'calendar', txt: state.startDate ? `${fmtDate(state.startDate)}부터 진행 중` : '진행 중' }
     case 'range':
       if (state.daysLeft < 0) return { cls: 'urgent', icon: 'calendar', txt: '마감됨' }
       if (state.daysLeft === 0) return { cls: 'urgent', icon: 'zap', txt: '오늘 마감!' }
