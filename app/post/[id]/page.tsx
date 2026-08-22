@@ -5,6 +5,7 @@ import { isCustomerVisible, isPagePublic, isExpired, getPeriodState, periodLabel
 import { SITE_URL } from '@/lib/landing'
 import { CATEGORY_LABEL } from '@/lib/categoryIcons'
 import { visiblePurchaseLinks } from '@/lib/purchaseLinks'
+import { getDealVerdict } from '@/lib/dealGrade'
 import JsonLd, { productSchema, breadcrumbSchema } from '@/components/JsonLd'
 import type { Post } from '@/lib/types'
 import PostDetailClient from './PostDetailClient'
@@ -100,6 +101,11 @@ export default function PostPage({ params }: { params: { id: string } }) {
   const post = getPost(params.id)
   if (!post) notFound()
   const ended = isExpired(post)
+  // 공구가 더 비싼 경우(아쉽딜)에는 진행 중이어도 대체 구매처를 보여준다 — 판정만 하고
+  // 살 곳을 안 알려주면 고객은 "여기가 비싸다"는 사실만 알고 빈손으로 나간다.
+  // 꿀딜·괜찮딜에는 붙이지 않는다. "여기가 제일 싸다"고 해 놓고 다른 데로 보내는 모양이
+  // 되기 때문이다 (D-027).
+  const betterPrice = !ended && getDealVerdict(post).display.key === 'meh'
   return (
     <>
       <JsonLd data={[
@@ -113,7 +119,8 @@ export default function PostPage({ params }: { params: { id: string } }) {
       <PostDetailClient
         post={post}
         ended={ended}
-        purchaseLinks={ended ? visiblePurchaseLinks(post) : []}
+        purchaseLinks={ended || betterPrice ? visiblePurchaseLinks(post) : []}
+        betterPrice={betterPrice}
         related={ended ? getRelated(post) : []}
       />
     </>

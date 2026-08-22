@@ -6,17 +6,20 @@ import { ArrowLeft } from 'lucide-react'
 import PostCard from '@/components/PostCard'
 import Toast from '@/components/Toast'
 import EndedDealNotice from '@/components/EndedDealNotice'
+import BetterPriceNotice from '@/components/BetterPriceNotice'
 import { track } from '@/lib/track'
 
 interface Props {
   post: Post
   /** 마감이 지난 공구 — 페이지는 유지하되 화면을 종료 상태로 바꾼다 */
   ended?: boolean
+  /** 진행 중인데 다른 곳이 더 싼 공구(아쉽딜) — 공구 버튼은 그대로 두고 대체 구매처를 함께 보여준다 */
+  betterPrice?: boolean
   purchaseLinks?: PurchaseLink[]
   related?: Post[]
 }
 
-export default function PostDetailClient({ post, ended = false, purchaseLinks = [], related = [] }: Props) {
+export default function PostDetailClient({ post, ended = false, betterPrice = false, purchaseLinks = [], related = [] }: Props) {
   const [bookmarks, setBookmarks] = useState<Set<number>>(new Set())
   const [toast, setToast] = useState({ message: '', visible: false })
 
@@ -74,6 +77,7 @@ export default function PostDetailClient({ post, ended = false, purchaseLinks = 
       </div>
 
       {ended && <EndedDealNotice post={post} purchaseLinks={purchaseLinks} related={related} />}
+      {!ended && betterPrice && <BetterPriceNotice post={post} purchaseLinks={purchaseLinks} />}
 
       <div style={{ padding: '0 16px 24px', textAlign: 'center' }}>
         <Link href="/" style={{ fontSize: 13, color: '#6366f1', fontWeight: 600, textDecoration: 'none' }}>
