@@ -1,6 +1,6 @@
 'use client'
 import { useState, useEffect, useMemo, useCallback } from 'react'
-import type { Post, ScraperStatus, InfluencerSource, Collection } from '@/lib/types'
+import type { Post, ScraperStatus, InfluencerSource, Collection, PurchaseLink } from '@/lib/types'
 import { daysLeft, periodLabel, isExpired, isCustomerVisible, isPagePublic, fmtDate, getPeriodState, DEADLINE_UNKNOWN_DAYS } from '@/lib/period'
 import { hasPurchaseLink, normalizePurchaseLinks } from '@/lib/purchaseLinks'
 import { getDealVerdict, isMultiOption } from '@/lib/dealGrade'
@@ -1863,33 +1863,81 @@ const fillInput: React.CSSProperties = {
 // 링크에 "네이버 파트너스 활동의 일환으로 수수료를 받습니다"가 붙어 허위 고지가 된다.
 
 /** 검색어 한 줄 — 눌러서 복사. 파트너스는 검색어를 직접 입력해야 한다. */
-function SearchQueryBar({ post }: { post: Post }) {
+/** 구매 링크의 판매처 도메인 — 어디로 나가는지 보고 누르게 한다 */
+function linkHost(url?: string | null): string {
+  try { return new URL(url || '').hostname.replace(/^www\.|^m\./, '') } catch { return '' }
+}
+
+/**
+ * 채우기 한 줄의 작업 도구.
+ *
+ * 실제 작업 순서는 "공구 판매 페이지에서 구성을 확인 → 같은 구성을 네이버·쿠팡에서 찾기 →
+ * 가격 입력"이다. 그런데 판매 링크가 화면에 아예 없어서 1단계를 다른 창에서 따로 찾아야
+ * 했다 — 미확인 34건 전부 purchase_url을 갖고 있는데도 그랬다. 순서대로 놓는다.
+ *
+ * 검색은 새 탭으로 바로 연다. 쿠팡은 파트너스 안에서 찾아야 추적 링크를 만들 수 있어서
+ * 일반 쿠팡이 아니라 partners.coupang.com으로 보낸다.
+ */
+function FillTools({ post }: { post: Post }) {
   const [copied, setCopied] = useState(false)
   const q = partnerSearchQuery(post)
+  const host = linkHost(post.purchase_url)
+
+  const linkBtn: React.CSSProperties = {
+    display: 'inline-flex', alignItems: 'center', gap: 5, padding: '7px 12px', borderRadius: 8,
+    border: '1px solid #cbd5e1', background: '#fff', fontSize: 12.5, fontWeight: 600, color: '#475569',
+    textDecoration: 'none', whiteSpace: 'nowrap',
+  }
+
   return (
-    <button type="button"
-      onClick={() => { navigator.clipboard?.writeText(q).catch(() => {}); setCopied(true); setTimeout(() => setCopied(false), 1400) }}
-      title="검색어를 복사합니다 — 검색창에 붙여넣으세요"
-      style={{ display: 'flex', alignItems: 'center', gap: 6, width: '100%', textAlign: 'left', marginBottom: 8,
-        padding: '7px 10px', borderRadius: 8, border: '1px dashed #cbd5e1', background: copied ? '#dcfce7' : '#f8fafc',
-        cursor: 'pointer', fontSize: 12.5, color: '#475569' }}>
-      <Copy size={13} strokeWidth={2.5} style={{ flexShrink: 0 }} />
-      <span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontWeight: 600 }}>{q}</span>
-      <span style={{ flexShrink: 0, color: copied ? '#15803d' : '#94a3b8', fontWeight: 700 }}>{copied ? '복사됨' : '복사'}</span>
-    </button>
+    <div style={{ marginBottom: 10 }}>
+      {post.purchase_url && (
+        <a href={post.purchase_url} target="_blank" rel="noreferrer"
+          style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '9px 12px', borderRadius: 8,
+            background: '#eef2ff', border: '1px solid #c7d2fe', textDecoration: 'none', marginBottom: 6 }}>
+          <Package size={15} strokeWidth={2.5} style={{ color: '#4f46e5', flexShrink: 0 }} />
+          <span style={{ fontSize: 13, fontWeight: 700, color: '#3730a3' }}>공구 판매 페이지 열기</span>
+          {host && <span style={{ fontSize: 11.5, color: '#6366f1', marginLeft: 'auto' }}>{host}</span>}
+        </a>
+      )}
+
+      <button type="button"
+        onClick={() => { navigator.clipboard?.writeText(q).catch(() => {}); setCopied(true); setTimeout(() => setCopied(false), 1400) }}
+        title="검색어를 복사합니다 — 검색창에 붙여넣으세요"
+        style={{ display: 'flex', alignItems: 'center', gap: 6, width: '100%', textAlign: 'left', marginBottom: 6,
+          padding: '7px 10px', borderRadius: 8, border: '1px dashed #cbd5e1', background: copied ? '#dcfce7' : '#f8fafc',
+          cursor: 'pointer', fontSize: 12.5, color: '#475569' }}>
+        <Copy size={13} strokeWidth={2.5} style={{ flexShrink: 0 }} />
+        <span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontWeight: 600 }}>{q}</span>
+        <span style={{ flexShrink: 0, color: copied ? '#15803d' : '#94a3b8', fontWeight: 700 }}>{copied ? '복사됨' : '복사'}</span>
+      </button>
+
+      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+        <a href={`https://search.shopping.naver.com/search/all?query=${encodeURIComponent(q)}`}
+          target="_blank" rel="noreferrer" style={linkBtn}>
+          <Search size={13} strokeWidth={2.5} />네이버쇼핑에서 찾기
+        </a>
+        <a href={`https://partners.coupang.com/#/product/search?keyword=${encodeURIComponent(q)}`}
+          target="_blank" rel="noreferrer" style={linkBtn}>
+          <Search size={13} strokeWidth={2.5} />쿠팡 파트너스에서 찾기
+        </a>
+      </div>
+    </div>
   )
 }
 
 function FillRowHead({ post, mode, badge }: { post: Post; mode: 'pending' | 'ended'; badge?: React.ReactNode }) {
   return (
     <div style={{ display: 'flex', gap: 10, alignItems: 'flex-start', marginBottom: 10 }}>
-      <div style={{ width: 44, height: 44, borderRadius: 8, background: '#f1f5f9', flexShrink: 0, overflow: 'hidden' }}>
+      <div style={{ width: 60, height: 60, borderRadius: 8, background: '#f1f5f9', flexShrink: 0, overflow: 'hidden' }}>
         {post.img
           ? <img src={post.img} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
           : <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: '#cbd5e1' }}><ImageOff size={18} /></div>}
       </div>
       <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ fontSize: 13.5, fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{post.title}</div>
+        {/* 말줄임 하지 않는다 — "리라 그루브 & 울리 페인트 스틱"처럼 구성이 제목에 들어 있어서,
+            잘리면 뭘 비교해야 하는지 알 수 없다 */}
+        <div style={{ fontSize: 13.5, fontWeight: 700, lineHeight: 1.45, wordBreak: 'break-word' }}>{post.title}</div>
         <div style={{ fontSize: 12, color: '#64748b', marginTop: 2, display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
           <span>{mode === 'ended' ? '당시 공구가' : '공구가'} <strong style={{ color: '#0f172a' }}>{post.price?.toLocaleString()}원</strong></span>
           {mode === 'ended' && post.deadline && <span style={{ color: '#dc2626' }}>{fmtDate(post.deadline)} 마감</span>}
@@ -1934,8 +1982,12 @@ function SaveButton({ canSave, saving, done, onClick }: { canSave: boolean; savi
  */
 function CompareFillRow({ post, allPosts, views, onSaved }: { post: Post; allPosts: Post[]; views: number; onSaved: () => void }) {
   const state = getCompareState(post)
+  const existingLinks = normalizePurchaseLinks(post)
+  const existingCoupang = existingLinks.find(l => l.platform === 'coupang')
   const [orig, setOrig]           = useState(String(post.origPrice ?? ''))
+  const [showOrig, setShowOrig]   = useState(!!post.origPrice)
   const [market, setMarket]       = useState(String(post.market_price ?? ''))
+  const [coupang, setCoupang]     = useState(String(existingCoupang?.price ?? ''))
   const [marketUrl, setMarketUrl] = useState(post.market_url ?? '')
   const [cands, setCands]         = useState<CompareCandidate[] | null>(null)
   const [picked, setPicked]       = useState<number | null>(null)
@@ -1951,12 +2003,32 @@ function CompareFillRow({ post, allPosts, views, onSaved }: { post: Post; allPos
     return () => { alive = false }
   }, [post, allPosts])
 
+  /**
+   * 쿠팡에서 찾은 가격은 purchase_links에 넣는다.
+   *
+   * market_price에 넣으면 고객 화면에 "네이버 최저가"로 표시된다 — 쿠팡에서 찾은 값인데
+   * 네이버라고 말하는 셈이다. purchase_links는 가격만 있고 url이 없으면 판정에는 '쿠팡'으로
+   * 들어가되 구매 버튼으로 뜨지 않고 제휴 고지도 안 붙는다(visiblePurchaseLinks가 url을
+   * 요구한다). 비교 전용 값에 정확히 맞는 자리다.
+   *
+   * 이미 url이 있는 쿠팡 링크(진짜 제휴 링크)는 가격만 고치고 url·노출 설정은 건드리지 않는다.
+   */
+  function mergedLinks(): PurchaseLink[] {
+    const price = parseInt(coupang) || 0
+    const rest = existingLinks.filter(l => l.platform !== 'coupang')
+    if (!price) return existingCoupang?.url ? [...rest, { ...existingCoupang, price: null }] : rest
+    if (existingCoupang) return [...rest, { ...existingCoupang, price }]
+    return [...rest, { platform: 'coupang' as const, url: '', price, visible: false, checked_at: new Date().toISOString() }]
+  }
+
   // 저장하고 목록에서 다시 찾아 확인하는 왕복을 없애기 위해 입력하는 동안 등급을 보여준다
   const preview = (() => {
     if (!post.price) return null
-    const o = parseInt(orig) || 0, m = parseInt(market) || 0
-    if (!o && !m) return null
-    return getDealVerdict({ ...post, origPrice: o || null, market_price: m || null } as Post).display
+    const o = parseInt(orig) || 0, m = parseInt(market) || 0, cp = parseInt(coupang) || 0
+    if (!o && !m && !cp) return null
+    return getDealVerdict({
+      ...post, origPrice: o || null, market_price: m || null, purchase_links: mergedLinks(),
+    } as Post).display
   })()
 
   async function patch(body: Record<string, unknown>) {
@@ -1967,12 +2039,13 @@ function CompareFillRow({ post, allPosts, views, onSaved }: { post: Post; allPos
     setSaving(false); setDone(true); onSaved()
   }
 
-  const canSave = parseInt(orig) > 0 || parseInt(market) > 0
+  const canSave = parseInt(orig) > 0 || parseInt(market) > 0 || parseInt(coupang) > 0
   // 값이 실제로 붙었으면 "비교할 게 없다"는 더 이상 사실이 아니므로 표시를 함께 지운다
   const savePrice = () => patch({
     origPrice: parseInt(orig) || null,
     market_price: parseInt(market) || null,
     market_url: marketUrl.trim() || null,
+    purchase_links: mergedLinks(),
     ...CLEAR_COMPARE_NONE,
   })
   const saveNone = () => patch({
@@ -2022,7 +2095,7 @@ function CompareFillRow({ post, allPosts, views, onSaved }: { post: Post; allPos
         </div>
       )}
 
-      <SearchQueryBar post={post} />
+      <FillTools post={post} />
 
       {/* 후보 — 지금은 우리 안에 있는 값만 낸다. 외부 탐색이 붙을 자리다 */}
       <div style={{ border: '1px solid #eef2f7', borderRadius: 8, padding: 10, marginBottom: 8, background: '#fbfdff' }}>
@@ -2056,16 +2129,29 @@ function CompareFillRow({ post, allPosts, views, onSaved }: { post: Post; allPos
       </div>
 
       <div className="admin-2col" style={{ gap: 8 }}>
-        <input type="number" value={orig} onChange={e => { setOrig(e.target.value); setDone(false) }}
-          placeholder="정가 (공구 게시물에 적힌 값)" style={{ ...fillInput, fontSize: 13 }} />
         <input type="number" value={market} onChange={e => { setMarket(e.target.value); setPicked(null); setDone(false) }}
-          placeholder="네이버 최저가" style={{ ...fillInput, fontSize: 13 }} />
+          placeholder="네이버에서 찾은 가격" style={{ ...fillInput, fontSize: 13 }} />
+        <input type="number" value={coupang} onChange={e => { setCoupang(e.target.value); setDone(false) }}
+          placeholder="쿠팡에서 찾은 가격" style={{ ...fillInput, fontSize: 13 }} />
       </div>
       <input type="url" value={marketUrl} onChange={e => setMarketUrl(e.target.value)}
         placeholder="네이버쇼핑 링크 (선택 — 근거로 보여줄 때만)" style={{ ...fillInput, fontSize: 12, marginTop: 6 }} />
-      <p style={{ fontSize: 11, color: '#94a3b8', margin: '6px 0 0' }}>
-        비교용 값이라 고객 화면에 구매 버튼으로는 안 뜨고, 제휴 고지 문구도 붙지 않아요.
+      <p style={{ fontSize: 11, color: '#94a3b8', margin: '6px 0 0', lineHeight: 1.6 }}>
+        둘 다 비교용이라 구매 버튼으로 안 뜨고 제휴 고지도 안 붙어요. 고객 화면엔 각각
+        &quot;네이버 최저가&quot;, &quot;쿠팡&quot;으로 표시됩니다.
       </p>
+
+      {showOrig ? (
+        <input type="number" value={orig} onChange={e => { setOrig(e.target.value); setDone(false) }}
+          placeholder="정가 (공구 게시물에 적힌 값 — 판매자가 쓴 값이라 근거가 약해요)"
+          style={{ ...fillInput, fontSize: 12.5, marginTop: 6 }} />
+      ) : (
+        <button type="button" onClick={() => setShowOrig(true)}
+          style={{ marginTop: 6, padding: 0, border: 'none', background: 'none', cursor: 'pointer',
+            fontSize: 11.5, color: '#94a3b8', fontWeight: 600 }}>
+          + 정가도 입력
+        </button>
+      )}
 
       {askNone ? (
         <div style={{ marginTop: 10, padding: 10, borderRadius: 8, background: '#fafaf9', border: '1px solid #e7e5e4' }}>
@@ -2206,7 +2292,7 @@ function EndedFillRow({ post, onSaved }: { post: Post; onSaved: () => void }) {
   return (
     <div style={{ border: '1px solid #e2e8f0', borderRadius: 10, padding: 12, background: done ? '#f0fdf4' : '#fff' }}>
       <FillRowHead post={post} mode="ended" />
-      <SearchQueryBar post={post} />
+      <FillTools post={post} />
       <div className="admin-2col" style={{ gap: 8 }}>
         <input type="url" value={coupangUrl} onChange={e => { setCoupangUrl(e.target.value); setDone(false) }}
           placeholder="쿠팡 파트너스 링크" style={{ ...fillInput, fontSize: 13 }} />
