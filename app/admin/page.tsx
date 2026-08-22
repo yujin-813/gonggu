@@ -6,6 +6,7 @@ import { hasPurchaseLink, normalizePurchaseLinks } from '@/lib/purchaseLinks'
 import { getDealVerdict, isMultiOption } from '@/lib/dealGrade'
 import { partnerSearchQuery } from '@/lib/searchQuery'
 import { getCompareState, COMPARE_STATE_LABEL, CLEAR_COMPARE_NONE, type CompareState } from '@/lib/compareState'
+import { needsKoreanName } from '@/lib/influencerItems'
 import { findCompareCandidates, type CompareCandidate } from '@/lib/compareCandidates'
 import { COMPARE_NONE_REASON_LABEL, type CompareNoneReason } from '@/lib/types'
 import { GradeBadge } from '@/components/DealVerdictBox'
@@ -1220,16 +1221,37 @@ function InfluencerManager({
     padding: '7px 10px', borderRadius: 8, border: '1.5px solid #e2e8f0', fontSize: 13, outline: 'none', width: '100%', boxSizing: 'border-box',
   }
   const [search, setSearch] = useState('')
+  const [onlyNoName, setOnlyNoName] = useState(false)
   const q = search.trim().toLowerCase()
-  const filteredSources = !q ? sources : sources.filter(s =>
+  const noName = sources.filter(s => needsKoreanName(s.influencer_name))
+  let filteredSources = !q ? sources : sources.filter(s =>
     (s.influencer_name || '').toLowerCase().includes(q) ||
     (s.instagram_handle || '').toLowerCase().includes(q) ||
     (s.handle || '').toLowerCase().includes(q) ||
     (s.url || '').toLowerCase().includes(q)
   )
+  if (onlyNoName) filteredSources = filteredSources.filter(s => needsKoreanName(s.influencer_name))
 
   return (
     <div>
+      {/* 이름이 핸들 그대로면 인플루언서 페이지 제목이 "bobpro__ 공구"로 검색 결과에 나간다.
+          그 페이지들은 노출 844에 클릭 33(CTR 3.9%)로, 상세 페이지의 1/4 수준이다 */}
+      {noName.length > 0 && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', marginBottom: 16,
+          padding: '12px 14px', background: '#FFFBEB', border: '1px solid #FDE68A', borderRadius: 10 }}>
+          <TriangleAlert size={17} strokeWidth={2.5} style={{ color: '#D97706', flexShrink: 0 }} />
+          <div style={{ fontSize: 13, lineHeight: 1.6, color: '#92400E', flex: 1, minWidth: 0 }}>
+            <strong>{noName.length}명</strong>의 이름이 핸들 그대로예요.
+            인플루언서 페이지 제목이 <strong>&quot;bobpro__ 공구&quot;</strong>처럼 나가서 검색에서 잘 안 눌립니다.
+            각 줄의 <strong>인스타 열기</strong>로 활동명을 확인해 넣어주세요.
+          </div>
+          <button onClick={() => setOnlyNoName(v => !v)}
+            style={{ flexShrink: 0, padding: '7px 14px', borderRadius: 8, border: 'none',
+              background: onlyNoName ? '#92400E' : '#D97706', color: '#fff', cursor: 'pointer', fontSize: 12.5, fontWeight: 700 }}>
+            {onlyNoName ? '전체 보기' : '이것만 보기'}
+          </button>
+        </div>
+      )}
       <div style={{ background: '#fff', borderRadius: 12, padding: 20, marginBottom: 20, border: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap' }}>
         <button onClick={onCollectAll}
           disabled={inpockBusy || !!inpockStatus?.running || sources.length === 0}
@@ -1303,6 +1325,17 @@ function InfluencerManager({
                     {src.source_type}
                   </span>
                   <span style={{ fontWeight: 700, fontSize: 15, color: '#1e293b' }}>{src.influencer_name}</span>
+                  {/* 이름이 핸들 그대로면 페이지 제목이 "bobpro__ 공구"로 나간다. 한국 사용자는
+                      그렇게 검색하지 않으므로 채울 대상을 눈에 띄게 표시한다 */}
+                  {needsKoreanName(src.influencer_name) && (
+                    <a href={`https://www.instagram.com/${(src.instagram_handle || src.handle || '').replace('@', '')}/`}
+                      target="_blank" rel="noopener noreferrer"
+                      title="인스타에서 활동명을 확인하고 아래 수정에서 넣어주세요"
+                      style={{ fontSize: 11, fontWeight: 700, background: '#fef3c7', color: '#92400e',
+                        borderRadius: 6, padding: '2px 8px', textDecoration: 'none', flexShrink: 0 }}>
+                      한글 이름 없음 · 인스타 열기 ↗
+                    </a>
+                  )}
                   {src.instagram_handle && (
                     <span style={{ fontSize: 12, color: '#64748b' }}>@{src.instagram_handle.replace('@', '')}</span>
                   )}

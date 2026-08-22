@@ -1,5 +1,6 @@
 import type { MetadataRoute } from 'next'
-import { loadCollections } from '@/lib/store'
+import { loadCollections, loadPosts } from '@/lib/store'
+import { influencerItems } from '@/lib/influencerItems'
 import { SITE_URL, visiblePosts, routablePosts, LANDING_KEYS, CATEGORY_KEYS, landingCopy } from '@/lib/landing'
 
 // 컬렉션·공구는 재배포 없이 관리자가 수시로 바꾸므로 빌드 시점에 고정되지 않게 요청마다 새로 계산한다
@@ -9,8 +10,14 @@ export default function sitemap(): MetadataRoute.Sitemap {
   const posts = visiblePosts()
   const collections = loadCollections().filter(c => c.productIds.length > 0)
 
-  // 인플루언서별 페이지는 공개된 공구가 있는 계정만 — 빈 페이지를 색인시키면 품질 평가에 불리하다
-  const accounts = [...new Set(posts.map(p => p.account).filter(Boolean))]
+  // 인플루언서별 페이지는 화면에 띄울 상품이 있는 계정만.
+  //
+  // 예전에는 "공개 중인 공구가 있는 계정"만 넣었는데, 이 페이지는 마감·비공구까지 다 보여주는
+  // 자리라 기준이 어긋나 있었다. 진행 중 공구가 0건이어도 지난 상품 20건이 떠 있는 계정이
+  // 74개 중 35개였고 그게 통째로 색인에서 빠져 있었다. 화면이 보여주는 것과 같은 규칙으로 센다.
+  const allPosts = loadPosts()
+  const accounts = [...new Set(allPosts.map(p => p.account).filter(Boolean))]
+    .filter(account => influencerItems(allPosts, account).length > 0)
 
   const lastPostUpdate = posts.reduce<string>(
     (latest, p) => ((p.scraped_at || '') > latest ? p.scraped_at || '' : latest),

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { loadInfluencerSources, saveInfluencerSources, updateInfluencerSource } from '@/lib/store'
+import { loadInfluencerSources, saveInfluencerSources, updateInfluencerSource, loadPosts, savePosts } from '@/lib/store'
 import type { LinkSourceType, InfluencerSource } from '@/lib/types'
 
 function detectSourceType(url: string): LinkSourceType {
@@ -76,7 +76,29 @@ export async function PATCH(request: NextRequest) {
   const body = await request.json().catch(() => ({}))
   const allowed = ['influencer_name', 'instagram_handle', 'category', 'collection_status', 'last_collected_at', 'memo', 'url', 'source_type']
   const patch = Object.fromEntries(Object.entries(body).filter(([k]) => allowed.includes(k)))
+  const before = loadInfluencerSources().find(s => s.id === id)
   const ok = updateInfluencerSource(id, patch as Partial<InfluencerSource>)
   if (!ok) return NextResponse.json({ error: '소스를 찾을 수 없습니다' }, { status: 404 })
-  return NextResponse.json({ success: true })
+
+  // 이름은 게시물에도 복사돼 있고, 인플루언서 페이지 제목("OOO 공구")은 게시물 쪽 값을 읽는다.
+  // 소스만 고치면 화면이 안 바뀌어서, 관리자가 한글 활동명을 넣어도 검색 결과에는 그대로
+  // "bobpro__ 공구"가 나갔다. 같은 계정의 게시물을 함께 갱신한다.
+  const newName = typeof patch.influencer_name === 'string' ? patch.influencer_name.trim() : ''
+  let renamed = 0
+  if (newName && before && newName !== before.influencer_name) {
+    const handles = [before.instagram_handle, before.handle, before.influencer_name]
+      .filter(Boolean)
+      .map(h => `@${String(h).replace('@', '')}`.toLowerCase())
+    if (handles.length) {
+      const posts = loadPosts()
+      for (const post of posts) {
+        if (handles.includes((post.account || '').toLowerCase())) {
+          post.influencer_name = newName
+          renamed++
+        }
+      }
+      if (renamed) savePosts(posts)
+    }
+  }
+  return NextResponse.json({ success: true, renamed })
 }
