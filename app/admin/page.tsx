@@ -105,17 +105,38 @@ const CAT_LABEL: Record<string, string> = {
  *
  * 관리자 목록이 이미 전체 게시물을 들고 있으므로 새 API를 만들지 않고 여기서 센다.
  */
-function comparePriceStall(posts: Post[]): { days: number; since: string; collected: number } | null {
-  const withPrice = posts.filter(p => p.market_price && p.scraped_at)
-  if (!withPrice.length) return null
-  const last = withPrice.reduce((m, p) => (p.scraped_at! > m ? p.scraped_at! : m), '').slice(0, 10)
-  if (!last) return null
-  // 그 이후로 새로 들어온 공구가 몇 건인데 하나도 안 붙었는지
-  const collected = posts.filter(p => (p.scraped_at || '').slice(0, 10) > last).length
-  const days = Math.floor((Date.now() - new Date(last + 'T00:00:00+09:00').getTime()) / 86400000)
-  // 하루 이틀 비는 건 정상(수집이 없는 날도 있다). 사흘 넘게 + 새 공구가 쌓였을 때만 알린다
-  if (days < 3 || collected < 10) return null
-  return { days, since: last, collected }
+/**
+ * 판정 없이 쌓인 공구를 센다.
+ *
+ * 예전에는 "자동 비교가가 며칠째 안 붙는다"를 알렸다(D-020). 두 가지가 틀어져 있었다.
+ *
+ * 첫째, 기준이 "비교가를 가진 공구 중 가장 최근 **수집일**"이라, 오래 전에 들어온 공구를
+ * 관리자가 손으로 채워도 시계가 앞으로 밀렸다. 일할수록 경고가 조용해졌다 — 실제로 자동
+ * 수집은 2026-07-31에 끊겼는데 경고는 "6일째"라고 말하고 있었다(8/17에 수집된 공구 한 건에
+ * 사람이 값을 넣어서다).
+ *
+ * 둘째, 자동 수집이 멎었다는 건 이제 뉴스가 아니다. 네이버가 API를 폐지했으므로(D-019)
+ * 그 값은 영원히 0이다. 매일 같은 말을 하는 경고는 결국 아무도 안 본다.
+ *
+ * 그래서 "자동이 죽었나"가 아니라 "고객이 지금 판정을 못 보고 있나"를 센다. 채우면 실제로
+ * 줄어들고, 다 채우면 사라진다.
+ */
+const BACKLOG_ALERT_MIN = 10
+
+function unjudgedBacklog(posts: Post[]): { visible: number; visibleTotal: number; recent: number } | null {
+  const visiblePosts = posts.filter(isCustomerVisible)
+  const unchecked = visiblePosts.filter(p => getCompareState(p) === 'unchecked')
+  if (unchecked.length < BACKLOG_ALERT_MIN) return null
+
+  // 늘고 있는지도 알아야 한다. 다만 수집분 전체를 세면 안 된다 — 하루 46건씩 들어오지만
+  // 대부분 비공구로 제외되거나 검수 대기라 고객에게 안 나간다. 실제로 고객이 보고 있는
+  // 것들 안에서 "최근에 들어온 게 몇 건인지"만 센다
+  const cutoff = new Date(Date.now() - 14 * 86400000).toISOString().slice(0, 10)
+  return {
+    visible: unchecked.length,
+    visibleTotal: visiblePosts.length,
+    recent: unchecked.filter(p => (p.scraped_at || '').slice(0, 10) >= cutoff).length,
+  }
 }
 
 export default function AdminPage() {
@@ -515,10 +536,10 @@ export default function AdminPage() {
           <StatCard label="공구 후보" value={candidateCount}    Icon={FileEdit}      color="#eab308" />
         </div>
 
-        {/* 자동 비교가가 멎으면 알린다 — 조용히 망가지는 걸 막는 유일한 장치 */}
+        {/* 판정 없이 쌓인 공구를 알린다 — 채우면 줄고, 다 채우면 사라진다 */}
         {(() => {
-          const stall = comparePriceStall(posts)
-          if (!stall) return null
+          const backlog = unjudgedBacklog(posts)
+          if (!backlog) return null
           return (
             <div style={{
               display: 'flex', alignItems: 'flex-start', gap: 10, marginBottom: 20,
@@ -526,13 +547,17 @@ export default function AdminPage() {
               borderRadius: 10,
             }}>
               <TriangleAlert size={18} strokeWidth={2.5} style={{ color: '#DC2626', flexShrink: 0, marginTop: 1 }} />
-              <div style={{ fontSize: 13, lineHeight: 1.6, color: '#7F1D1D' }}>
-                <strong>비교가가 {stall.days}일째 안 붙고 있어요.</strong>
+              <div style={{ fontSize: 13, lineHeight: 1.6, color: '#7F1D1D', flex: 1, minWidth: 0 }}>
+                <strong>지금 {backlog.visible}건이 판정 없이 고객에게 보이고 있어요.</strong>
                 <br />
-                마지막으로 붙은 날이 {stall.since}이고, 그 뒤로 들어온 {stall.collected}건에 비교가가 하나도 없어요.
-                이 상태로는 새 공구가 계속 판정 없이 쌓입니다.
-                {/* 직접 입력한 값도 함께 세므로 "자동 수집"이라 단정하지 않는다 */}
+                고객 화면에 뜨는 {backlog.visibleTotal}건 중 {backlog.visible}건에 아직 비교가가 없어요.
+                {backlog.recent > 0 && `그중 ${backlog.recent}건은 최근 2주 안에 들어온 거예요.`}
               </div>
+              <button onClick={() => setAdminTab('verdict')}
+                style={{ flexShrink: 0, padding: '7px 14px', borderRadius: 8, border: 'none',
+                  background: '#DC2626', color: '#fff', cursor: 'pointer', fontSize: 12.5, fontWeight: 700 }}>
+                채우러 가기
+              </button>
             </div>
           )
         })()}

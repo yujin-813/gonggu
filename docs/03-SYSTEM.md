@@ -12,7 +12,7 @@
 | 단계 | 운영 중 · 실사용자 있음 (2026-08-19 기준 사람 방문 고유 IP 163명/2일) |
 | 스택 | Next.js 14 (App Router) · React 18 · TypeScript · 파이썬 수집기 |
 | 저장소 | **파일 기반** — `data/*.json`. DB 없음 |
-| 코드 규모 | `lib/` 2,567줄 · `app/admin` + `components/` 4,454줄 · 파이썬 2,983줄 |
+| 코드 규모 | `lib/` 2,567줄 · `app/admin` + `components/` 4,479줄 · 파이썬 2,983줄 |
 | 데이터 규모 | 게시물 2,317건 (공개 277건) · 인플루언서 소스 58개 · analytics 31일치 |
 | 배포 | EC2 `13.125.121.62` · PM2(fork, 포트 3002) + nginx · `bash deploy.sh` |
 | 도메인 | https://gonggu.asknuggetdata.com |
@@ -258,7 +258,7 @@ getDealVerdict(post)
 
 **영향:** 2026-08-06~08-20 수집 656건 중 자동 비교가가 붙은 것 **0건**. 새로 들어오는 공구가 계속 판정 없이 쌓인다. 3주 동안 아무도 몰랐다.
 
-**대응:** 관리자 화면에 중단 경고를 넣었다(`app/admin/page.tsx`의 `comparePriceStall()`). 대체 수단은 쿠팡 파트너스 Open API 검토 중 — `D-020` 참고.
+**대응:** 자동 수집이 되살아날 일이 없으므로(API 폐지) "멎었다"는 경고는 접었다. 대신 관리자 첫 화면이 **판정 없이 고객에게 보이는 공구 수**를 알린다(`unjudgedBacklog()`) — 채우면 줄고 다 채우면 사라진다 (`D-025`). 대체 수단은 쿠팡 파트너스 Open API 검토 중.
 
 **근거:** `openapi.naver.com/v1/search/shop.json` → 404 SE05 (2026-08-20 실측) · `market_price` 보유 711건의 마지막 자동 수집일 2026-07-31
 
