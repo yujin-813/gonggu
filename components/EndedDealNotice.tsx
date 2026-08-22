@@ -18,11 +18,27 @@ interface Props {
   post: Post
   purchaseLinks: PurchaseLink[]
   related: Post[]
+  /**
+   * 어느 부분을 그릴지.
+   *
+   * 마감 공구에서는 "지금 어디서 사나"가 제일 급한 정보인데, 공구 카드(제목·구성·판정)를 다
+   * 지나야 구매 버튼이 나왔다. 그래서 구매 영역은 카드 위로 올리고 비슷한 공구 추천은 아래에
+   * 남긴다 — 당시 가격을 보기도 전에 다른 공구를 권하는 건 순서가 뒤집힌 것이다.
+   */
+  section?: 'buy' | 'related'
 }
 
-export default function EndedDealNotice({ post, purchaseLinks, related }: Props) {
+/** 참고 문구 자리에 고지 문구를 그대로 넣은 데이터가 있다 — 같은 말이 두 번 나가지 않게 거른다 */
+function isDisclosureText(note: string, platform: PurchaseLink['platform']): boolean {
+  const norm = (t: string) => t.replace(/["\u201c\u201d\s]/g, '')
+  return norm(note).includes(norm(PLATFORM_DISCLOSURE[platform]).slice(0, 25))
+}
+
+export default function EndedDealNotice({ post, purchaseLinks, related, section }: Props) {
+  const notes = purchaseLinks.filter(l => l.note && !isDisclosureText(l.note, l.platform))
   return (
     <div className="ended-wrap">
+      {section !== 'related' && (
       <section className="ended-box">
         <h2 className="ended-title">이 공동구매는 종료되었습니다</h2>
 
@@ -57,9 +73,9 @@ export default function EndedDealNotice({ post, purchaseLinks, related }: Props)
               ))}
             </div>
 
-            {purchaseLinks.some(l => l.note) && (
+            {notes.length > 0 && (
               <ul className="ended-notes">
-                {purchaseLinks.filter(l => l.note).map(l => (
+                {notes.map(l => (
                   <li key={`note-${l.platform}`}>{PLATFORM_LABEL[l.platform]}: {l.note}</li>
                 ))}
               </ul>
@@ -81,7 +97,9 @@ export default function EndedDealNotice({ post, purchaseLinks, related }: Props)
           </p>
         )}
       </section>
+      )}
 
+      {section !== 'buy' && (
       <section className="ended-related">
         <h2 className="ended-related-title">현재 진행 중인 비슷한 공구</h2>
         {related.length === 0 ? (
@@ -110,6 +128,7 @@ export default function EndedDealNotice({ post, purchaseLinks, related }: Props)
           </>
         )}
       </section>
+      )}
     </div>
   )
 }

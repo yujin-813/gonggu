@@ -63,6 +63,10 @@ export default function PostDetailClient({ post, ended = false, betterPrice = fa
         </div>
       </header>
 
+      {/* 마감 공구는 "지금 어디서 사나"가 제일 급하다. 검색으로 들어온 사람이 공구 카드
+          (제목·구성·판정)를 다 지나야 구매 버튼을 만나던 걸 위로 올렸다. */}
+      {ended && <EndedDealNotice post={post} purchaseLinks={purchaseLinks} related={related} section="buy" />}
+
       <div className="feed" style={{ paddingBottom: 100, paddingTop: 12 }}>
         <PostCard
           post={post}
@@ -76,7 +80,7 @@ export default function PostDetailClient({ post, ended = false, betterPrice = fa
         />
       </div>
 
-      {ended && <EndedDealNotice post={post} purchaseLinks={purchaseLinks} related={related} />}
+      {ended && <EndedDealNotice post={post} purchaseLinks={purchaseLinks} related={related} section="related" />}
       {!ended && betterPrice && <BetterPriceNotice post={post} purchaseLinks={purchaseLinks} />}
 
       <div style={{ padding: '0 16px 24px', textAlign: 'center' }}>
