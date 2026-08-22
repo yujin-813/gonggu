@@ -692,7 +692,7 @@ export default function AdminPage() {
             onRemove={removeInfluencerSource}
             onCollectAll={startInpock}
             onCollectOne={collectInfluencer}
-            onEditStart={(src) => { setEditingInfluencer(src.id); setEditInfluencerDraft({ influencer_name: src.influencer_name, instagram_handle: src.instagram_handle, category: src.category, collection_status: src.collection_status, memo: src.memo }) }}
+            onEditStart={(src) => { setEditingInfluencer(src.id); setEditInfluencerDraft({ influencer_name: src.influencer_name, instagram_handle: src.instagram_handle, url: src.url, category: src.category, collection_status: src.collection_status, memo: src.memo }) }}
             onEditChange={(patch) => setEditInfluencerDraft(prev => ({ ...prev, ...patch }))}
             onEditSave={saveInfluencerEdit}
             onEditCancel={() => { setEditingInfluencer(null); setEditInfluencerDraft({}) }}
@@ -1336,12 +1336,17 @@ function InfluencerManager({
                   {/* 이름이 핸들 그대로면 페이지 제목이 "bobpro__ 공구"로 나간다. 한국 사용자는
                       그렇게 검색하지 않으므로 채울 대상을 눈에 띄게 표시한다 */}
                   {needsKoreanName(src.influencer_name) && (
-                    <a href={`https://www.instagram.com/${(src.instagram_handle || src.handle || '').replace('@', '')}/`}
+                    /* 인스타 핸들이 없으면 인포크 주소로 보낸다. 인포크 핸들은 인스타 계정명과
+                       다른 경우가 많아서(58개 중 39개는 인스타 핸들이 아예 없고, 있는 19개 중
+                       13개는 서로 다르다) 그걸로 인스타 주소를 만들면 엉뚱한 계정이 열린다 */
+                    <a href={src.instagram_handle
+                      ? `https://www.instagram.com/${src.instagram_handle.replace('@', '')}/`
+                      : src.url}
                       target="_blank" rel="noopener noreferrer"
-                      title="인스타에서 활동명을 확인하고 아래 수정에서 넣어주세요"
+                      title="활동명을 확인하고 아래 수정에서 넣어주세요"
                       style={{ fontSize: 11, fontWeight: 700, background: '#fef3c7', color: '#92400e',
                         borderRadius: 6, padding: '2px 8px', textDecoration: 'none', flexShrink: 0 }}>
-                      한글 이름 없음 · 인스타 열기 ↗
+                      한글 이름 없음 · {src.instagram_handle ? '인스타' : '인포크'} 열기 ↗
                     </a>
                   )}
                   {src.instagram_handle && (
@@ -1404,7 +1409,14 @@ function InfluencerManager({
                           style={inputStyle} />
                       </div>
                       <div>
-                        <label style={{ fontSize: 12, fontWeight: 600, color: '#475569', display: 'block', marginBottom: 4 }}>인스타 핸들</label>
+                        <label style={{ fontSize: 12, fontWeight: 600, color: '#475569', display: 'flex', gap: 8, alignItems: 'center', marginBottom: 4 }}>
+                          인스타 핸들
+                          {(editInfluencerDraft.instagram_handle ?? src.instagram_handle) && (
+                            <a href={`https://www.instagram.com/${String(editInfluencerDraft.instagram_handle ?? src.instagram_handle).replace('@', '')}/`}
+                              target="_blank" rel="noopener noreferrer"
+                              style={{ fontSize: 11, fontWeight: 700, color: '#6366f1', textDecoration: 'none' }}>열기 ↗</a>
+                          )}
+                        </label>
                         <input value={editInfluencerDraft.instagram_handle ?? src.instagram_handle ?? ''}
                           onChange={e => onEditChange({ instagram_handle: e.target.value })}
                           placeholder="@username"
@@ -1430,6 +1442,28 @@ function InfluencerManager({
                         </select>
                       </div>
                     </div>
+                    {/* 인포크 주소는 인스타 핸들과 다른 경우가 많아서(@bobpro__ ↔ inpock/bobpro) 함께
+                        보여야 어느 계정인지 확인이 된다. 둘 다 바로 열어볼 수 있게 링크를 붙인다 */}
+                    <div style={{ marginBottom: 12 }}>
+                      <label style={{ fontSize: 12, fontWeight: 600, color: '#475569', display: 'flex', gap: 8, alignItems: 'center', marginBottom: 4 }}>
+                        인포크 주소
+                        {(editInfluencerDraft.url ?? src.url) && (
+                          <a href={editInfluencerDraft.url ?? src.url} target="_blank" rel="noopener noreferrer"
+                            style={{ fontSize: 11, fontWeight: 700, color: '#6366f1', textDecoration: 'none' }}>열기 ↗</a>
+                        )}
+                        {src.handle && (
+                          <span style={{ fontSize: 11, color: '#94a3b8', fontWeight: 500 }}>인포크 핸들 {src.handle}</span>
+                        )}
+                      </label>
+                      <input value={editInfluencerDraft.url ?? src.url ?? ''}
+                        onChange={e => onEditChange({ url: e.target.value })}
+                        placeholder="https://link.inpock.co.kr/..."
+                        style={inputStyle} />
+                      <p style={{ fontSize: 11, color: '#94a3b8', margin: '4px 0 0' }}>
+                        이 주소에서 공구를 수집해요. 바꾸면 다음 수집부터 다른 페이지를 읽습니다.
+                      </p>
+                    </div>
+
                     <div style={{ marginBottom: 12 }}>
                       <label style={{ fontSize: 12, fontWeight: 600, color: '#475569', display: 'block', marginBottom: 4 }}>메모</label>
                       <textarea value={editInfluencerDraft.memo ?? src.memo ?? ''}

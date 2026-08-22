@@ -12,7 +12,7 @@
 | 단계 | 운영 중 · 실사용자 있음 (2026-08-19 기준 사람 방문 고유 IP 163명/2일) |
 | 스택 | Next.js 14 (App Router) · React 18 · TypeScript · 파이썬 수집기 |
 | 저장소 | **파일 기반** — `data/*.json`. DB 없음 |
-| 코드 규모 | `lib/` 2,722줄 · `app/admin` + `components/` 4,792줄 · 파이썬 2,986줄 |
+| 코드 규모 | `lib/` 2,722줄 · `app/admin` + `components/` 4,826줄 · 파이썬 2,986줄 |
 | 데이터 규모 | 게시물 2,317건 (공개 277건) · 인플루언서 소스 58개 · analytics 31일치 |
 | 배포 | EC2 `13.125.121.62` · PM2(fork, 포트 3002) + nginx · `bash deploy.sh` |
 | 도메인 | https://gonggu.asknuggetdata.com |
@@ -250,7 +250,10 @@ getDealVerdict(post)
 - **`purchase_links`에는 공정위 제휴 고지가 항상 따라붙는다.** 제휴가 아닌 링크를 넣으면 거짓 고지가 된다 (`D-003`).
 - **URL에 `?notrack=1`을 한 번 붙이면** 그 브라우저는 이후 통계에서 계속 제외된다. 해제는 `?notrack=0`.
 - **관리자 페이지를 한 번이라도 연 브라우저**는 흔적 쿠키(1년)로 통계에서 제외된다.
-- **인플루언서 이름은 `influencer_sources.json`과 `posts.json` 두 곳에 있다.** 페이지 제목은
+- **인포크 핸들 ≠ 인스타 핸들이다.** 소스 58개 중 39개는 `instagram_handle`이 아예 없고,
+  있는 19개 중 13개는 서로 다르다(`@bobpro__` ↔ 인포크 `bobpro`). 인포크 핸들로 인스타
+  주소를 만들면 엉뚱한 계정이 열린다.
+- - **인플루언서 이름은 `influencer_sources.json`과 `posts.json` 두 곳에 있다.** 페이지 제목은
   게시물 쪽 값을 읽으므로, 관리자가 소스에서 이름을 고치면 `/api/inpock-sources` PATCH가
   같은 계정의 게시물까지 함께 갱신한다(`posts.json`을 쓴다).
 - - **끝난 걸 아는데 마감일을 모르면 `ended_at`을 쓴다.** `deadline`에 오늘 날짜를 넣으면
