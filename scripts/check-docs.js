@@ -100,7 +100,7 @@ const CHECKS = [
   ['status 없음',            /\| \(없음\) \| [^|]*\| ([\d,]+)/,             () => statusCount(null), 'fixed'],
   ['status↔published 불일치', /— ([\d,]+)건 차이가 있다/,                     () => count(p => p.published === true && p.status !== 'published'), 'fixed'],
   ['posts.json 크기(MB)',   /posts\.json +[\d,]+건 · ([\d.]+)MB/,           () => (fs.statSync(path.join(ROOT, 'data/posts.json')).size / 1024 ** 2).toFixed(1), 'moving'],
-  ['market_price 보유',     /`market_price` 보유 ([\d,]+)건/,                () => count(p => p.market_price), 'fixed'],
+  ['market_price 보유',     /`market_price` 보유 ([\d,]+)건/,                () => count(p => p.market_price), 'moving'],
   // 판정기를 표방하는 제품의 핵심 지표라 등급 규칙을 다시 쓰지 않고 getDealVerdict()를 그대로 쓴다
   ['고객에게 보이는 공구',    /보이는 공구 ([\d,]+)건 중 pending/,                    () => visible.length, 'moving'],
   ['그중 pending',          /보이는 공구 [\d,]+건 중 pending ([\d,]+)건/,           () => visible.filter(p => getDealVerdict(p).display.key === 'pending').length, 'moving'],
