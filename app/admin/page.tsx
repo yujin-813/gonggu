@@ -125,7 +125,9 @@ const CAT_LABEL: Record<string, string> = {
 const BACKLOG_ALERT_MIN = 10
 
 function unjudgedBacklog(posts: Post[]): { visible: number; visibleTotal: number; recent: number } | null {
-  const visiblePosts = posts.filter(isCustomerVisible)
+  // 오픈 예정은 뺀다. 아직 안 열려서 가격도 구매 링크도 없다 — 지금 채울 방법이 없는 걸
+  // 일감으로 세면 숫자만 커지고 할 일은 안 보인다
+  const visiblePosts = posts.filter(p => isCustomerVisible(p) && getPeriodState(p).kind !== 'upcoming')
   const unchecked = visiblePosts.filter(p => getCompareState(p) === 'unchecked')
   if (unchecked.length < BACKLOG_ALERT_MIN) return null
 
@@ -2168,9 +2170,16 @@ function VerdictFiller({ posts, views, onSaved }: { posts: Post[]; views: Record
   // 이론이고, 검색으로 들어와 판정 없는 상세에 착지한 사람 수가 진짜 손실이다 — 실측에서
   // 검색 유입 146명 중 64명(44%)이 판정 없는 페이지에 떨어졌고, 1위 착지 공구 한 건만
   // 채워도 26명이 판정을 보게 된다.
+  // 오픈 예정은 채울 수 없다(가격·구매 링크가 아직 없다). 몇 건을 뺐는지는 아래에 적는다
+  const upcomingSkipped = posts.filter(p =>
+    isCustomerVisible(p) && getPeriodState(p).kind === 'upcoming' && getCompareState(p) === 'unchecked').length
+
   const groups = useMemo(() => {
     const g: Record<CompareState, Post[]> = { unchecked: [], compared: [], incomparable: [] }
-    for (const p of posts) g[getCompareState(p)].push(p)
+    for (const p of posts) {
+      if (getPeriodState(p).kind === 'upcoming') continue
+      g[getCompareState(p)].push(p)
+    }
     const byTraffic = (a: Post, b: Post) => {
       const av = views[a.id] || 0
       const bv = views[b.id] || 0
@@ -2220,7 +2229,7 @@ function VerdictFiller({ posts, views, onSaved }: { posts: Post[]; views: Record
   ]
 
   const blurb: Record<CompareState | 'ended' | 'deadline', React.ReactNode> = {
-    unchecked: <>아직 아무도 비교가를 안 본 공구예요. <strong>최근 14일 조회가 많은 순</strong>으로 세웠으니 위에서부터 채우면 손실이 제일 빨리 줄어요. 찾아봐도 비교할 상품이 없으면 <strong>비교불가</strong>로 남겨주세요 — 그래야 이 목록에서 빠집니다.</>,
+    unchecked: <>{upcomingSkipped > 0 && <><strong>오픈 예정 {upcomingSkipped}건은 뺐어요</strong> — 아직 안 열려서 가격도 링크도 없어요.<br /></>}아직 아무도 비교가를 안 본 공구예요. <strong>최근 14일 조회가 많은 순</strong>으로 세웠으니 위에서부터 채우면 손실이 제일 빨리 줄어요. 찾아봐도 비교할 상품이 없으면 <strong>비교불가</strong>로 남겨주세요 — 그래야 이 목록에서 빠집니다.</>,
     incomparable: <>찾아본 끝에 비교할 동일상품이 없다고 표시해 둔 공구예요. 나중에 팔기 시작했다면 <strong>다시 확인하기</strong>로 되돌릴 수 있어요.</>,
     compared: <>비교가가 붙어 판정이 나가고 있는 공구예요. 값이 이상하면 여기서 고칠 수 있어요.</>,
     deadline: <>수집기가 <strong>마감일을 못 읽은</strong> 공구예요. 상시딜과 구분이 안 돼서 예전에는 끝난 공구가 계속 진행 중으로 남아 있었어요.
