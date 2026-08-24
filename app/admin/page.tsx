@@ -531,7 +531,11 @@ export default function AdminPage() {
             했다. 공개·검수·후보 건수는 '공구 관리' 탭의 필터 칩에 그대로 남아 있다 */}
         <TodayPriorities posts={posts} detailViews={detailViews} clickBreakdown={clickBreakdown}
           postSources={postSources} sources={sources}
-          onGoTo={(tab, mode) => { setAdminTab(tab); if (mode) setVerdictMode(mode) }} />
+          onGoTo={(tab, mode) => {
+            setAdminTab(tab)
+            if (mode) setVerdictMode(mode)
+            if (tab === 'posts') setFilter('upcoming')
+          }} />
 
         {/* 방문자 분석 */}
         <AnalyticsSection data={analytics} topPosts={topPosts} topSharedPosts={topSharedPosts} sources={sources} />
@@ -2203,7 +2207,7 @@ function TodayPriorities({ posts, detailViews, clickBreakdown, postSources, sour
   clickBreakdown: Record<string, Record<string, number>>
   postSources: Record<string, Record<string, number>>
   sources: { source: string; label: string; count: number }[]
-  onGoTo: (tab: 'verdict' | 'revenue', verdictMode?: 'unchecked' | 'ended' | 'deadline') => void
+  onGoTo: (tab: 'verdict' | 'revenue' | 'posts', verdictMode?: 'unchecked' | 'ended' | 'deadline') => void
 }) {
   const views = (id: number) => detailViews[id] || 0
   const searchIn = (id: number) => {
@@ -2240,12 +2244,22 @@ function TodayPriorities({ posts, detailViews, clickBreakdown, postSources, sour
     .filter(p => isPagePublic(p) && isExpired(p) && !hasPurchaseLink(p) && alternativeLinks(p).length === 0 && views(p.id) > 0)
     .sort((a, b) => views(b.id) - views(a.id))
 
-  const buckets: { emoji: string; label: string; items: Post[]; metric: (p: Post) => string; tab: 'verdict' | 'revenue'; verdictMode?: 'unchecked' | 'ended' | 'deadline' }[] = [
+  // 오픈일이 지나면 D-037이 알아서 고객 화면에서 숨겨주지만, 그건 이미 늦은 뒤다 —
+  // 하루 전에 미리 알려줘야 그날 안에 재수집을 걸어보거나 사장님이 직접 확인할 시간이 있다.
+  const bucketD = posts
+    .filter(p => {
+      const s = getPeriodState(p)
+      return s.kind === 'upcoming' && s.daysToOpen === 1 && (!p.price || !p.img || !p.purchase_url)
+    })
+    .sort((a, b) => (a.start_date || '').localeCompare(b.start_date || ''))
+
+  const buckets: { emoji: string; label: string; items: Post[]; metric: (p: Post) => string; tab: 'verdict' | 'revenue' | 'posts'; verdictMode?: 'unchecked' | 'ended' | 'deadline' }[] = [
     { emoji: '🔥', label: '검색 유입 있는데 비교가 없는 상품', items: bucketA, metric: p => `검색 ${searchIn(p.id)}회`, tab: 'verdict', verdictMode: 'unchecked' },
     { emoji: '💰', label: '조회수 있는데 구매 링크가 없는 상품', items: bucketB, metric: p => `조회 ${views(p.id)}회`, tab: 'revenue' },
     // "종료됐는데 대체 상품도 없는" 상품은 채우기의 「종료·링크없음」 세부 탭에 있다.
     // 탭만 'verdict'로 바꾸면 항상 '미확인'으로 열려서 이 항목을 못 찾았다 — 세부 탭까지 지정한다
     { emoji: '⚠️', label: '공구 종료됐는데 대체 상품도 없는 상품', items: bucketC, metric: p => `조회 ${views(p.id)}회`, tab: 'verdict', verdictMode: 'ended' },
+    { emoji: '📅', label: '내일 오픈인데 아직 콘텐츠가 안 채워진 예고', items: bucketD, metric: p => `${fmtDate(p.start_date)} 오픈`, tab: 'posts' },
   ]
 
   return (
