@@ -98,7 +98,7 @@ const CHECKS = [
   ['status: ready',         /\| `ready` \| [^|]*\| ([\d,]+)/,               () => statusCount('ready'), 'moving'],
   ['status: candidate',     /\| `candidate` \| [^|]*\| ([\d,]+)/,           () => statusCount('candidate'), 'fixed'],
   ['status 없음',            /\| \(없음\) \| [^|]*\| ([\d,]+)/,             () => statusCount(null), 'fixed'],
-  ['status↔published 불일치', /— ([\d,]+)건 차이가 있다/,                     () => count(p => p.published === true && p.status !== 'published' && p.status !== 'upcoming'), 'fixed'],
+  ['status↔published 불일치', /([\d,]+)건 차이가 있다/,                     () => count(p => p.published === true && p.status !== 'published' && p.status !== 'upcoming'), 'fixed'],
   ['posts.json 크기(MB)',   /posts\.json +[\d,]+건 · ([\d.]+)MB/,           () => (fs.statSync(path.join(ROOT, 'data/posts.json')).size / 1024 ** 2).toFixed(1), 'moving'],
   ['market_price 보유',     /`market_price` 보유 ([\d,]+)건/,                () => count(p => p.market_price), 'moving'],
   // 판정기를 표방하는 제품의 핵심 지표라 등급 규칙을 다시 쓰지 않고 getDealVerdict()를 그대로 쓴다
