@@ -330,11 +330,17 @@ header {
 .img-placeholder-upcoming {
   flex-direction: column;
   gap: 6px;
+  padding: 0 16px;
 }
 .img-placeholder-account {
   font-size: 12px;
   font-weight: 700;
   color: var(--gray-4);
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-align: center;
 }
 
 /* 마감은 2순위 — 좌상단(1순위)은 판정 배지가 쓰고, 마감은 아래에 작게 붙인다.
