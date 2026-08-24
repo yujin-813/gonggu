@@ -327,6 +327,16 @@ header {
   background: linear-gradient(135deg, var(--gray-1), var(--gray-2));
 }
 
+.img-placeholder-upcoming {
+  flex-direction: column;
+  gap: 6px;
+}
+.img-placeholder-account {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--gray-4);
+}
+
 /* 마감은 2순위 — 좌상단(1순위)은 판정 배지가 쓰고, 마감은 아래에 작게 붙인다.
    급한 것만 색으로 구분하고 나머지는 흰 바탕에 담백하게 둔다. */
 .badge-deadline {

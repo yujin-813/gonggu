@@ -135,6 +135,14 @@ export default function PostCard({
               loading="lazy"
             />
           </>
+        ) : !post.price && periodState.kind === 'upcoming' ? (
+          // 아직 콘텐츠가 안 채워진 예고 카드 — 카테고리 아이콘만 덜렁 있으면 다 똑같아
+          // 보여서 "고장났나?" 싶다. 인플루언서 이름을 같이 보여줘 카드마다 구분되고,
+          // "아직 공개 전이라 비어 있다"는 게 그 자체로 읽히게 한다.
+          <div className="img-placeholder img-placeholder-upcoming">
+            <CalendarClock size={32} strokeWidth={1.5} />
+            <span className="img-placeholder-account">{post.account}</span>
+          </div>
         ) : (
           <div className="img-placeholder"><CatIcon size={40} strokeWidth={1.5} /></div>
         )}
