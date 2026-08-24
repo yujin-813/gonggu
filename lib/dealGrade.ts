@@ -1,5 +1,5 @@
 import type { Post, DealOption } from './types'
-import { normalizePurchaseLinks } from './purchaseLinks'
+import { normalizePurchaseLinks, isSameProduct } from './purchaseLinks'
 import { getPeriodState } from './period'
 
 // 꿀공구의 핵심은 "공구를 모아주는 것"이 아니라 "이 공구가 진짜 싼지 판정해주는 것"이다.
@@ -190,6 +190,9 @@ export function getDealVerdict(post: Post): DealVerdict {
   const auto: ComparePrice[] = []
 
   for (const link of normalizePurchaseLinks(post)) {
+    // 비슷한 용도의 다른 상품은 비교가가 아니다. 그 가격으로 할인율을 내면 화면에 틀린
+    // 숫자가 나간다 — 판단 기준 1번이다
+    if (!isSameProduct(link)) continue
     if (link.price && link.price > 0) {
       const name = link.platform === 'coupang' ? '쿠팡' : link.platform === 'naver' ? '네이버' : '다른 판매처'
       verified.push({ label: name, price: link.price, checkedAt: link.checked_at })

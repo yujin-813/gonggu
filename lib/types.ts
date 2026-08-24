@@ -163,9 +163,25 @@ export const COMPARE_NONE_REASON_LABEL: Record<CompareNoneReason, string> = {
 
 export type PurchasePlatform = 'naver' | 'coupang' | 'other'
 
+/**
+ * 링크가 **같은 상품**인지, **비슷한 용도의 다른 상품**인지.
+ *
+ * 값이 없으면 `same`으로 본다 — 기존 데이터가 전부 동일 상품이라 마이그레이션 없이 붙는다.
+ *
+ * 이 구분이 필요한 이유는 판정 때문이다. 다른 상품 가격으로 할인율을 계산하면 화면에 틀린
+ * 숫자가 나간다 — 이 제품이 제일 하면 안 되는 일이다(판단 기준 1번). getDealVerdict()는
+ * `same`만 비교가로 쓴다.
+ *
+ * `alternative`는 "공구는 끝났는데 같은 용도로 지금 살 수 있는 것"을 권하는 자리다. 아직
+ * 화면도 입력칸도 없다 — 구조만 있다(`D-030`).
+ */
+export type PurchaseLinkKind = 'same' | 'alternative'
+
 /** 공구가 아닌 일반 판매처 링크. 공구 종료 후 "지금 바로 사고 싶은" 사용자를 위한 대체 경로. */
 export interface PurchaseLink {
   platform: PurchasePlatform
+  /** 같은 상품인가, 비슷한 용도의 다른 상품인가. 없으면 same */
+  kind?: PurchaseLinkKind
   url: string
   /** 확인 당시 가격. 실시간 조회가 아니므로 화면에는 "확인 시점"과 함께 조심스럽게 쓴다 */
   price?: number | null

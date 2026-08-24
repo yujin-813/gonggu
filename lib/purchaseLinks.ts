@@ -75,6 +75,26 @@ export function isAffiliateLink(link: Pick<PurchaseLink, 'platform' | 'url'>): b
   return pattern ? pattern.test(host) : true
 }
 
+/** 같은 상품인 링크인지 — kind가 없는 옛 데이터는 전부 같은 상품이다 */
+export function isSameProduct(link: Pick<PurchaseLink, 'kind'>): boolean {
+  return (link.kind ?? 'same') === 'same'
+}
+
+/**
+ * 판정과 "지금 살 수 있어요"에 쓸 수 있는 링크 — **같은 상품만**.
+ *
+ * 다른 상품을 섞으면 두 가지가 깨진다. 하나는 판정(다른 상품 가격으로 할인율을 내면 틀린
+ * 숫자다), 하나는 문구("공구는 끝났지만 지금 살 수 있어요"가 거짓이 된다).
+ */
+export function sameProductLinks(post: Parameters<typeof normalizePurchaseLinks>[0]): PurchaseLink[] {
+  return visiblePurchaseLinks(post).filter(isSameProduct)
+}
+
+/** 비슷한 용도의 다른 상품 — 권할 수는 있어도 판정 근거로는 절대 못 쓴다 */
+export function alternativeLinks(post: Parameters<typeof normalizePurchaseLinks>[0]): PurchaseLink[] {
+  return visiblePurchaseLinks(post).filter(l => !isSameProduct(l))
+}
+
 /** 고객 화면에 실제로 띄울 링크만 — 관리자가 확인해 켠 것 중, 진짜 제휴 링크만 */
 export function visiblePurchaseLinks(post: Parameters<typeof normalizePurchaseLinks>[0]): PurchaseLink[] {
   return normalizePurchaseLinks(post).filter(l => l.visible !== false && isAffiliateLink(l))
@@ -88,7 +108,12 @@ export function brokenPurchaseLinks(post: Parameters<typeof normalizePurchaseLin
   return normalizePurchaseLinks(post).filter(l => !!l.url && !isAffiliateLink(l))
 }
 
-/** 공구가 끝났을 때 보여줄 대체 구매처가 하나라도 있는지 — 관리자 필터와 홈 하단 영역에서 쓴다 */
+/**
+ * 공구가 끝났을 때 "이 상품을" 살 수 있는 곳이 있는지 — 관리자 필터와 홈 하단 영역에서 쓴다.
+ *
+ * 다른 상품 링크는 세지 않는다. "공구는 끝났지만 지금 살 수 있어요"에 다른 상품이 뜨면
+ * 그 문장이 거짓이 된다.
+ */
 export function hasPurchaseLink(post: Parameters<typeof normalizePurchaseLinks>[0]): boolean {
-  return visiblePurchaseLinks(post).length > 0
+  return sameProductLinks(post).length > 0
 }

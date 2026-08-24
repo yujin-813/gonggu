@@ -12,7 +12,7 @@
 | 단계 | 운영 중 · 실사용자 있음 (2026-08-19 기준 사람 방문 고유 IP 163명/2일) |
 | 스택 | Next.js 14 (App Router) · React 18 · TypeScript · 파이썬 수집기 |
 | 저장소 | **파일 기반** — `data/*.json`. DB 없음 |
-| 코드 규모 | `lib/` 2,918줄 · `app/admin` + `components/` 5,292줄 · 파이썬 2,986줄 |
+| 코드 규모 | `lib/` 2,962줄 · `app/admin` + `components/` 5,292줄 · 파이썬 2,986줄 |
 | 데이터 규모 | 게시물 2,317건 (공개 277건) · 인플루언서 소스 58개 · analytics 31일치 |
 | 배포 | EC2 `13.125.121.62`(t3.small) · PM2(fork) + nginx · `bash deploy.sh` — **무중단**(3002↔3003 슬롯 교대, `D-028`) |
 | 도메인 | https://gonggu.asknuggetdata.com |
@@ -93,7 +93,7 @@
 ```
 id, shortcode, title, account, cat, price, origPrice, deadline, start_date, img, url
 brand, purchase_url, market_url, market_price, market_price_note
-options[], is_multi_option, purchase_links[]
+options[], is_multi_option, purchase_links[] (kind: same|alternative)
 ended_at, compare_none_at, compare_none_reason, compare_none_note
 status, published, review_reason[], is_featured, featured_order
 is_always_on, is_evergreen_deal, sale_until_sold_out, is_exclusive_deal
@@ -283,7 +283,10 @@ getDealVerdict(post)
   꿀딜에 붙이면 "여기가 제일 싸다"고 판정해 놓고 다른 데로 보내는 모양이 된다.
 - - **`SITE_URL`은 `lib/siteUrl.ts`에 있다.** 예전엔 `lib/landing.ts`에 있었는데 그 파일은 fs를
   읽어서, 클라이언트 컴포넌트가 상수 하나 때문에 import하면 전 페이지가 500난다.
-- **돈이 되는 클릭은 `coupang`·`naver`·`other`뿐이다.** `groupbuy`는 판매자 링크라 수수료가 없다.
+- **`purchase_links[].kind`가 `alternative`면 비교가로 안 쓴다.** 다른 상품 가격으로 할인율을
+  내면 화면에 틀린 숫자가 나간다. `hasPurchaseLink()`도 `same`만 센다 — "지금 살 수 있어요"에
+  다른 상품이 뜨면 그 문장이 거짓이 된다. 입력칸·화면은 아직 없다 (`D-030`)
+- - **돈이 되는 클릭은 `coupang`·`naver`·`other`뿐이다.** `groupbuy`는 판매자 링크라 수수료가 없다.
 - - **쿠팡에서 찾은 비교가는 `market_price`가 아니라 `purchase_links`에 url 없이 넣는다.**
   `market_price`는 고객 화면에 무조건 "네이버 최저가"로 표시되기 때문이다. `purchase_links`는
   url이 없으면 판정에는 '쿠팡'으로 들어가되 구매 버튼으로 안 뜨고 제휴 고지도 안 붙는다.
