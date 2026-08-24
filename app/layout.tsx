@@ -1,6 +1,7 @@
 import type { Metadata } from 'next'
 import Script from 'next/script'
 import './globals.css'
+import Footer from '@/components/Footer'
 
 const SITE_URL = 'https://gonggu.asknuggetdata.com'
 
@@ -59,6 +60,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           <Script src="https://t1.kakaocdn.net/kakao_js_sdk/2.7.2/kakao.min.js" strategy="afterInteractive" />
         )}
         {children}
+        <Footer />
       </body>
     </html>
   )

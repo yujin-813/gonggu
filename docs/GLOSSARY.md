@@ -28,6 +28,7 @@
 | 캘린더 알림 | `/api/calendar/[id]` · `TrafficSource` → `calendar` | 우리가 푸시를 보내는 게 아니라 고객 폰 캘린더가 알린다 |
 | 대체 상품 | `purchase_links[].kind = 'alternative'` | 비슷한 용도의 **다른** 상품. 판정 근거로 안 쓴다. 종료 화면에서 "똑같은 상품은 못 찾았어요"로 따로 보여준다 |
 | 종료 확인 | `post.ended_at` | 관리자가 "이 공구 끝났다"고 직접 확인한 시각. 마감일을 몰라도 마감 처리된다 |
+| 제휴 문의 | `Inquiry` (`data/inquiries.json`) | `/propose`로 들어온 인플루언서·브랜드 제안. `/api/posts/request`(공구 등록 요청)와는 다른 창구다 |
 | 마감일 미확인 | `PeriodState` → `deadline_unknown` | 수집기가 마감일을 못 읽은 공구. 상시딜과 다르다 — 21일 지나면 마감으로 본다 |
 
 ---

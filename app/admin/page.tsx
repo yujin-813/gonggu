@@ -6,6 +6,7 @@ import { hasPurchaseLink, normalizePurchaseLinks, brokenPurchaseLinks, isAffilia
 import { getDealVerdict, isMultiOption } from '@/lib/dealGrade'
 import { partnerSearchQuery } from '@/lib/searchQuery'
 import { getCompareState, COMPARE_STATE_LABEL, CLEAR_COMPARE_NONE, type CompareState } from '@/lib/compareState'
+import type { Inquiry } from '@/lib/inquiries'
 import { needsKoreanName } from '@/lib/influencerItems'
 import { findCompareCandidates, type CompareCandidate } from '@/lib/compareCandidates'
 import { COMPARE_NONE_REASON_LABEL, type CompareNoneReason } from '@/lib/types'
@@ -126,6 +127,7 @@ export default function AdminPage() {
   const [postSources, setPostSources] = useState<Record<string, Record<string, number>>>({})
   // 최근 방문의 개별 동작 — 세션 단위로 묶어 흐름을 본다
   const [recentSessions, setRecentSessions] = useState<RecentSession[]>([])
+  const [inquiries, setInquiries] = useState<Inquiry[]>([])
   const [influencerSources, setInfluencerSources] = useState<InfluencerSource[]>([])
   const [newSourceUrl, setNewSourceUrl] = useState('')
   const [newSourceName, setNewSourceName] = useState('')
@@ -134,7 +136,7 @@ export default function AdminPage() {
   const [instPostUrl, setInstPostUrl] = useState('')
   const [instPostBusy, setInstPostBusy] = useState(false)
   const [instPostMsg, setInstPostMsg] = useState('')
-  const [adminTab, setAdminTab] = useState<'posts' | 'influencers' | 'collections' | 'verdict' | 'revenue' | 'data' | 'settings'>('posts')
+  const [adminTab, setAdminTab] = useState<'posts' | 'influencers' | 'collections' | 'verdict' | 'revenue' | 'data' | 'inquiries' | 'settings'>('posts')
   const [collections, setCollections] = useState<Collection[]>([])
   const [editingInfluencer, setEditingInfluencer] = useState<string | null>(null)
   const [editInfluencerDraft, setEditInfluencerDraft] = useState<Partial<InfluencerSource>>({})
@@ -173,6 +175,11 @@ export default function AdminPage() {
       setPostSources(d.postSources || {})
       setRecentSessions(d.recentSessions || [])
     }
+  }, [])
+
+  const fetchInquiries = useCallback(async () => {
+    const r = await fetch('/api/inquiries')
+    if (r.ok) { const d = await r.json(); setInquiries(d.inquiries || []) }
   }, [])
 
   const fetchInfluencerSources = useCallback(async () => {
@@ -299,12 +306,13 @@ export default function AdminPage() {
   useEffect(() => {
     fetchPosts()
     fetchAnalytics()
+    fetchInquiries()
     fetchInfluencerSources()
     fetchInpockStatus()
     fetchCollections()
     const iv = setInterval(() => { fetchInpockStatus() }, 5000)
     return () => clearInterval(iv)
-  }, [fetchPosts, fetchAnalytics, fetchInfluencerSources, fetchInpockStatus, fetchCollections])
+  }, [fetchPosts, fetchAnalytics, fetchInquiries, fetchInfluencerSources, fetchInpockStatus, fetchCollections])
 
   async function togglePublished(p: Post) {
     const isPublished = p.status === 'published' || (!p.status && p.published !== false)
@@ -522,6 +530,7 @@ export default function AdminPage() {
             { key: 'verdict',     label: '채우기' },
             { key: 'revenue',     label: '수익화 현황' },
             { key: 'data',        label: '데이터' },
+            { key: 'inquiries',   label: `제휴 문의${inquiries.filter(i => !i.handled).length ? ` ${inquiries.filter(i => !i.handled).length}` : ''}` },
             { key: 'settings',    label: '통계 설정' },
           ] as const).map(({ key, label }) => (
             <button key={key} onClick={() => setAdminTab(key)}
@@ -661,6 +670,8 @@ export default function AdminPage() {
         {adminTab === 'verdict' && <VerdictFiller posts={posts} views={detailViews} onSaved={fetchPosts} />}
 
         {adminTab === 'data' && <VisitorFlow sessions={recentSessions} posts={posts} clickBreakdown={clickBreakdown} postSources={postSources} sources={sources} onRefresh={fetchAnalytics} />}
+
+        {adminTab === 'inquiries' && <InquiryList inquiries={inquiries} onRefresh={fetchInquiries} />}
 
         {adminTab === 'revenue' && <RevenueBoard posts={posts} clicks={clickBreakdown} sources={postSources} onGoFill={() => setAdminTab('verdict')} onSaved={fetchPosts} />}
 
@@ -1905,6 +1916,100 @@ const SOURCE_KO: Record<string, string> = {
   instagram: '인스타그램', kakao: '카카오톡', calendar: '캘린더 알림',
   inapp: '앱 안에서', external: '외부 링크', direct: '직접 방문',
 }
+
+const INQUIRY_KIND_KO: Record<string, string> = { influencer: '인플루언서', brand: '브랜드', company: '업체' }
+
+/**
+ * 제휴 문의 — "우리 공구도 올려주세요" "제휴하고 싶어요" 창구(`/propose`)로 들어온 것들.
+ *
+ * 이메일로도 가겠지만(설정돼 있으면) 여기가 최종 저장소다. SMTP가 아직 안 잡혀 있거나
+ * 잠깐 죽어도 문의는 여기 남는다 — `emailed`가 false면 그 문의는 메일로 못 받았다는 뜻이라
+ * 표시해 둔다. 처리한 건 접어 둘 수 있게 `handled` 토글만 뒀다 — 계속 쌓이면 새 문의를
+ * 못 찾는다.
+ */
+function InquiryList({ inquiries, onRefresh }: { inquiries: Inquiry[]; onRefresh: () => void }) {
+  const [showHandled, setShowHandled] = useState(false)
+  const [busyId, setBusyId] = useState<string | null>(null)
+  const list = showHandled ? inquiries : inquiries.filter(i => !i.handled)
+
+  async function toggle(id: string, handled: boolean) {
+    setBusyId(id)
+    await fetch('/api/inquiries', {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id, handled }),
+    })
+    setBusyId(null)
+    onRefresh()
+  }
+
+  return (
+    <div style={{ background: '#fff', borderRadius: 12, padding: 20, border: '1px solid #e2e8f0' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 6, flexWrap: 'wrap' }}>
+        <h2 style={{ fontSize: 17, fontWeight: 800 }}>제휴 문의</h2>
+        <button onClick={onRefresh}
+          style={{ padding: '6px 12px', borderRadius: 8, border: '1px solid #cbd5e1',
+            background: '#fff', cursor: 'pointer', fontSize: 12.5, fontWeight: 600, color: '#475569' }}>
+          새로고침
+        </button>
+        <label style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 6, fontSize: 12.5, color: '#64748b', cursor: 'pointer' }}>
+          <input type="checkbox" checked={showHandled} onChange={e => setShowHandled(e.target.checked)} />
+          처리한 것도 보기
+        </label>
+      </div>
+      <p style={{ fontSize: 13, color: '#64748b', lineHeight: 1.7, marginBottom: 16 }}>
+        「공구 제안 · 입점 문의」(사이트 하단)로 들어온 것들이에요. 이메일로도 보내지만
+        <code style={{ background: '#f1f5f9', borderRadius: 4, padding: '1px 5px' }}>SMTP_HOST</code> 등이
+        아직 설정 안 됐거나 발송이 실패하면 여기가 유일한 기록이에요.
+      </p>
+
+      {list.length === 0 ? (
+        <p style={{ textAlign: 'center', padding: '28px 0', fontSize: 14, fontWeight: 700, color: '#64748b' }}>
+          {showHandled ? '문의가 없어요' : '처리할 문의가 없어요'}
+        </p>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+          {list.map(i => (
+            <div key={i.id} style={{ border: '1px solid #e2e8f0', borderRadius: 10, padding: '12px 14px',
+              opacity: i.handled ? 0.6 : 1 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 6 }}>
+                <span style={{ fontSize: 11, fontWeight: 700, color: '#4f46e5', background: '#eef2ff', borderRadius: 6, padding: '2px 8px' }}>
+                  {INQUIRY_KIND_KO[i.kind] || i.kind}
+                </span>
+                <span style={{ fontSize: 13.5, fontWeight: 700 }}>{i.name}</span>
+                <span style={{ fontSize: 12, color: '#94a3b8' }}>{i.contact}</span>
+                {!i.emailed && (
+                  <span style={{ fontSize: 11, fontWeight: 700, color: '#b45309', background: '#fef3c7', borderRadius: 6, padding: '2px 8px' }}
+                    title="메일 발송이 안 됐거나 SMTP가 설정 안 됐어요">
+                    메일 미발송
+                  </span>
+                )}
+                <span style={{ marginLeft: 'auto', fontSize: 11.5, color: '#94a3b8' }}>
+                  {new Date(i.createdAt).toLocaleString('ko-KR')}
+                </span>
+              </div>
+              {i.link && (
+                <a href={i.link.startsWith('http') ? i.link : `https://${i.link}`} target="_blank" rel="noreferrer"
+                  style={{ fontSize: 12, color: '#6366f1', fontWeight: 600, textDecoration: 'none' }}>
+                  {i.link} ↗
+                </a>
+              )}
+              {i.product && <div style={{ fontSize: 12.5, color: '#475569', marginTop: 4 }}>상품: {i.product}</div>}
+              <p style={{ fontSize: 13, color: '#334155', lineHeight: 1.6, margin: '8px 0 0', whiteSpace: 'pre-wrap' }}>{i.message}</p>
+              <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 8 }}>
+                <button onClick={() => toggle(i.id, !i.handled)} disabled={busyId === i.id}
+                  style={{ padding: '5px 12px', borderRadius: 7, border: '1px solid #cbd5e1', background: '#fff',
+                    cursor: 'pointer', fontSize: 12, fontWeight: 600, color: '#475569' }}>
+                  {i.handled ? '처리 취소' : '처리 완료'}
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
 
 /**
  * 제휴 링크를 그 자리에서 넣는 창.

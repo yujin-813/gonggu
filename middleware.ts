@@ -19,6 +19,10 @@ function isProtected(req: NextRequest): boolean {
   if (pathname === '/api/posts/request') {
     return method !== 'POST'
   }
+  // 제휴 문의 — 제출(POST)은 누구나, 목록 조회(GET)·처리 표시(PATCH)는 관리자만
+  if (pathname === '/api/inquiries') {
+    return method !== 'POST'
+  }
   if (pathname.startsWith('/api/posts/')) return true // PATCH/PUT/DELETE
 
   // 컬렉션: 일반 GET(고객 페이지)은 허용, admin=1 조회와 모든 쓰기는 보호
@@ -80,6 +84,7 @@ export const config = {
   matcher: [
     '/api/posts',
     '/api/posts/:path*',
+    '/api/inquiries',
     '/api/collections',
     '/api/collections/:path*',
     '/api/scrape',
