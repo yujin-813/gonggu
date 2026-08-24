@@ -15,7 +15,7 @@
 import os
 import time
 import warnings
-from datetime import date
+from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 
 import requests
@@ -70,6 +70,15 @@ UNCERTAIN_REASON = "구매링크 확인 필요"
 DEADLINE_UNKNOWN_DAYS = 21
 
 
+def kst_today():
+    """lib/kst.ts의 kstToday()와 같은 계산 — 서버가 UTC로 도는데(Etc/UTC 확인됨) 공구
+    일정은 KST 기준이다. 이 스크립트는 cron으로 매일 KST 05:00(UTC 20:00)에 도는데, 그
+    시각은 UTC 날짜가 KST보다 하루 뒤처지는 구간(UTC 15:00~23:59)에 정확히 걸린다 —
+    date.today()를 그대로 쓰면 매일 실행할 때마다 하루 늦은 날짜로 판정했다는 뜻이다.
+    """
+    return (datetime.now(timezone.utc) + timedelta(hours=9)).date()
+
+
 def is_customer_visible(p):
     """lib/period.ts의 isCustomerVisible과 같은 규칙 — 한쪽만 고치면 갈라진다."""
     if p.get("status") == "upcoming":
@@ -90,11 +99,11 @@ def is_customer_visible(p):
         if not basis:
             return True
         try:
-            since = (date.today() - date.fromisoformat(basis)).days
+            since = (kst_today() - date.fromisoformat(basis)).days
         except ValueError:
             return True
         return since <= DEADLINE_UNKNOWN_DAYS
-    return deadline[:10] >= date.today().isoformat()
+    return deadline[:10] >= kst_today().isoformat()
 
 
 def check_link(url):

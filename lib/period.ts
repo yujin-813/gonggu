@@ -1,14 +1,15 @@
 import type { Post } from './types'
+import { kstToday } from './kst'
 
 // admin/page.tsx, PostCard.tsx, api/posts/route.ts 세 곳에 거의 동일한 로직이
 // 중복돼 있던 걸 하나로 모은 것 — 공구 기간 계산·표시는 반드시 여기서만 한다.
 
 export function daysLeft(deadline?: string): number {
   if (!deadline) return 999
-  const today = new Date(); today.setHours(0, 0, 0, 0)
-  // 시각이 섞여 있으면 타임존에 따라 하루가 밀릴 수 있어 날짜만 떼서 본다
-  const d = new Date(dateOnly(deadline)); d.setHours(0, 0, 0, 0)
-  return Math.ceil((d.getTime() - today.getTime()) / 86400000)
+  // "오늘"은 서버 타임존이 아니라 KST 기준이어야 한다 — lib/kst.ts 참고
+  const today = Date.parse(`${kstToday()}T00:00:00Z`)
+  const d = Date.parse(`${dateOnly(deadline)}T00:00:00Z`)
+  return Math.round((d - today) / 86400000)
 }
 
 /** 날짜 필드에 시각이 섞여 들어와도("2026-08-17T00:00:00+09:00") 깨지지 않게 앞 10자만 본다 */
@@ -162,8 +163,7 @@ export function isCustomerVisible(post: Pick<Post, 'status' | 'published' | 'is_
   // 마감일을 모르는 공구는 DEADLINE_UNKNOWN_DAYS까지만 진행 중으로 본다.
   // 그 전에는 무기한 노출돼서, 이미 끝난 공구가 고객 화면 최상위 착지 페이지로 남아 있었다.
   if (!post.deadline) return !isExpired(post)
-  const today = new Date(); today.setHours(0, 0, 0, 0)
-  return new Date(dateOnly(post.deadline)) >= today
+  return dateOnly(post.deadline) >= kstToday()
 }
 
 const NEW_WINDOW_HOURS = 48

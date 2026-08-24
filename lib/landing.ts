@@ -25,14 +25,10 @@ export interface LandingCopy {
   empty: string
 }
 
-function kstNow(): Date {
-  // 서버가 UTC로 도는데 공구 일정은 전부 한국 시간 기준이라, 날짜 계산은 KST로 한다
-  return new Date(Date.now() + 9 * 60 * 60 * 1000)
-}
-
-export function kstToday(): string {
-  return kstNow().toISOString().slice(0, 10)
-}
+// kstNow/kstToday는 lib/kst.ts에 있다 — period.ts도 같은 계산이 필요한데
+// landing.ts를 import하면 순환 참조가 생겨서 그쪽으로 옮기고 여기서 다시 내보낸다
+import { kstNow, kstToday } from './kst'
+export { kstToday }
 
 /** "8월 14일" 형태 — 제목에 날짜를 넣어 검색어와 겹치는 표현을 만든다 */
 export function kstTodayLabel(): string {
@@ -59,21 +55,35 @@ export function routablePosts(): Post[] {
 }
 
 /**
+ * 오픈 예정 공구가 실제로 열렸는지 — 예고만 있고 아직 상품 페이지가 없으면(가격이
+ * 없으면) 열린 게 아니다. `status`는 수집기가 실제로 채워 넣어도 그대로 'upcoming'에
+ * 남아 있어서(그 필드를 아무도 안 바꾼다), 이 값만으로는 "진짜 열렸나"를 못 가른다.
+ * 오늘 오픈 예정 5건 중 1건은 오늘 실제로 가격·이미지·링크가 채워졌는데 `status`는
+ * 여전히 'upcoming'이었다 — 그 경우를 놓치지 않으려고 가격 유무로 가른다.
+ */
+function isAnnouncementOnly(p: Post): boolean {
+  return getPeriodState(p).kind === 'upcoming' && !p.price
+}
+
+/**
  * 오늘 새로 올라온 공구 — "오늘의 공구"
  *
  * 처음에는 "오늘 마감"도 여기 넣었는데, 그러면 마감 임박 영역과 완전히 겹친다.
  * 실제로 확인해 보니 오늘의 공구 8건이 전부 마감 임박에도 들어 있었다(겹침 100%).
  * 두 영역이 답하는 질문을 갈라놓는다 — 여기는 "오늘 뭐 새로 나왔나",
  * 마감 임박은 "뭐가 곧 끝나나".
+ *
+ * 오늘 오픈 "예정"인데 아직 예고뿐인 건(가격·이미지·링크가 없는 건) 여기 안 넣는다 —
+ * "곧 열려요"에만 있어야 한다. 예전엔 오늘 날짜만 보고 넣어서, 방금 채워진 진짜 공구
+ * 옆에 "가격 미정" 빈 카드가 나란히 떴다.
  */
 export function todayPosts(posts: Post[]): Post[] {
   const today = kstToday()
   return posts.filter(p => {
-    if (p.start_date === today) return true
     // 수집기가 오늘 새로 물어온 공구 — 오픈일이 없어도 "오늘 올라온 것"은 맞다
     if ((p.scraped_at || '').slice(0, 10) === today) return true
-    const state = getPeriodState(p)
-    return state.kind === 'upcoming' && state.startDate === today
+    if (p.start_date !== today) return false
+    return !isAnnouncementOnly(p)
   })
 }
 
@@ -86,7 +96,9 @@ export function todayPosts(posts: Post[]): Post[] {
  */
 export function upcomingPosts(posts: Post[]): Post[] {
   return posts
-    .filter(p => getPeriodState(p).kind === 'upcoming')
+    // 실제로 열려서 가격이 채워졌으면 더 이상 "곧 열려요"가 아니다 — "오늘의 공구"·평소
+    // 목록으로 넘어간다. 안 걸러내면 같은 공구가 두 영역에 동시에 뜬다
+    .filter(isAnnouncementOnly)
     .sort((a, b) => {
       // 오픈일이 정해진 것을 먼저, 그중 가까운 순. 날짜 미정은 뒤로 민다
       const ad = a.start_date || '', bd = b.start_date || ''
