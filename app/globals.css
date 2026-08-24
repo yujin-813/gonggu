@@ -1050,6 +1050,25 @@ header {
 .ended-related-title { font-size: 15px; font-weight: 800; margin-bottom: 14px; }
 .ended-related-empty { font-size: 13px; color: var(--gray-4); line-height: 1.6; }
 .ended-related-meta { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+
+.upcoming-alt { margin: 10px 0 0; font-size: 13px; }
+.upcoming-alt a { color: #D98E00; font-weight: 700; text-decoration: none; }
+
+/* 공유 권유 — 상세 맨 아래. 판정 CTA(주황)와 경쟁하지 않게 테두리형으로 둔다 */
+.share-invite { padding: 0 16px 28px; }
+.share-invite-btn {
+  display: flex; align-items: center; justify-content: center; gap: 8px;
+  width: 100%; padding: 13px 14px;
+  background: var(--card-bg); color: var(--gray-5);
+  border: 1.5px solid var(--gray-2); border-radius: 10px;
+  font-size: 14.5px; font-weight: 700; cursor: pointer;
+}
+.share-invite-btn:hover { border-color: var(--brand); color: var(--brand); }
+.share-invite-btn:disabled { opacity: .6; cursor: default; }
+.share-invite-note {
+  margin: 8px 0 0; text-align: center;
+  font-size: 12px; color: var(--gray-4); line-height: 1.6;
+}
 /* 마감됐지만 살 곳이 확인된 공구 — 초록은 혜택에만 쓴다는 색 규칙(D-017)에 맞는 자리다 */
 .ended-related-buyable {
   font-size: 11px; font-weight: 700; color: #15803D;

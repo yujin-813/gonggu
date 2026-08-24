@@ -6,7 +6,7 @@ import { CATEGORY_LABEL, categoryIcon } from '@/lib/categoryIcons'
 import Toast from '@/components/Toast'
 import DealStrip, { InfluencerStrip } from '@/components/DealStrip'
 import { track } from '@/lib/track'
-import { Flame, Award, CalendarDays, AlarmClock, CalendarRange, ShoppingBag } from 'lucide-react'
+import { Flame, Award, CalendarDays, AlarmClock, CalendarRange, ShoppingBag, CalendarClock } from 'lucide-react'
 
 // 홈 큐레이션. 두 종류의 영역이 있다.
 //
@@ -28,6 +28,8 @@ interface Props {
   featured: Post[]
   popular: Post[]
   today: Post[]
+  /** 아직 안 열린 공구 — 홈에 자리가 없어 상세 조회가 0이었다 */
+  upcoming: Post[]
   endingSoon: Post[]
   monthly: Post[]
   categories: { cat: Category; posts: Post[] }[]
@@ -37,7 +39,7 @@ interface Props {
 }
 
 export default function HomeSections({
-  featured, popular, today, endingSoon, monthly, categories, influencers, endedButBuyable,
+  featured, popular, today, upcoming, endingSoon, monthly, categories, influencers, endedButBuyable,
 }: Props) {
   const [bookmarks, setBookmarks] = useState<Set<number>>(new Set())
   const [toast, setToast] = useState({ message: '', visible: false })
@@ -67,6 +69,9 @@ export default function HomeSections({
 
       <DealStrip icon={<CalendarDays size={17} strokeWidth={2.5} />} title="오늘 새로 올라온 공구" moreHref="/today"    posts={today} />
       <DealStrip icon={<AlarmClock size={17} strokeWidth={2.5} />} title="마감 임박 공구" moreHref="/deadline" posts={endingSoon} />
+      {/* 오픈 예정은 55건이 있는데도 홈에 자리가 없어 아무도 못 봤다. 마감 임박 바로 뒤에
+          두는 이유는, 둘 다 "날짜를 챙겨야 하는 공구"라 같이 훑는 게 자연스럽기 때문이다 */}
+      <DealStrip icon={<CalendarClock size={17} strokeWidth={2.5} />} title="곧 열려요" posts={upcoming} />
       <DealStrip icon={<CalendarRange size={17} strokeWidth={2.5} />} title="이달의 공구"   moreHref="/monthly"  posts={monthly} />
 
       {categories.map(({ cat, posts }) => (

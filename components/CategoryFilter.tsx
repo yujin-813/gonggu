@@ -3,8 +3,8 @@ import { CATEGORY_KEYS, type Category } from '@/lib/types'
 import { CATEGORY_ICON, CATEGORY_LABEL, CATEGORY_ORDER } from '@/lib/categoryIcons'
 
 interface CategoryFilterProps {
-  current: Category | 'all' | 'evergreen'
-  onSelect: (cat: Category | 'all' | 'evergreen') => void
+  current: Category | 'all' | 'evergreen' | 'upcoming'
+  onSelect: (cat: Category | 'all' | 'evergreen' | 'upcoming') => void
 }
 
 export default function CategoryFilter({ current, onSelect }: CategoryFilterProps) {
@@ -27,7 +27,7 @@ export default function CategoryFilter({ current, onSelect }: CategoryFilterProp
           )
         }
 
-        // 전체·상시딜은 대응하는 페이지가 없어 홈에서 거르는 방식을 유지한다
+        // 전체·오픈예정·상시딜은 대응하는 페이지가 없어 홈에서 거르는 방식을 유지한다
         return (
           <button key={id} className={className} onClick={() => onSelect(id)}>
             <Icon size={14} strokeWidth={2.25} />

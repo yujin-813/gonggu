@@ -86,12 +86,16 @@ function save(data: AnalyticsData) {
  */
 export type TrafficSource =
   | 'instagram' | 'kakao' | 'naver_search' | 'google_search' | 'other_search'
+  // 오픈 예정 공구를 캘린더에 담아 둔 사람이 그날 다시 들어온 것 — 그 기능이 실제로
+  // 사람을 데려오는지 재려면 external과 섞이면 안 된다
+  | 'calendar'
   | 'inapp' | 'external' | 'direct'
 
 const SOURCE_LABEL: Record<TrafficSource, string> = {
   instagram: '인스타그램',
   kakao: '카카오톡',
   naver_search: '네이버 검색',
+  calendar: '캘린더 알림',
   google_search: '구글 검색',
   other_search: '기타 검색',
   inapp: '앱 내 브라우저(경로 미상)',
@@ -112,6 +116,7 @@ export function classifySource(opts: {
   if (utm) {
     if (utm.includes('insta')) return { source: 'instagram', detail: utm }
     if (utm.includes('kakao') || utm.includes('talk')) return { source: 'kakao', detail: utm }
+    if (utm.includes('calendar')) return { source: 'calendar', detail: utm }
     if (utm.includes('naver')) return { source: 'naver_search', detail: utm }
     if (utm.includes('google')) return { source: 'google_search', detail: utm }
     return { source: 'external', detail: utm }

@@ -1,7 +1,7 @@
 # 03 · 시스템 — 지금 상태
 
 > **"지금"만 쓴다.** 변경 이력과 "예전에는 ○○였다"는 여기 쓰지 않는다. 과거는 `02-DECISIONS.md`에 있다.
-> 마지막 갱신: 2026-08-23
+> 마지막 갱신: 2026-08-24
 
 ---
 
@@ -12,9 +12,9 @@
 | 단계 | 운영 중 · 실사용자 있음 (2026-08-19 기준 사람 방문 고유 IP 163명/2일) |
 | 스택 | Next.js 14 (App Router) · React 18 · TypeScript · 파이썬 수집기 |
 | 저장소 | **파일 기반** — `data/*.json`. DB 없음 |
-| 코드 규모 | `lib/` 2,803줄 · `app/admin` + `components/` 4,947줄 · 파이썬 2,986줄 |
+| 코드 규모 | `lib/` 2,838줄 · `app/admin` + `components/` 5,173줄 · 파이썬 2,986줄 |
 | 데이터 규모 | 게시물 2,317건 (공개 277건) · 인플루언서 소스 58개 · analytics 31일치 |
-| 배포 | EC2 `13.125.121.62` · PM2(fork, 포트 3002) + nginx · `bash deploy.sh` |
+| 배포 | EC2 `13.125.121.62`(t3.small) · PM2(fork) + nginx · `bash deploy.sh` — **무중단**(3002↔3003 슬롯 교대, `D-028`) |
 | 도메인 | https://gonggu.asknuggetdata.com |
 
 ---
@@ -30,6 +30,10 @@
   **진행 중이어도 아쉽딜이면** 대체 구매처를 함께 보여준다(공구 버튼은 그대로 둔다) — 꿀딜·괜찮딜에는 안 붙인다 (`D-027`)
 - 랜딩 페이지 — `/today`, `/deadline`, `/monthly`, `/category/[cat]`, `/influencer/[account]`, `/influencers`, `/collection/[id]`
 - 검색 (마감 공구 포함), 찜, 공유(카카오/네이티브/복사 — utm 자동 부착)
+- 홈 **「곧 열려요」** 영역 + 카테고리 필터의 **오픈예정** — 오픈 전 공구를 모아 본다
+- 오픈 예정 상세의 **「캘린더에 담기」** (`/api/calendar/[id]`, `.ics`) — 알림은 우리가 안 보내고
+  고객 폰 캘린더가 한다. 웹 푸시는 iOS·인앱 브라우저에서 도달이 안 된다 (`D-029`)
+- 상세 하단 **공유 권유** — 판정에 맞춘 문구(`shareLabel`)를 눈에 보이게 꺼냈다. 31일간 공유 0회였다
 - 공유 카드 이미지 `/api/og/deal/[id]` — 판정 결과를 그린 800×400 PNG
 - SEO — JSON-LD(WebSite/ItemList/Product·Offer/BreadcrumbList), sitemap.xml(356 URL), robots.txt, 네이버·구글 소유확인
 
@@ -65,7 +69,7 @@
 
 | | 상태 |
 |---|---|
-| 푸시 알림 | `lib/push.ts`, `/api/push/subscribe`, `scripts/send-deadline-alerts.js`가 있고 cron이 매시 15분에 돈다. **구독자 2명**이라 사실상 미가동 ⚠️ |
+| 푸시 알림 | `lib/push.ts`, `/api/push/subscribe`, `scripts/send-deadline-alerts.js`가 있고 cron이 매시 15분에 돈다. **구독자 2명**(3주째 그대로). iOS는 홈 화면 추가가 필요하고 네이버앱·인스타 인앱은 Service Worker가 막혀서 도달 자체가 안 된다 — 그래서 오픈 알림은 캘린더로 갔다(`D-029`) ⚠️ |
 | `scraper.py` (인스타 직접 수집) | 2026-06-30 이후 미사용. `npm run scrape`로만 호출됨 |
 | 컬렉션 | 기능은 있으나 운영 데이터에 `collections.json` 360바이트 — 거의 안 씀 ⚠️ |
 | `group_key` (같은 상품 공구 묶기) | 필드와 API(`/api/posts/group-history`)는 있으나 실제 데이터 0건 |
@@ -140,7 +144,8 @@ extraction_debug, scraped_at, collection_status, collection_error
 
 **`ClickType`** (`lib/analytics.ts`) — `groupbuy` / `coupang` / `naver` / `other` / `detail`
 
-**`TrafficSource`** (`lib/analytics.ts`) — `instagram` / `kakao` / `naver_search` / `google_search` / `other_search` / `inapp` / `external` / `direct`
+**`TrafficSource`** (`lib/analytics.ts`) — `instagram` / `kakao` / `naver_search` / `google_search` / `other_search` / **`calendar`** / `inapp` / `external` / `direct`
+> `calendar`는 오픈 예정을 캘린더에 담아 둔 사람이 그날 눌러 들어온 것. 그 기능의 효과를 재는 유일한 지표다.
 
 **`Category`** — `kids` / `life` / `food` / `health` / `beauty`
 > 화면 카테고리 바에는 `all`·`evergreen`이 더 있지만 이 둘은 `Category`가 아니고 전용 페이지도 없다.
@@ -270,7 +275,9 @@ getDealVerdict(post)
   "비슷한 공구"라고 부르면 거짓말이 된다.
 - - **대체 구매처가 고객에게 보이는 경우는 둘뿐이다** — 마감된 공구, 그리고 진행 중인 아쉽딜.
   꿀딜에 붙이면 "여기가 제일 싸다"고 판정해 놓고 다른 데로 보내는 모양이 된다.
-- - **돈이 되는 클릭은 `coupang`·`naver`·`other`뿐이다.** `groupbuy`는 판매자 링크라 수수료가 없다.
+- - **`SITE_URL`은 `lib/siteUrl.ts`에 있다.** 예전엔 `lib/landing.ts`에 있었는데 그 파일은 fs를
+  읽어서, 클라이언트 컴포넌트가 상수 하나 때문에 import하면 전 페이지가 500난다.
+- **돈이 되는 클릭은 `coupang`·`naver`·`other`뿐이다.** `groupbuy`는 판매자 링크라 수수료가 없다.
 - - **쿠팡에서 찾은 비교가는 `market_price`가 아니라 `purchase_links`에 url 없이 넣는다.**
   `market_price`는 고객 화면에 무조건 "네이버 최저가"로 표시되기 때문이다. `purchase_links`는
   url이 없으면 판정에는 '쿠팡'으로 들어가되 구매 버튼으로 안 뜨고 제휴 고지도 안 붙는다.
@@ -309,7 +316,7 @@ getDealVerdict(post)
 새로 들어오는 것일수록 나쁘다 — 8월 수집분은 절반 가까이가 판정을 못 받는다. 문제 1(비교가 수집 중단)이
 고객 화면에서 드러나는 자리다.
 
-**근거:** 2026-08-23 측정(`scripts/check-docs.js`) — 보이는 공구 88건 중 pending 24건.
+**근거:** 2026-08-23 측정(`scripts/check-docs.js`) — 보이는 공구 88건 중 pending 19건.
 (`D-024`로 마감일 미확인 22건이 목록에서 내려가면서 분모와 분자가 함께 줄었다.)
 그중 8월 수집분 22건(8월 수집 47건의 47%), 7월 이전 16건(65건의 25%).
 pending 38건 중 사람이 넣은 `origPrice`가 있는 건 0건, `market_price`는 있으나 `AUTO_MATCH_FLOOR`에

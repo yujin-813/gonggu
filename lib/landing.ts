@@ -3,8 +3,11 @@ import { getPeriodState, isCustomerVisible, isPagePublic, isExpired, daysLeft } 
 import { hasPurchaseLink } from './purchaseLinks'
 import { loadPosts } from './store'
 import { CATEGORY_LABEL } from './categoryIcons'
+import { SITE_URL } from './siteUrl'
 
-export const SITE_URL = 'https://gonggu.asknuggetdata.com'
+// 클라이언트에서도 쓰려고 상수만 따로 뺐다 — 여기서 다시 내보내 기존 import를 유지한다
+export { SITE_URL }
+
 
 // 네이버·구글에서 "오늘 공구", "이달의 공구", "유아 공구"처럼 찾는 검색어에 착지할 URL이
 // 없어서 홈 하나로만 색인되고 있었다. 검색어별로 전용 페이지를 두고 제목·설명을 그 검색어에
@@ -72,6 +75,24 @@ export function todayPosts(posts: Post[]): Post[] {
     const state = getPeriodState(p)
     return state.kind === 'upcoming' && state.startDate === today
   })
+}
+
+/**
+ * 아직 안 열린 공구 — "곧 열려요".
+ *
+ * 오픈 예정이 55건인데 홈 어디에도 자리가 없어서 상세 조회가 **전 건 0회**였다(2026-08-24).
+ * todayPosts가 "오늘 오픈하는 것"만 집어 가고, 카테고리 바에도 랜딩에도 없어서 찾아갈
+ * 길이 없었다. 오픈일이 가까운 순으로 보여준다.
+ */
+export function upcomingPosts(posts: Post[]): Post[] {
+  return posts
+    .filter(p => getPeriodState(p).kind === 'upcoming')
+    .sort((a, b) => {
+      // 오픈일이 정해진 것을 먼저, 그중 가까운 순. 날짜 미정은 뒤로 민다
+      const ad = a.start_date || '', bd = b.start_date || ''
+      if (!ad !== !bd) return ad ? -1 : 1
+      return ad.localeCompare(bd)
+    })
 }
 
 /** 3일 안에 끝나는 공구 — "마감 임박 공구" */

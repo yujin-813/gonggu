@@ -9,7 +9,7 @@ import PostCard from '@/components/PostCard'
 import Toast from '@/components/Toast'
 import type { Post, Category, SortOrder, Collection } from '@/lib/types'
 import { categoryIcon } from '@/lib/categoryIcons'
-import { isEvergreen, isExpired } from '@/lib/period'
+import { isEvergreen, isExpired, getPeriodState } from '@/lib/period'
 import { getVisitorId, track } from '@/lib/track'
 import { Bell, ArrowLeft, Heart, Star, Clock, Loader2, Search, MessageCircle, X } from 'lucide-react'
 
@@ -44,7 +44,7 @@ const KAKAO_CHANNEL_URL = 'http://pf.kakao.com/_WVxgfX/friend'
 export default function HomeClient({ sections }: { sections?: React.ReactNode }) {
   const [posts, setPosts] = useState<Post[]>([])
   const [bookmarks, setBookmarks] = useState<Set<number>>(new Set())
-  const [currentCat, setCurrentCat] = useState<Category | 'all' | 'evergreen'>('all')
+  const [currentCat, setCurrentCat] = useState<Category | 'all' | 'evergreen' | 'upcoming'>('all')
   const [searchQuery, setSearchQuery] = useState('')
   const [sortOrder, setSortOrder] = useState<SortOrder>('latest')
   const [viewingBookmarks, setViewingBookmarks] = useState(false)
@@ -248,6 +248,9 @@ export default function HomeClient({ sections }: { sections?: React.ReactNode })
   const showingMainFeed = !viewingBookmarks && !viewingFollowed
   if (showingMainFeed && currentCat === 'evergreen') {
     filtered = filtered.filter(isEvergreen)
+  } else if (showingMainFeed && currentCat === 'upcoming') {
+    // 오픈 예정은 아직 못 사는 공구라 다른 카테고리와 섞이면 헷갈린다 — 따로 골라 본다
+    filtered = filtered.filter(p => getPeriodState(p).kind === 'upcoming')
   } else if (showingMainFeed && currentCat !== 'all') {
     filtered = filtered.filter(p => p.cat === currentCat)
   }

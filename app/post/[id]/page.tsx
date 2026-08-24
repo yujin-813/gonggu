@@ -103,6 +103,7 @@ export default function PostPage({ params }: { params: { id: string } }) {
   // 살 곳을 안 알려주면 고객은 "여기가 비싸다"는 사실만 알고 빈손으로 나간다.
   // 꿀딜·괜찮딜에는 붙이지 않는다. "여기가 제일 싸다"고 해 놓고 다른 데로 보내는 모양이
   // 되기 때문이다 (D-027).
+  const upcoming = getPeriodState(post).kind === 'upcoming'
   const betterPrice = !ended && getDealVerdict(post).display.key === 'meh'
   const related = ended ? getRelated(post) : { posts: [] as Post[], kind: 'category' as RelatedKind }
   return (
@@ -119,6 +120,7 @@ export default function PostPage({ params }: { params: { id: string } }) {
         post={post}
         ended={ended}
         purchaseLinks={ended || betterPrice ? visiblePurchaseLinks(post) : []}
+        upcoming={upcoming}
         betterPrice={betterPrice}
         related={related.posts}
         relatedKind={related.kind}

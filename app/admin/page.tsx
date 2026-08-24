@@ -2,7 +2,7 @@
 import { useState, useEffect, useMemo, useCallback } from 'react'
 import type { Post, ScraperStatus, InfluencerSource, Collection, PurchaseLink } from '@/lib/types'
 import { daysLeft, periodLabel, isExpired, isCustomerVisible, isPagePublic, fmtDate, getPeriodState, DEADLINE_UNKNOWN_DAYS } from '@/lib/period'
-import { hasPurchaseLink, normalizePurchaseLinks, brokenPurchaseLinks } from '@/lib/purchaseLinks'
+import { hasPurchaseLink, normalizePurchaseLinks, brokenPurchaseLinks, isAffiliateLink, PLATFORM_LABEL } from '@/lib/purchaseLinks'
 import { getDealVerdict, isMultiOption } from '@/lib/dealGrade'
 import { partnerSearchQuery } from '@/lib/searchQuery'
 import { getCompareState, COMPARE_STATE_LABEL, CLEAR_COMPARE_NONE, type CompareState } from '@/lib/compareState'
@@ -717,7 +717,7 @@ export default function AdminPage() {
         {/* 통계 설정 탭 — 관리자 방문이 고객 통계에 섞이지 않게 관리 */}
         {adminTab === 'verdict' && <VerdictFiller posts={posts} views={detailViews} onSaved={fetchPosts} />}
 
-        {adminTab === 'revenue' && <RevenueBoard posts={posts} clicks={clickBreakdown} sources={postSources} onGoFill={() => setAdminTab('verdict')} />}
+        {adminTab === 'revenue' && <RevenueBoard posts={posts} clicks={clickBreakdown} sources={postSources} onGoFill={() => setAdminTab('verdict')} onSaved={fetchPosts} />}
 
         {adminTab === 'settings' && <AdminIpManager />}
 
@@ -1809,6 +1809,93 @@ function AdminIpManager() {
 }
 
 /**
+ * 제휴 링크를 그 자리에서 넣는 창.
+ *
+ * 수익화 현황 표에서 "없음"을 보고 다른 화면으로 옮겨 다시 찾는 왕복이 있었다. 표에서 바로
+ * 넣게 한다.
+ *
+ * 저장 전에 파트너스 링크인지 검사한다 — url 자리에 상품명을 그대로 붙여넣은 데이터가
+ * 실제로 있었다("앱솔리 또또뻥 호라산밀 앤 파로 뻥튀기, 5개, 95g"). 그런 값은 고객 화면에
+ * 안 뜨는데, 관리자는 넣었다고 생각하고 넘어간다. 입구에서 막는 편이 낫다.
+ */
+function PurchaseLinkModal({ post, onClose, onSaved }: { post: Post; onClose: () => void; onSaved: () => void }) {
+  const existing = normalizePurchaseLinks(post)
+  const current = existing.find(l => l.platform === 'coupang')
+  const [url, setUrl] = useState(current?.url ?? '')
+  const [price, setPrice] = useState(String(current?.price ?? ''))
+  const [saving, setSaving] = useState(false)
+
+  const trimmed = url.trim()
+  const looksOk = !trimmed || isAffiliateLink({ platform: 'coupang', url: trimmed })
+  const canSave = !!trimmed && looksOk
+
+  async function save() {
+    setSaving(true)
+    const rest = existing.filter(l => l.platform !== 'coupang')
+    const links = [...rest, {
+      platform: 'coupang' as const,
+      url: trimmed,
+      price: parseInt(price) || null,
+      visible: true,
+      checked_at: new Date().toISOString(),
+    }]
+    await fetch(`/api/posts/${post.id}`, {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ purchase_links: links }),
+    })
+    setSaving(false); onSaved(); onClose()
+  }
+
+  return (
+    <div onClick={onClose}
+      style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,.5)', zIndex: 50,
+        display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
+      <div onClick={e => e.stopPropagation()}
+        style={{ background: '#fff', borderRadius: 14, padding: 20, width: '100%', maxWidth: 520,
+          maxHeight: '90vh', overflowY: 'auto' }}>
+        <h3 style={{ fontSize: 15.5, fontWeight: 800, marginBottom: 4 }}>쿠팡 파트너스 링크 넣기</h3>
+        <p style={{ fontSize: 13, color: '#475569', lineHeight: 1.6, marginBottom: 12 }}>{post.title}</p>
+
+        <FillTools post={post} />
+
+        <input type="url" value={url} onChange={e => setUrl(e.target.value)}
+          placeholder="https://link.coupang.com/a/..."
+          style={{ ...fillInput, fontSize: 13 }} />
+        {!looksOk && (
+          <p style={{ fontSize: 12, color: '#b91c1c', margin: '6px 0 0', lineHeight: 1.6 }}>
+            파트너스 링크가 아니에요. 파트너스에서 <strong>링크를 복사</strong>해 주세요 —
+            상품명이 복사된 것 같아요. (<code>link.coupang.com</code> 또는 <code>coupa.ng</code>)
+          </p>
+        )}
+
+        <input type="number" value={price} onChange={e => setPrice(e.target.value)}
+          placeholder="쿠팡 가격 (선택 — 모르면 비워두면 '가격 확인하기'로 보내요)"
+          style={{ ...fillInput, fontSize: 13, marginTop: 8 }} />
+
+        <p style={{ fontSize: 11, color: '#94a3b8', margin: '8px 0 0', lineHeight: 1.6 }}>
+          고객 화면에 구매 버튼으로 뜨고 공정위 제휴 고지가 함께 붙어요. 그래서 진짜 파트너스
+          링크만 넣어야 합니다.
+        </p>
+
+        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 14 }}>
+          <button onClick={onClose}
+            style={{ padding: '8px 16px', borderRadius: 8, border: '1px solid #cbd5e1', background: '#fff',
+              cursor: 'pointer', fontSize: 13, fontWeight: 600, color: '#475569' }}>
+            닫기
+          </button>
+          <button onClick={save} disabled={!canSave || saving}
+            style={{ padding: '8px 18px', borderRadius: 8, border: 'none', fontSize: 13, fontWeight: 700,
+              cursor: canSave && !saving ? 'pointer' : 'not-allowed',
+              background: canSave ? '#6366f1' : '#e2e8f0', color: canSave ? '#fff' : '#94a3b8' }}>
+            {saving ? '저장 중…' : '저장'}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+/**
  * 수익화 현황 — 상품별로 "얼마나 보고, 얼마나 나가고, 나갈 곳이 있는가"를 한 표로 본다.
  *
  * 이 제품에서 돈이 되는 동작은 제휴 링크 클릭뿐이다(사이트 안에서 결제하지 않는다). 그런데
@@ -1818,13 +1905,15 @@ function AdminIpManager() {
  * "검색유입" 열은 오늘부터 쌓인다(postSources). 소급이 안 되므로 한동안 0으로 보이는 게
  * 정상이다 — 없는 값을 있는 것처럼 보이게 하지 않는다.
  */
-function RevenueBoard({ posts, clicks, sources, onGoFill }: {
+function RevenueBoard({ posts, clicks, sources, onGoFill, onSaved }: {
   posts: Post[]
   clicks: Record<string, Record<string, number>>
   sources: Record<string, Record<string, number>>
   onGoFill: () => void
+  onSaved: () => void
 }) {
   const [needOnly, setNeedOnly] = useState(true)
+  const [linking, setLinking] = useState<Post | null>(null)
 
   const n = (id: number, k: string) => (clicks[id] || {})[k] || 0
   const searchIn = (id: number) => {
@@ -1924,16 +2013,22 @@ function RevenueBoard({ posts, clicks, sources, onGoFill }: {
                 <td style={{ ...td, color: r.coupang ? '#0f172a' : '#cbd5e1' }}>{r.coupang || '–'}</td>
                 <td style={{ ...td, color: r.naver ? '#0f172a' : '#cbd5e1' }}>{r.naver || '–'}</td>
                 <td style={{ ...td, textAlign: 'center' }}>
-                  {r.linked
-                    ? <span style={{ fontSize: 11.5, fontWeight: 700, color: '#15803d' }}>있음</span>
-                    : r.broken
-                    ? <span style={{ fontSize: 11.5, fontWeight: 700, color: '#b45309' }} title="파트너스 링크가 아니라 고객에게 안 보입니다">링크 오류</span>
-                    : <span style={{ fontSize: 11.5, fontWeight: 700, color: '#dc2626' }}>없음</span>}
+                  <button onClick={() => setLinking(r.post)}
+                    title={r.linked ? '링크를 고칩니다' : '여기서 바로 넣습니다'}
+                    style={{ border: 'none', background: 'none', cursor: 'pointer', padding: '2px 6px',
+                      borderRadius: 6, fontSize: 11.5, fontWeight: 700,
+                      color: r.linked ? '#15803d' : r.broken ? '#b45309' : '#dc2626',
+                      textDecoration: r.linked ? 'none' : 'underline' }}>
+                    {r.linked ? '있음' : r.broken ? '링크 오류' : '없음'}
+                  </button>
                 </td>
               </tr>
             ))}
           </tbody>
         </table>
+        {linking && (
+          <PurchaseLinkModal post={linking} onClose={() => setLinking(null)} onSaved={onSaved} />
+        )}
         {list.length === 0 && (
           <p style={{ textAlign: 'center', padding: '24px 0', fontSize: 14, fontWeight: 700, color: '#64748b' }}>
             해당하는 상품이 없어요
