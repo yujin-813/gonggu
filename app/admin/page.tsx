@@ -114,7 +114,7 @@ export default function AdminPage() {
   const [showAddModal, setShowAddModal] = useState(false)
   const [editingPost, setEditingPost]   = useState<Post | null>(null)
   const [loading, setLoading]         = useState(true)
-  const [filter, setFilter]           = useState<'all' | 'candidate' | 'needs_review' | 'ready' | 'published' | 'expired' | 'excluded' | 'upcoming' | 'featured'>('all')
+  const [filter, setFilter]           = useState<'all' | 'candidate' | 'needs_review' | 'ready' | 'published' | 'expired' | 'excluded' | 'upcoming' | 'upcoming_overdue' | 'featured'>('all')
   const [searchQ, setSearchQ]         = useState('')
   const [analytics, setAnalytics]     = useState<DayStat[]>([])
   const [topPosts, setTopPosts]       = useState<TopPost[]>([])
@@ -463,12 +463,21 @@ export default function AdminPage() {
   const isPublishedLive = (p: Post) => effectiveStatus(p) === 'published' && !isExpired(p)
   const isPublishedExpired = (p: Post) => effectiveStatus(p) === 'published' && isExpired(p)
 
+  // status는 'upcoming'으로 저장되면 실제 공구가 수집되기 전까지 안 바뀐다(D-036 참고).
+  // 오픈일이 지나도 status만 보고 "오픈예정" 탭에 묶으면, 정작 오픈일이 지나 이제
+  // "왜 아직도 안 채워졌지" 확인이 필요한 것들이 "아직 안 열렸다"는 탭에 계속 숨어 버린다.
+  // 날짜 계산은 getPeriodState가 KST 기준으로 다시 해주므로 그걸로 가른다.
+  const isUpcomingOpen    = (p: Post) => effectiveStatus(p) === 'upcoming' && getPeriodState(p).kind === 'upcoming'
+  const isUpcomingOverdue = (p: Post) => effectiveStatus(p) === 'upcoming' && getPeriodState(p).kind !== 'upcoming'
+
   const visible = posts.filter(p => {
     const st = effectiveStatus(p)
     const matchFilter =
       filter === 'all'       ? true :
       filter === 'published' ? isPublishedLive(p) :
       filter === 'expired'   ? isPublishedExpired(p) :
+      filter === 'upcoming'  ? isUpcomingOpen(p) :
+      filter === 'upcoming_overdue' ? isUpcomingOverdue(p) :
       filter === 'featured'  ? !!p.is_featured :
       st === filter
     const q = searchQ.toLowerCase()
@@ -483,7 +492,8 @@ export default function AdminPage() {
   const publishedCount   = posts.filter(isPublishedLive).length
   const expiredCount     = posts.filter(isPublishedExpired).length
   const excludedCount    = countBy('excluded')
-  const upcomingCount    = countBy('upcoming')
+  const upcomingCount        = posts.filter(isUpcomingOpen).length
+  const upcomingOverdueCount = posts.filter(isUpcomingOverdue).length
   const featuredCount    = posts.filter(p => p.is_featured).length
 
   // 인증 확인 중 (hydration 전)
@@ -595,6 +605,7 @@ export default function AdminPage() {
                   { key: 'ready',        label: `공개 가능 ${readyCount}`,       color: '#22c55e', count: readyCount },
                   { key: 'published',    label: `공개됨 ${publishedCount}`,      color: '#0ea5e9', count: publishedCount },
                   { key: 'upcoming',     label: `오픈예정 ${upcomingCount}`,      color: '#7c3aed', count: upcomingCount },
+                  { key: 'upcoming_overdue', label: `오픈일 지남 · 미수집 ${upcomingOverdueCount}`, color: '#dc2626', count: upcomingOverdueCount },
                   { key: 'expired',      label: `마감됨 ${expiredCount}`,        color: '#94a3b8', count: expiredCount },
                   { key: 'featured',     label: `추천 ${featuredCount}`,         color: '#f59e0b', count: featuredCount },
                   { key: 'candidate',    label: `공구 후보 ${candidateCount}`,   color: '#eab308', count: candidateCount },
@@ -947,7 +958,11 @@ function AdminPostRow({ post: p, onToggle, onDelete, onEdit, onToggleAlwaysOn, o
             {p.status === 'needs_review' && <span style={{ fontSize: 11, background: '#fff7ed', color: '#c2410c',  padding: '2px 6px', borderRadius: 10, fontWeight: 600 }}>검수 필요</span>}
             {p.status === 'ready'        && <span style={{ fontSize: 11, background: '#dcfce7', color: '#15803d',  padding: '2px 6px', borderRadius: 10, fontWeight: 600 }}>공개 가능</span>}
             {p.status === 'excluded'     && <span style={{ fontSize: 11, background: '#f1f5f9', color: '#64748b',  padding: '2px 6px', borderRadius: 10, fontWeight: 600 }}>제외</span>}
-            {p.status === 'upcoming'     && <span style={{ fontSize: 11, background: '#ede9fe', color: '#7c3aed',  padding: '2px 6px', borderRadius: 10, fontWeight: 600 }}>오픈 예정</span>}
+            {p.status === 'upcoming' && (
+              getPeriodState(p).kind === 'upcoming'
+                ? <span style={{ fontSize: 11, background: '#ede9fe', color: '#7c3aed',  padding: '2px 6px', borderRadius: 10, fontWeight: 600 }}>오픈 예정</span>
+                : <span title="오픈일은 지났는데 정식 공구로 아직 수집되지 않았어요" style={{ fontSize: 11, background: '#fee2e2', color: '#dc2626',  padding: '2px 6px', borderRadius: 10, fontWeight: 700, cursor: 'help' }}>오픈일 지남 · 미수집</span>
+            )}
             {p.source === 'influencer_request' && <span title="인플루언서가 직접 제출한 등록 요청" style={{ fontSize: 11, background: '#e0f2fe', color: '#0369a1', padding: '2px 6px', borderRadius: 10, fontWeight: 600, cursor: 'help' }}>직접 제보</span>}
             {p.review_reason && p.review_reason.length > 0 && p.review_reason.map((r, i) => (
               <span key={i} style={{ fontSize: 10, background: '#fee2e2', color: '#dc2626', padding: '1px 5px', borderRadius: 8 }}>{r}</span>
