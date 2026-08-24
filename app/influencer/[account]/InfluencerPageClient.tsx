@@ -1,7 +1,8 @@
 'use client'
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
-import { ArrowLeft, Search } from 'lucide-react'
+import { ArrowLeft, Search, Star } from 'lucide-react'
+import Toast from '@/components/Toast'
 
 interface InfluencerItem {
   id: number
@@ -26,6 +27,8 @@ export default function InfluencerPage({ params }: { params: { account: string }
   const [loading, setLoading] = useState(true)
   const [sortOrder, setSortOrder] = useState<SortOrder>('latest')
   const [query, setQuery] = useState('')
+  const [following, setFollowing] = useState(false)
+  const [toast, setToast] = useState({ message: '', visible: false })
 
   useEffect(() => {
     fetch(`/api/posts/by-influencer?account=${encodeURIComponent(account)}`)
@@ -34,6 +37,27 @@ export default function InfluencerPage({ params }: { params: { account: string }
       .catch(() => {})
       .finally(() => setLoading(false))
   }, [account])
+
+  // 홈의 "팔로우한 인플루언서만 보기"가 읽는 것과 같은 저장소를 쓴다 — 팔로우는
+  // 여기(인플루언서 페이지)에서만 하고, 홈은 그 결과를 필터링해서 보여주기만 한다
+  useEffect(() => {
+    const saved: string[] = JSON.parse(localStorage.getItem('gonggu_followed_accounts') || '[]')
+    setFollowing(saved.includes(account))
+  }, [account])
+
+  function toggleFollow() {
+    const saved: string[] = JSON.parse(localStorage.getItem('gonggu_followed_accounts') || '[]')
+    const set = new Set(saved)
+    if (set.has(account)) {
+      set.delete(account)
+      setToast({ message: '팔로우를 취소했어요', visible: true })
+    } else {
+      set.add(account)
+      setToast({ message: '인플루언서를 팔로우했어요!', visible: true })
+    }
+    localStorage.setItem('gonggu_followed_accounts', JSON.stringify([...set]))
+    setFollowing(set.has(account))
+  }
 
   const filtered = query.trim()
     ? items.filter(item => {
@@ -64,11 +88,30 @@ export default function InfluencerPage({ params }: { params: { account: string }
         <p style={{ fontSize: 13, color: '#64748b', margin: '0 0 8px' }}>
           공구 여부와 상관없이 이 인플루언서가 올린 상품들이에요 — 가격 비교/할인 판단은 따로 하지 않아요
         </p>
-        <a href={profileUrl} target="_blank" rel="noopener noreferrer"
-          style={{ fontSize: 13, color: '#6366f1', fontWeight: 600, textDecoration: 'none' }}>
-          인스타그램 {account} 보기 →
-        </a>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12, flexWrap: 'wrap' }}>
+          <a href={profileUrl} target="_blank" rel="noopener noreferrer"
+            style={{ fontSize: 13, color: '#6366f1', fontWeight: 600, textDecoration: 'none' }}>
+            인스타그램 {account} 보기 →
+          </a>
+          <button
+            onClick={toggleFollow}
+            style={{
+              display: 'inline-flex', alignItems: 'center', gap: 5,
+              fontSize: 13, fontWeight: 700,
+              padding: '6px 12px', borderRadius: 999,
+              border: `1.5px solid ${following ? '#f59e0b' : '#e2e8f0'}`,
+              background: following ? '#fffbeb' : '#fff',
+              color: following ? '#b45309' : '#64748b',
+              cursor: 'pointer',
+            }}
+          >
+            <Star size={14} fill={following ? 'currentColor' : 'none'} />
+            {following ? '팔로잉' : '팔로우'}
+          </button>
+        </div>
       </div>
+
+      <Toast message={toast.message} visible={toast.visible} onHide={() => setToast(t => ({ ...t, visible: false }))} />
 
       {!loading && items.length > 0 && (
         <div className="hero-search-wrap">

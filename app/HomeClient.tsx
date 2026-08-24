@@ -146,16 +146,6 @@ export default function HomeClient({ sections }: { sections?: React.ReactNode })
     else subscribeToPush()
   }
 
-  function toggleFollowInfluencer(account: string) {
-    setFollowedInfluencers(prev => {
-      const next = new Set(prev)
-      if (next.has(account)) { next.delete(account); showToast('팔로우를 취소했어요') }
-      else { next.add(account); showToast('인플루언서를 팔로우했어요!') }
-      localStorage.setItem('gonggu_followed_accounts', JSON.stringify([...next]))
-      return next
-    })
-  }
-
   // "공구 보기"를 눌러 실제로 관심을 보인 상품을 최근 본 목록에 기록 (최대 20개, 중복 제거)
   function recordRecentlyViewed(id: number) {
     setRecentlyViewed(prev => {
@@ -425,8 +415,6 @@ export default function HomeClient({ sections }: { sections?: React.ReactNode })
                     }}
                     siblings={post.group_key ? groupMap.get(post.group_key) : undefined}
                     pastPrices={post.group_key ? groupHistory[post.group_key]?.filter(h => h.id !== post.id) : undefined}
-                    isFollowingAccount={followedInfluencers.has(post.account)}
-                    onToggleFollowAccount={toggleFollowInfluencer}
                   />
                 )}
               />
@@ -480,8 +468,6 @@ export default function HomeClient({ sections }: { sections?: React.ReactNode })
               }}
               siblings={post.group_key ? groupMap.get(post.group_key) : undefined}
               pastPrices={post.group_key ? groupHistory[post.group_key]?.filter(h => h.id !== post.id) : undefined}
-              isFollowingAccount={followedInfluencers.has(post.account)}
-              onToggleFollowAccount={toggleFollowInfluencer}
             />
           ))
         )}

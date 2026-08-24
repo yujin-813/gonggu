@@ -425,15 +425,6 @@ header {
 .account-name { font-size: 13px; font-weight: 600; color: var(--gray-4); }
 .account-name a { color: inherit; text-decoration: none; }
 .account-name a:hover { color: var(--brand); }
-.btn-follow-star {
-  background: none;
-  border: none;
-  cursor: pointer;
-  display: inline-flex;
-  align-items: center;
-  padding: 0 2px;
-  line-height: 1;
-}
 .cat-tag {
   margin-left: auto;
   display: inline-flex;

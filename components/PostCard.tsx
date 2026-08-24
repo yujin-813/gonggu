@@ -5,7 +5,7 @@ import type { Post } from '@/lib/types'
 import { daysLeft, getPeriodState, badgeFromState, periodTextFromState, isExpired, isNewPost, type BadgeIcon, type PeriodIcon } from '@/lib/period'
 import { CATEGORY_LABEL, categoryIcon } from '@/lib/categoryIcons'
 import {
-  Heart, Star, Wallet, CheckCircle2, Calendar, CalendarClock, CalendarPlus,
+  Heart, Wallet, CheckCircle2, Calendar, CalendarClock, CalendarPlus,
   Package, Flame, Lock, Timer, Zap, ExternalLink, Share2,
 } from 'lucide-react'
 import PriceCompareModal from './PriceCompareModal'
@@ -30,13 +30,10 @@ interface PostCardProps {
   onShare?: (id: number, result: 'kakao' | 'native' | 'clipboard') => void
   siblings?: Post[]
   pastPrices?: { id: number; price: number; origPrice: number | null; date: string }[]
-  isFollowingAccount?: boolean
-  onToggleFollowAccount?: (account: string) => void
 }
 
 export default function PostCard({
   post, isBookmarked, onToggleBookmark, onJoin, onShare, siblings = [], pastPrices = [],
-  isFollowingAccount, onToggleFollowAccount,
 }: PostCardProps) {
   const [imgFailed, setImgFailed] = useState(false)
   const [showCompare, setShowCompare] = useState(false)
@@ -189,16 +186,6 @@ export default function PostCard({
               {post.account}
             </a>
           </span>
-          {onToggleFollowAccount && (
-            <button
-              onClick={() => onToggleFollowAccount(post.account)}
-              title={isFollowingAccount ? '인플루언서 팔로우 취소' : '이 인플루언서 팔로우'}
-              className="btn-follow-star"
-              style={{ color: isFollowingAccount ? '#f59e0b' : '#cbd5e1' }}
-            >
-              <Star size={14} fill={isFollowingAccount ? 'currentColor' : 'none'} />
-            </button>
-          )}
           <Link
             href={`/influencer/${encodeURIComponent(post.account.replace('@', ''))}`}
             onClick={e => e.stopPropagation()}

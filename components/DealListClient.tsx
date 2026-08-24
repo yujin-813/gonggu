@@ -82,6 +82,10 @@ export default function DealListClient({ h1, description, empty, posts, related 
               isBookmarked={bookmarks.has(post.id)}
               onToggleBookmark={toggleBookmark}
               onJoin={id => track('join', { postId: id })}
+              onShare={(id, result) => {
+                if (result === 'clipboard') showToast('링크가 복사되었어요')
+                track('share', { postId: id })
+              }}
             />
           ))
         )}
