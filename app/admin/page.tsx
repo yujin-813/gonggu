@@ -1818,21 +1818,27 @@ function AdminIpManager() {
 
 interface RecentSession {
   sessionId: string
+  visitorId: string | null
   startedAt: string
   lastAt: string
   source: string | null
   isReturning: boolean
+  pageViews: number
   events: { at: string; s: string; v?: string; t: string; p?: number; c?: string; src?: string }[]
 }
 
 /**
- * 최근 방문 흐름 — 한 사람이 들어와서 무엇을 했는지 한 줄로 본다.
+ * 최근 방문 흐름 — 한 방문을 가로 한 줄로 본다.
  *
- * 유입 경로 표는 "네이버 74건"까지만 알려주고 그 74명이 뭘 하고 나갔는지는 답하지 못한다.
- * 판정을 보러 왔는데 못 보고 나갔는지, 공구 링크까지 갔는지는 흐름을 봐야 안다.
+ * 처음에는 동작을 세로로 나열했는데, 절반이 "페이지 열기"라 읽히지 않았다. view 이벤트는
+ * postId가 없어서 **어느 페이지인지도 모른다** — 점으로 찍을 내용이 없다. 그래서 주요 동작만
+ * 가로로 잇고, 페이지 열기는 개수만 요약에 적는다.
  *
- * 최근 300건만 남긴다(대략 일주일치). 추세는 daily가 이미 갖고 있고, 여기는 "지금 무슨 일이
- * 일어나는지" 보는 자리다. sessionId는 익명 난수이고 IP는 저장하지 않는다.
+ * 방문자 id를 앞에 붙인다. 같은 사람이 여러 번 온 걸 눈으로 잇기 위해서다(visitorId는
+ * localStorage에 남는 익명 난수라 브라우저당 하나다). IP는 저장하지 않는다.
+ *
+ * 관리자 방문은 여기 안 들어온다 — /api/analytics가 쿠키·흔적 쿠키·IP 세 겹으로 걸러낸 뒤에
+ * 기록하기 때문이다(D-007). 표시 안 되는 기기에서 볼 때는 URL에 ?notrack=1을 한 번 붙이면 된다.
  */
 function VisitorFlow({ sessions, posts, onRefresh }: { sessions: RecentSession[]; posts: Post[]; onRefresh: () => void }) {
   const title = (id?: number) => (id ? posts.find(p => p.id === id)?.title || `#${id}` : '')
@@ -1843,19 +1849,22 @@ function VisitorFlow({ sessions, posts, onRefresh }: { sessions: RecentSession[]
     if (m < 1440) return `${Math.floor(m / 60)}시간 전`
     return `${Math.floor(m / 1440)}일 전`
   }
-  const label = (e: RecentSession['events'][number]) => {
-    if (e.t === 'view') return '페이지 열기'
-    if (e.t === 'category') return '카테고리 보기'
-    if (e.t === 'search') return '검색'
-    if (e.t === 'bookmark') return `찜 ${title(e.p)}`.trim()
-    if (e.t === 'share') return `공유 ${title(e.p)}`.trim()
-    if (e.t === 'join') return `공구 보러가기 → ${title(e.p)}`
-    if (e.t === 'click' && e.c === 'detail') return `상세 ${title(e.p)}`
-    if (e.t === 'click') return `${e.c} 링크 → ${title(e.p)}`
-    return e.t
+
+  /** 타임라인에 점으로 찍을 만한 동작인지 — 페이지 열기는 내용이 없어 뺀다 */
+  type Node = { label: string; sub: string; money: boolean; strong: boolean }
+  const toNode = (e: RecentSession['events'][number]): Node | null => {
+    if (e.t === 'view') return null
+    if (e.t === 'click' && e.c === 'detail') return { label: '상세', sub: title(e.p), money: false, strong: false }
+    if (e.t === 'join' || (e.t === 'click' && e.c === 'groupbuy')) return { label: '공구로 나감', sub: title(e.p), money: false, strong: true }
+    if (e.t === 'click' && (e.c === 'coupang' || e.c === 'naver' || e.c === 'other')) {
+      return { label: `${e.c} 구매`, sub: title(e.p), money: true, strong: true }
+    }
+    if (e.t === 'bookmark') return { label: '찜', sub: title(e.p), money: false, strong: true }
+    if (e.t === 'share') return { label: '공유', sub: title(e.p), money: false, strong: true }
+    if (e.t === 'search') return { label: '검색', sub: '', money: false, strong: false }
+    if (e.t === 'category') return { label: '카테고리', sub: '', money: false, strong: false }
+    return { label: e.t, sub: title(e.p), money: false, strong: false }
   }
-  // 돈이 되는 동작만 눈에 띄게 — 나머지는 흐름을 읽는 배경이다
-  const isMoney = (t: string, c?: string) => t === 'click' && (c === 'coupang' || c === 'naver' || c === 'other')
 
   return (
     <div style={{ background: '#fff', borderRadius: 12, padding: 20, border: '1px solid #e2e8f0' }}>
@@ -1868,9 +1877,11 @@ function VisitorFlow({ sessions, posts, onRefresh }: { sessions: RecentSession[]
         </button>
       </div>
       <p style={{ fontSize: 13, color: '#64748b', lineHeight: 1.7, marginBottom: 16 }}>
-        한 사람이 들어와서 무엇을 했는지 순서대로예요. 최근 300건만 남기니 대략 일주일치입니다.
+        한 방문이 한 줄이에요. <strong>페이지 열기는 뺐습니다</strong> — 어느 페이지인지 안 남아서 볼 게 없어요.
         <br />
-        <span style={{ color: '#94a3b8' }}>기록은 2026-08-24부터 쌓입니다 — 그 전 방문은 집계만 있고 흐름이 없어요.</span>
+        <span style={{ color: '#94a3b8' }}>
+          앞의 4자리는 방문자 표시(브라우저마다 하나). 관리자 방문은 안 들어옵니다. 최근 300건만 남아요.
+        </span>
       </p>
 
       {sessions.length === 0 ? (
@@ -1878,34 +1889,55 @@ function VisitorFlow({ sessions, posts, onRefresh }: { sessions: RecentSession[]
           아직 쌓인 방문이 없어요
         </p>
       ) : (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-          {sessions.map(s => (
-            <div key={s.sessionId}
-              style={{ border: '1px solid #e2e8f0', borderRadius: 10, padding: '11px 13px' }}>
-              <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', marginBottom: 7 }}>
-                <span style={{ fontSize: 12.5, fontWeight: 700, color: '#0f172a' }}>
-                  {SOURCE_KO[s.source || 'direct'] || s.source || '직접 방문'}
-                </span>
-                {s.isReturning && (
-                  <span style={{ fontSize: 11, fontWeight: 700, color: '#15803d', background: '#dcfce7', borderRadius: 5, padding: '1px 6px' }}>
-                    재방문
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          {sessions.map(s => {
+            const nodes = s.events.map(toNode).filter(Boolean) as Node[]
+            const paid = nodes.some(n => n.money)
+            return (
+              <div key={s.sessionId}
+                style={{ border: '1px solid #e2e8f0', borderLeft: `3px solid ${paid ? '#22c55e' : '#e2e8f0'}`,
+                  borderRadius: 10, padding: '10px 12px' }}>
+                <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', marginBottom: nodes.length ? 8 : 0 }}>
+                  <code style={{ fontSize: 11, fontWeight: 700, color: '#475569', background: '#f1f5f9', borderRadius: 5, padding: '1px 6px' }}>
+                    {(s.visitorId || s.sessionId).slice(0, 4)}
+                  </code>
+                  <span style={{ fontSize: 12.5, fontWeight: 700, color: '#0f172a' }}>
+                    {SOURCE_KO[s.source || 'direct'] || s.source || '직접 방문'}
                   </span>
-                )}
-                <span style={{ fontSize: 12, color: '#94a3b8' }}>{when(s.lastAt)} · {s.events.length}동작</span>
-              </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
-                {s.events.map((e, i) => (
-                  <div key={i} style={{ fontSize: 12.5, color: isMoney(e.t, e.c) ? '#15803d' : '#475569',
-                    fontWeight: isMoney(e.t, e.c) ? 700 : 400, display: 'flex', gap: 8 }}>
-                    <span style={{ color: '#cbd5e1', flexShrink: 0 }}>{i + 1}</span>
-                    <span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                      {label(e)}
-                    </span>
+                  {s.isReturning && (
+                    <span style={{ fontSize: 11, fontWeight: 700, color: '#15803d', background: '#dcfce7', borderRadius: 5, padding: '1px 6px' }}>재방문</span>
+                  )}
+                  <span style={{ fontSize: 12, color: '#94a3b8', marginLeft: 'auto' }}>
+                    {s.pageViews > 0 && `${s.pageViews}페이지 · `}{when(s.lastAt)}
+                  </span>
+                </div>
+
+                {nodes.length === 0 ? (
+                  <div style={{ fontSize: 12.5, color: '#94a3b8' }}>둘러보기만 하고 나갔어요</div>
+                ) : (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 0, overflowX: 'auto', paddingBottom: 2 }}>
+                    {nodes.map((n, i) => (
+                      <div key={i} style={{ display: 'flex', alignItems: 'center', flexShrink: 0 }}>
+                        {i > 0 && <span style={{ width: 18, height: 1.5, background: '#e2e8f0', flexShrink: 0 }} />}
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 1, maxWidth: 190, flexShrink: 0 }}>
+                          <span style={{ fontSize: 11.5, fontWeight: 700, whiteSpace: 'nowrap',
+                            color: n.money ? '#15803d' : n.strong ? '#4f46e5' : '#64748b' }}>
+                            {n.money ? '● ' : n.strong ? '◆ ' : '○ '}{n.label}
+                          </span>
+                          {n.sub && (
+                            <span style={{ fontSize: 11, color: '#94a3b8', overflow: 'hidden',
+                              textOverflow: 'ellipsis', whiteSpace: 'nowrap', paddingLeft: 12 }}>
+                              {n.sub}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    ))}
                   </div>
-                ))}
+                )}
               </div>
-            </div>
-          ))}
+            )
+          })}
         </div>
       )}
     </div>

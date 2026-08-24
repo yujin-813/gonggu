@@ -383,10 +383,12 @@ export function getPostSourceCounts(days = 14): Record<number, Record<string, nu
  */
 export function getRecentSessions(limit = 40): {
   sessionId: string
+  visitorId: string | null
   startedAt: string
   lastAt: string
   source: string | null
   isReturning: boolean
+  pageViews: number
   events: RecentEvent[]
 }[] {
   const data = load()
@@ -404,9 +406,12 @@ export function getRecentSessions(limit = 40): {
       const day = sorted[0].at.slice(0, 10)
       return {
         sessionId,
+        visitorId: vid ?? null,
         startedAt: sorted[0].at,
         lastAt: sorted[sorted.length - 1].at,
         source: sorted.find(e => e.src)?.src ?? null,
+        // view는 어느 페이지인지 안 남아서 타임라인에 점으로 찍을 게 없다 — 개수만 센다
+        pageViews: sorted.filter(e => e.t === 'view').length,
         // 이 방문자를 오늘 이전에 본 적이 있으면 재방문이다
         isReturning: !!vid && !!firstSeen[vid] && firstSeen[vid] < day,
         events: sorted,
