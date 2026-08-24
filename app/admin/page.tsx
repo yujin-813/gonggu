@@ -2,7 +2,7 @@
 import { useState, useEffect, useMemo, useCallback } from 'react'
 import type { Post, ScraperStatus, InfluencerSource, Collection, PurchaseLink } from '@/lib/types'
 import { daysLeft, periodLabel, isExpired, isCustomerVisible, isPagePublic, fmtDate, getPeriodState, DEADLINE_UNKNOWN_DAYS } from '@/lib/period'
-import { hasPurchaseLink, normalizePurchaseLinks, brokenPurchaseLinks, isAffiliateLink, isSameProduct, PLATFORM_LABEL } from '@/lib/purchaseLinks'
+import { hasPurchaseLink, normalizePurchaseLinks, brokenPurchaseLinks, isAffiliateLink, isSameProduct, alternativeLinks, PLATFORM_LABEL } from '@/lib/purchaseLinks'
 import { getDealVerdict, isMultiOption } from '@/lib/dealGrade'
 import { partnerSearchQuery } from '@/lib/searchQuery'
 import { getCompareState, COMPARE_STATE_LABEL, CLEAR_COMPARE_NONE, type CompareState } from '@/lib/compareState'
@@ -10,7 +10,7 @@ import { needsKoreanName } from '@/lib/influencerItems'
 import { findCompareCandidates, type CompareCandidate } from '@/lib/compareCandidates'
 import { COMPARE_NONE_REASON_LABEL, type CompareNoneReason } from '@/lib/types'
 import { GradeBadge } from '@/components/DealVerdictBox'
-import { CheckCircle2, CircleDot, TriangleAlert, FileEdit, Search, Flame, ImageOff, Eye, EyeOff, Package, Copy, type LucideIcon } from 'lucide-react'
+import { CheckCircle2, TriangleAlert, Search, Flame, ImageOff, Eye, EyeOff, Package, Copy } from 'lucide-react'
 import AddPostModal from '@/components/AddPostModal'
 
 interface DayStat { date: string; visitors: number; events: Record<string, number>; newVisitors: number; returningVisitors: number }
@@ -106,41 +106,6 @@ const CAT_LABEL: Record<string, string> = {
  *
  * 관리자 목록이 이미 전체 게시물을 들고 있으므로 새 API를 만들지 않고 여기서 센다.
  */
-/**
- * 판정 없이 쌓인 공구를 센다.
- *
- * 예전에는 "자동 비교가가 며칠째 안 붙는다"를 알렸다(D-020). 두 가지가 틀어져 있었다.
- *
- * 첫째, 기준이 "비교가를 가진 공구 중 가장 최근 **수집일**"이라, 오래 전에 들어온 공구를
- * 관리자가 손으로 채워도 시계가 앞으로 밀렸다. 일할수록 경고가 조용해졌다 — 실제로 자동
- * 수집은 2026-07-31에 끊겼는데 경고는 "6일째"라고 말하고 있었다(8/17에 수집된 공구 한 건에
- * 사람이 값을 넣어서다).
- *
- * 둘째, 자동 수집이 멎었다는 건 이제 뉴스가 아니다. 네이버가 API를 폐지했으므로(D-019)
- * 그 값은 영원히 0이다. 매일 같은 말을 하는 경고는 결국 아무도 안 본다.
- *
- * 그래서 "자동이 죽었나"가 아니라 "고객이 지금 판정을 못 보고 있나"를 센다. 채우면 실제로
- * 줄어들고, 다 채우면 사라진다.
- */
-const BACKLOG_ALERT_MIN = 10
-
-function unjudgedBacklog(posts: Post[]): { visible: number; visibleTotal: number; recent: number } | null {
-  // 오픈 예정은 뺀다. 아직 안 열려서 가격도 구매 링크도 없다 — 지금 채울 방법이 없는 걸
-  // 일감으로 세면 숫자만 커지고 할 일은 안 보인다
-  const visiblePosts = posts.filter(p => isCustomerVisible(p) && getPeriodState(p).kind !== 'upcoming')
-  const unchecked = visiblePosts.filter(p => getCompareState(p) === 'unchecked')
-  if (unchecked.length < BACKLOG_ALERT_MIN) return null
-
-  // 늘고 있는지도 알아야 한다. 다만 수집분 전체를 세면 안 된다 — 하루 46건씩 들어오지만
-  // 대부분 비공구로 제외되거나 검수 대기라 고객에게 안 나간다. 실제로 고객이 보고 있는
-  // 것들 안에서 "최근에 들어온 게 몇 건인지"만 센다
-  const cutoff = new Date(Date.now() - 14 * 86400000).toISOString().slice(0, 10)
-  return {
-    visible: unchecked.length,
-    visibleTotal: visiblePosts.length,
-    recent: unchecked.filter(p => (p.scraped_at || '').slice(0, 10) >= cutoff).length,
-  }
-}
 
 export default function AdminPage() {
   const [authed, setAuthed]           = useState<boolean | null>(null)  // null = 확인 중
@@ -539,39 +504,11 @@ export default function AdminPage() {
 
       <div className="admin-body">
 
-        {/* 통계 카드 */}
-        <div className="admin-stats">
-          <StatCard label="공개됨"    value={publishedCount}   Icon={CheckCircle2}  color="#22c55e" />
-          <StatCard label="공개 가능" value={readyCount}        Icon={CircleDot}     color="#6366f1" />
-          <StatCard label="검수 필요" value={needsReviewCount}  Icon={TriangleAlert} color="#f97316" />
-          <StatCard label="공구 후보" value={candidateCount}    Icon={FileEdit}      color="#eab308" />
-        </div>
-
-        {/* 판정 없이 쌓인 공구를 알린다 — 채우면 줄고, 다 채우면 사라진다 */}
-        {(() => {
-          const backlog = unjudgedBacklog(posts)
-          if (!backlog) return null
-          return (
-            <div style={{
-              display: 'flex', alignItems: 'flex-start', gap: 10, marginBottom: 20,
-              padding: '12px 14px', background: '#FEF2F2', border: '1px solid #FECACA',
-              borderRadius: 10,
-            }}>
-              <TriangleAlert size={18} strokeWidth={2.5} style={{ color: '#DC2626', flexShrink: 0, marginTop: 1 }} />
-              <div style={{ fontSize: 13, lineHeight: 1.6, color: '#7F1D1D', flex: 1, minWidth: 0 }}>
-                <strong>지금 {backlog.visible}건이 판정 없이 고객에게 보이고 있어요.</strong>
-                <br />
-                고객 화면에 뜨는 {backlog.visibleTotal}건 중 {backlog.visible}건에 아직 비교가가 없어요.
-                {backlog.recent > 0 && `그중 ${backlog.recent}건은 최근 2주 안에 들어온 거예요.`}
-              </div>
-              <button onClick={() => setAdminTab('verdict')}
-                style={{ flexShrink: 0, padding: '7px 14px', borderRadius: 8, border: 'none',
-                  background: '#DC2626', color: '#fff', cursor: 'pointer', fontSize: 12.5, fontWeight: 700 }}>
-                채우러 가기
-              </button>
-            </div>
-          )
-        })()}
+        {/* 오늘 손보면 돈 되는 일. 이 화면의 첫 질문을 "몇 명 들어왔지?"에서
+            "오늘 어떤 상품을 손보면 돈이 될까?"로 바꾼다 — 통계 카드는 그 질문에 답을 못
+            했다. 공개·검수·후보 건수는 '공구 관리' 탭의 필터 칩에 그대로 남아 있다 */}
+        <TodayPriorities posts={posts} detailViews={detailViews} clickBreakdown={clickBreakdown}
+          postSources={postSources} sources={sources} onGoTo={setAdminTab} />
 
         {/* 방문자 분석 */}
         <AnalyticsSection data={analytics} topPosts={topPosts} topSharedPosts={topSharedPosts} sources={sources} />
@@ -723,7 +660,7 @@ export default function AdminPage() {
         {/* 통계 설정 탭 — 관리자 방문이 고객 통계에 섞이지 않게 관리 */}
         {adminTab === 'verdict' && <VerdictFiller posts={posts} views={detailViews} onSaved={fetchPosts} />}
 
-        {adminTab === 'data' && <VisitorFlow sessions={recentSessions} posts={posts} onRefresh={fetchAnalytics} />}
+        {adminTab === 'data' && <VisitorFlow sessions={recentSessions} posts={posts} clickBreakdown={clickBreakdown} postSources={postSources} sources={sources} onRefresh={fetchAnalytics} />}
 
         {adminTab === 'revenue' && <RevenueBoard posts={posts} clicks={clickBreakdown} sources={postSources} onGoFill={() => setAdminTab('verdict')} onSaved={fetchPosts} />}
 
@@ -761,20 +698,6 @@ export default function AdminPage() {
           </>
         )
       })()}
-    </div>
-  )
-}
-
-function StatCard({ label, value, Icon, color }: { label: string; value: number; Icon: LucideIcon; color: string }) {
-  return (
-    <div className="admin-stat-card">
-      <span className="admin-stat-icon" style={{ background: `${color}1a`, color }}>
-        <Icon size={18} strokeWidth={2.5} />
-      </span>
-      <div style={{ minWidth: 0 }}>
-        <div className="admin-stat-num" style={{ color }}>{value}</div>
-        <div className="admin-stat-label">{label}</div>
-      </div>
     </div>
   )
 }
@@ -1840,8 +1763,33 @@ interface RecentSession {
  * 관리자 방문은 여기 안 들어온다 — /api/analytics가 쿠키·흔적 쿠키·IP 세 겹으로 걸러낸 뒤에
  * 기록하기 때문이다(D-007). 표시 안 되는 기기에서 볼 때는 URL에 ?notrack=1을 한 번 붙이면 된다.
  */
-function VisitorFlow({ sessions, posts, onRefresh }: { sessions: RecentSession[]; posts: Post[]; onRefresh: () => void }) {
+function VisitorFlow({ sessions, posts, clickBreakdown, postSources, sources, onRefresh }: {
+  sessions: RecentSession[]
+  posts: Post[]
+  clickBreakdown: Record<string, Record<string, number>>
+  postSources: Record<string, Record<string, number>>
+  sources: { source: string; label: string; count: number }[]
+  onRefresh: () => void
+}) {
   const title = (id?: number) => (id ? posts.find(p => p.id === id)?.title || `#${id}` : '')
+  const searchIn = (id: number) => {
+    const row = postSources[id] || {}
+    return (row.naver_search || 0) + (row.google_search || 0) + (row.other_search || 0)
+  }
+
+  // 요약 3숫자 — 개별 로그(최근 300건, 대략 일주일치)보다 더 넓은 창(14일 집계)에서 낸다.
+  // 표본이 작으면 비율이 출렁여서, 로그 몇 개로 계산한 "이동률"은 믿을 수가 없다.
+  //
+  // "검색→상세"는 검색 발생분만 센다(postSources). 전체 상세조회(detailViews)로 나누면
+  // 100을 넘는 숫자가 나올 수 있다 — 검색 유입은 방문(세션) 수, 상세조회는 클릭(이벤트) 수라
+  // 한 사람이 여러 상품을 보면 분모보다 분자가 커진다.
+  const totalSearch = sources
+    .filter(s => s.source === 'naver_search' || s.source === 'google_search' || s.source === 'other_search')
+    .reduce((sum, s) => sum + s.count, 0)
+  const totalDetail = posts.reduce((sum, p) => sum + searchIn(p.id), 0)
+  const totalMoney = Object.values(clickBreakdown).reduce((sum, row) => sum + (row.coupang || 0) + (row.naver || 0) + (row.other || 0), 0)
+  const pct = (n: number, d: number) => (d > 0 ? `${Math.round((n / d) * 100)}%` : '–')
+
   const when = (iso: string) => {
     const m = Math.floor((Date.now() - new Date(iso).getTime()) / 60000)
     if (m < 1) return '방금'
@@ -1883,6 +1831,14 @@ function VisitorFlow({ sessions, posts, onRefresh }: { sessions: RecentSession[]
           앞의 4자리는 방문자 표시(브라우저마다 하나). 관리자 방문은 안 들어옵니다. 최근 300건만 남아요.
         </span>
       </p>
+
+      <div style={{ display: 'flex', gap: 18, flexWrap: 'wrap', marginBottom: 18,
+        padding: '12px 14px', background: '#f8fafc', borderRadius: 10, fontSize: 12.5 }}>
+        <span><strong style={{ fontSize: 15 }}>{totalSearch}</strong>명 검색 유입</span>
+        <span style={{ color: '#94a3b8' }}>검색→상세 {pct(totalDetail, totalSearch)}</span>
+        <span style={{ color: '#94a3b8' }}>상세→구매처클릭 {pct(totalMoney, totalDetail)}</span>
+        <span style={{ marginLeft: 'auto', color: '#94a3b8' }}>최근 14일 집계 기준</span>
+      </div>
 
       {sessions.length === 0 ? (
         <p style={{ textAlign: 'center', padding: '28px 0', fontSize: 14, fontWeight: 700, color: '#64748b' }}>
@@ -2047,6 +2003,155 @@ function PurchaseLinkModal({ post, onClose, onSaved }: { post: Post; onClose: ()
  * "검색유입" 열은 오늘부터 쌓인다(postSources). 소급이 안 되므로 한동안 0으로 보이는 게
  * 정상이다 — 없는 값을 있는 것처럼 보이게 하지 않는다.
  */
+/**
+ * 오늘 손보면 돈 되는 일 — 관리자 첫 화면.
+ *
+ * 예전엔 "공개됨 72 · 검수 필요 1047 · 오늘 방문자 29명"처럼 상태 개수부터 보여줬다. 숫자는
+ * 맞는데, 보고 나서 뭘 해야 할지가 안 나왔다. 이 화면의 첫 질문을 "몇 명 들어왔지?"에서
+ * "오늘 어떤 상품을 손보면 돈이 될까?"로 바꾼다.
+ *
+ * 우선순위 세 묶음은 전부 이미 있는 데이터(postSources·detailViews·clickBreakdown)를
+ * 다르게 자른 것뿐이다 — 새 집계를 만들지 않았다.
+ *
+ * **뺀 것 — 예상 수익.** 클릭까지는 알지만 결제 여부는 모른다. 파트너스 클릭이 실제
+ * 구매로 이어졌는지는 쿠팡·네이버 파트너스 자체 대시보드에서만 확인된다. 없는 숫자를
+ * 지어내지 않는다(원칙 2) — "구매 8건 · 수익 37,400원" 같은 값은 여기서 낼 수 없다.
+ *
+ * **뺀 것 — 검색 급상승.** 상품별 유입 경로(postSources)가 쌓인 지 며칠 안 됐다(2026-08-22
+ * 시작). 이번 주 대비 지난주를 비교하려면 최소 2주치가 있어야 하는데 지금은 절반도 안
+ * 된다. 데이터가 없는데 "+82%"를 보여주면 그게 바로 틀린 숫자를 내보내는 것이다(원칙 1).
+ * 자리는 비워 두고 며칠 뒤 데이터가 차면 그때 만든다.
+ */
+function TodayPriorities({ posts, detailViews, clickBreakdown, postSources, sources, onGoTo }: {
+  posts: Post[]
+  detailViews: Record<string, number>
+  clickBreakdown: Record<string, Record<string, number>>
+  postSources: Record<string, Record<string, number>>
+  sources: { source: string; label: string; count: number }[]
+  onGoTo: (tab: 'verdict' | 'revenue') => void
+}) {
+  const views = (id: number) => detailViews[id] || 0
+  const searchIn = (id: number) => {
+    const row = postSources[id] || {}
+    return (row.naver_search || 0) + (row.google_search || 0) + (row.other_search || 0)
+  }
+  const moneyClicks = (id: number) => {
+    const row = clickBreakdown[id] || {}
+    return (row.coupang || 0) + (row.naver || 0) + (row.other || 0)
+  }
+
+  // 14일 기준 — 위 세 집계와 같은 창(getSourceCounts(14)/getClickBreakdown(14)/getPostSourceCounts(14))
+  const totalSearch = sources
+    .filter(s => s.source === 'naver_search' || s.source === 'google_search' || s.source === 'other_search')
+    .reduce((sum, s) => sum + s.count, 0)
+  // "상세조회"는 검색 발생분만 센다. 전체 상세조회(detailViews)로 나누면 371/266=139%처럼
+  // 100을 넘는 숫자가 나온다 — 검색 유입은 방문(세션) 수고 상세조회는 클릭(이벤트) 수라
+  // 한 사람이 여러 상품을 보면 분모보다 분자가 커진다. 같은 모수(검색으로 온 사람의
+  // 클릭)로 맞춰야 비율이 뜻을 가진다
+  const totalDetail = posts.reduce((sum, p) => sum + searchIn(p.id), 0)
+  const totalMoneyClicks = posts.reduce((sum, p) => sum + moneyClicks(p.id), 0)
+  const pct = (n: number, d: number) => (d > 0 ? `${Math.round((n / d) * 100)}%` : '–')
+
+  const bucketA = posts
+    .filter(p => isCustomerVisible(p) && getPeriodState(p).kind !== 'upcoming'
+      && getCompareState(p) === 'unchecked' && searchIn(p.id) > 0)
+    .sort((a, b) => searchIn(b.id) - searchIn(a.id))
+
+  const bucketB = posts
+    .filter(p => isPagePublic(p) && !hasPurchaseLink(p) && views(p.id) > 0)
+    .sort((a, b) => views(b.id) - views(a.id))
+
+  const bucketC = posts
+    .filter(p => isPagePublic(p) && isExpired(p) && !hasPurchaseLink(p) && alternativeLinks(p).length === 0 && views(p.id) > 0)
+    .sort((a, b) => views(b.id) - views(a.id))
+
+  const buckets: { emoji: string; label: string; items: Post[]; metric: (p: Post) => string; tab: 'verdict' | 'revenue' }[] = [
+    { emoji: '🔥', label: '검색 유입 있는데 비교가 없는 상품', items: bucketA, metric: p => `검색 ${searchIn(p.id)}회`, tab: 'verdict' },
+    { emoji: '💰', label: '조회수 있는데 구매 링크가 없는 상품', items: bucketB, metric: p => `조회 ${views(p.id)}회`, tab: 'revenue' },
+    { emoji: '⚠️', label: '공구 종료됐는데 대체 상품도 없는 상품', items: bucketC, metric: p => `조회 ${views(p.id)}회`, tab: 'verdict' },
+  ]
+
+  return (
+    <div style={{ background: '#fff', borderRadius: 12, padding: 20, border: '1px solid #e2e8f0', marginBottom: 20 }}>
+      <h2 style={{ fontSize: 17, fontWeight: 800, marginBottom: 14 }}>오늘 손보면 돈 되는 일</h2>
+
+      {/* 최근 14일 퍼널. 클릭까지만 안다 — 결제 여부는 모른다 */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap', marginBottom: 4,
+        padding: '12px 14px', background: '#f8fafc', borderRadius: 10 }}>
+        <FunnelStep label="검색 유입" value={totalSearch} />
+        <FunnelArrow rate={pct(totalDetail, totalSearch)} />
+        <FunnelStep label="상세 조회" value={totalDetail} />
+        <FunnelArrow rate={pct(totalMoneyClicks, totalDetail)} />
+        <FunnelStep label="구매처 클릭" value={totalMoneyClicks} highlight />
+      </div>
+      <p style={{ fontSize: 11.5, color: '#94a3b8', margin: '6px 0 18px', lineHeight: 1.6 }}>
+        최근 14일 · 상세조회는 검색으로 들어와 본 것만 센 값이에요(전체 조회수는 아래 목록의
+        &quot;조회&quot;가 더 정확해요). 쿠팡·네이버 파트너스 클릭까지만 알 수 있고, 실제
+        결제 여부와 수익은 각 플랫폼 파트너스 대시보드에서 확인해야 해요 — 저희가 지어낼 수
+        있는 숫자가 아니에요.
+      </p>
+
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+        {buckets.map(b => b.items.length === 0 ? null : (
+          <div key={b.label} style={{ border: '1px solid #e2e8f0', borderRadius: 10, padding: '11px 13px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8, flexWrap: 'wrap' }}>
+              <span style={{ fontSize: 13.5, fontWeight: 700 }}>{b.emoji} {b.label} {b.items.length}건</span>
+              <button onClick={() => onGoTo(b.tab)}
+                style={{ marginLeft: 'auto', padding: '5px 12px', borderRadius: 7, border: '1px solid #cbd5e1',
+                  background: '#fff', cursor: 'pointer', fontSize: 12, fontWeight: 600, color: '#475569' }}>
+                목록으로 →
+              </button>
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+              {b.items.slice(0, 3).map(p => (
+                <div key={p.id} style={{ display: 'flex', gap: 8, fontSize: 12.5, color: '#475569' }}>
+                  <span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {p.title}
+                  </span>
+                  <span style={{ flexShrink: 0, color: '#94a3b8' }}>{b.metric(p)}</span>
+                </div>
+              ))}
+              {b.items.length > 3 && (
+                <span style={{ fontSize: 11.5, color: '#94a3b8' }}>외 {b.items.length - 3}건</span>
+              )}
+            </div>
+          </div>
+        ))}
+        {buckets.every(b => b.items.length === 0) && (
+          <p style={{ textAlign: 'center', padding: '16px 0', fontSize: 13.5, fontWeight: 700, color: '#64748b' }}>
+            지금 급한 일이 없어요 🎉
+          </p>
+        )}
+
+        {/* 검색 급상승 — 데이터가 아직 며칠치뿐이라 자리만 비워 둔다 */}
+        <div style={{ border: '1px dashed #e2e8f0', borderRadius: 10, padding: '11px 13px' }}>
+          <span style={{ fontSize: 13.5, fontWeight: 700, color: '#94a3b8' }}>
+            🚀 최근 검색 급상승 상품 — 데이터가 더 쌓이면 여기 보여요
+          </span>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function FunnelStep({ label, value, highlight }: { label: string; value: number; highlight?: boolean }) {
+  return (
+    <div style={{ textAlign: 'center', padding: '2px 10px' }}>
+      <div style={{ fontSize: 11.5, color: '#64748b', fontWeight: 600, marginBottom: 2 }}>{label}</div>
+      <div style={{ fontSize: 19, fontWeight: 800, color: highlight ? '#15803d' : '#0f172a' }}>{value.toLocaleString()}</div>
+    </div>
+  )
+}
+
+function FunnelArrow({ rate }: { rate: string }) {
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', color: '#cbd5e1', minWidth: 44 }}>
+      <span style={{ fontSize: 14 }}>→</span>
+      <span style={{ fontSize: 10.5, color: '#94a3b8', fontWeight: 700 }}>{rate}</span>
+    </div>
+  )
+}
+
 function RevenueBoard({ posts, clicks, sources, onGoFill, onSaved }: {
   posts: Post[]
   clicks: Record<string, Record<string, number>>
