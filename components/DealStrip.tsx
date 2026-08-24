@@ -6,7 +6,7 @@ import { categoryIcon } from '@/lib/categoryIcons'
 import { track } from '@/lib/track'
 import { getDealVerdict } from '@/lib/dealGrade'
 import GradeIcon from './GradeIcon'
-import { Users } from 'lucide-react'
+import { Users, CalendarClock } from 'lucide-react'
 
 // 홈에서 "제목 + 더보기 + 작은 카드 가로줄"로 훑어보는 영역.
 // 전체 크기 PostCard는 정보가 많아 한 화면에 두세 개밖에 안 들어가는데, 홈은 "무엇이 있는지"
@@ -36,10 +36,14 @@ export default function DealStrip({ title, icon, moreHref, posts, highlight }: P
 
       <div className="strip-scroll">
         {posts.map(p => {
-          const badge = badgeFromState(getPeriodState(p))
+          const state = getPeriodState(p)
+          const badge = badgeFromState(state)
           const v = getDealVerdict(p)
           const display = v.display
           const CatIcon = categoryIcon(p.cat)
+          // 콘텐츠가 아직 없는 예고 카드는 카테고리 아이콘만 있으면 다 똑같아 보여서
+          // "고장났나?" 싶다 — 인플루언서 이름을 같이 보여줘 카드마다 구분되게 한다
+          const isEmptyAnnouncement = !p.price && state.kind === 'upcoming'
           return (
             <Link
               key={p.id}
@@ -50,7 +54,14 @@ export default function DealStrip({ title, icon, moreHref, posts, highlight }: P
               <div className="strip-thumb">
                 {p.img
                   ? <img src={p.img} alt={p.title} loading="lazy" />
-                  : <div className="strip-thumb-empty"><CatIcon size={22} strokeWidth={1.5} /></div>}
+                  : isEmptyAnnouncement
+                    ? (
+                      <div className="strip-thumb-empty strip-thumb-upcoming">
+                        <CalendarClock size={20} strokeWidth={1.5} />
+                        <span className="strip-thumb-account">{p.account}</span>
+                      </div>
+                    )
+                    : <div className="strip-thumb-empty"><CatIcon size={22} strokeWidth={1.5} /></div>}
                 {/* 좌상단은 판정이 차지한다 — 홈을 훑을 때 판정 배지가 반복해서 보여야
                     "가격을 판정해주는 곳"이라는 게 전달된다. 마감은 아래 작은 칩으로 내린다. */}
                 {/* 판정 대기는 목록에 안 띄운다 — 이유는 PostCard 쪽 주석 참고 */}
