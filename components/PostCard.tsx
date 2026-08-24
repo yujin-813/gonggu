@@ -5,7 +5,7 @@ import type { Post } from '@/lib/types'
 import { daysLeft, getPeriodState, badgeFromState, periodTextFromState, isExpired, isNewPost, type BadgeIcon, type PeriodIcon } from '@/lib/period'
 import { CATEGORY_LABEL, categoryIcon } from '@/lib/categoryIcons'
 import {
-  Heart, Star, Wallet, CheckCircle2, Calendar, CalendarClock,
+  Heart, Star, Wallet, CheckCircle2, Calendar, CalendarClock, CalendarPlus,
   Package, Flame, Lock, Timer, Zap, ExternalLink, Share2,
 } from 'lucide-react'
 import PriceCompareModal from './PriceCompareModal'
@@ -342,21 +342,34 @@ export default function PostCard({
         )}
       </div>
 
-      {/* CTA — 카드 맨 아래, 옆 여백 없이 가로 전체를 다 쓰는 버튼 */}
-      <button
-        className={`card-cta ${canOpenPurchase ? '' : 'closed'}`}
-        onClick={openPurchaseLink}
-        disabled={!canOpenPurchase}
-        style={isUpcoming ? { background: '#ede9fe', color: '#7c3aed' } : {}}
-      >
-        {closed
-          ? '마감됨'
-          : isUpcoming
-          ? <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}><CalendarClock size={16} /> 오픈 예정</span>
-          : !(post.purchase_url || post.url)
-          ? '링크 없음'
-          : '공구 보기 →'}
-      </button>
+      {/* CTA — 카드 맨 아래, 옆 여백 없이 가로 전체를 다 쓰는 버튼.
+          오픈 예정은 눌러도 살 곳이 없어 예전엔 비활성 버튼이었다 — 눌리는데 아무 반응이
+          없어서 "고장났나" 싶었다. 상세 페이지(UpcomingNotice)와 같은 동작으로 바꿔서
+          누르면 실제로 캘린더에 담기도록 한다. */}
+      {isUpcoming && post.start_date ? (
+        <a
+          href={`/api/calendar/${post.id}`}
+          className="card-cta"
+          style={{ background: '#ede9fe', color: '#7c3aed', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, textDecoration: 'none' }}
+          onClick={e => { e.stopPropagation(); track('click', { postId: post.id, clickType: 'other' }) }}
+        >
+          <CalendarPlus size={16} /> 캘린더에 담기
+        </a>
+      ) : (
+        <button
+          className={`card-cta ${canOpenPurchase ? '' : 'closed'}`}
+          onClick={openPurchaseLink}
+          disabled={!canOpenPurchase}
+        >
+          {closed
+            ? '마감됨'
+            : isUpcoming
+            ? <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}><CalendarClock size={16} /> 오픈 예정</span>
+            : !(post.purchase_url || post.url)
+            ? '링크 없음'
+            : '공구 보기 →'}
+        </button>
+      )}
 
       {showCompare && (
         <PriceCompareModal

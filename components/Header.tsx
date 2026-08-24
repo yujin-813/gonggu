@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import { Bell, BellOff, Star, House, Heart, Users, Send } from 'lucide-react'
+import { Bell, BellOff, Star, House, Heart, Users, PackagePlus } from 'lucide-react'
 
 interface HeaderProps {
   onBookmarkView: () => void
@@ -17,15 +17,15 @@ export default function Header({
   return (
     <header>
       <div className="header-inner">
-        <div className="logo">
+        <Link href="/" className="logo" aria-label="홈으로">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src="/logo-symbol.png" alt="" className="logo-symbol" width={20} height={20} />
           <span className="logo-text">꿀공구</span>
           <span className="logo-tagline">| 꿀 같은 공구만 모아드려요</span>
-        </div>
+        </Link>
         <div style={{ flex: 1 }} />
         <Link href="/request" className="btn-icon" title="내 공구 등록 요청하기">
-          <Send size={18} />
+          <PackagePlus size={18} />
         </Link>
         <Link href="/influencers" className="btn-icon" title="인플루언서 목록">
           <Users size={18} />

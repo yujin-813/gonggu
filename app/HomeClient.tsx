@@ -333,6 +333,11 @@ export default function HomeClient({ sections }: { sections?: React.ReactNode })
             setViewingBookmarks(false)
             setViewingFollowed(false)
             if (cat !== 'all') track('category')
+            // 실제 카테고리는 Link 이동이라 브라우저가 알아서 맨 위로 올려준다. 오픈예정·
+            // 상시딜·전체는 제자리 필터링이라 그게 없다 — 스크롤이 깊이 내려간 채로 누르면
+            // 위쪽 큐레이션 섹션이 통째로 사라지는데 화면엔 아무 변화가 안 보여서 "눌러도
+            // 반응이 없다"로 느껴졌다. 눌렀을 때 맨 위로 올려 진짜 페이지 이동처럼 보이게 한다.
+            window.scrollTo({ top: 0, behavior: 'smooth' })
           }}
         />
       </div>
