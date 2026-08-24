@@ -2,9 +2,9 @@
 import Link from 'next/link'
 import { ExternalLink, ShoppingBag } from 'lucide-react'
 import type { Post, PurchaseLink } from '@/lib/types'
-import { PLATFORM_LABEL, PLATFORM_DISCLOSURE } from '@/lib/purchaseLinks'
+import { PLATFORM_LABEL, PLATFORM_DISCLOSURE, isSameProduct } from '@/lib/purchaseLinks'
 import { fmtDate, isExpired } from '@/lib/period'
-import { track } from '@/lib/track'
+import { track, type ClickType } from '@/lib/track'
 
 // 공구가 끝난 상세 페이지에 붙는 안내. 검색으로 들어온 사용자는 두 가지 중 하나를 원한다 —
 // (1) 비싸도 지금 바로 사기 (2) 비슷한 공구 기다리기. 그래서 대체 구매처와 진행 중 공구를
@@ -13,6 +13,12 @@ import { track } from '@/lib/track'
 // 가장 조심할 부분은 가격이다. 공동구매 가격과 현재 판매가는 다르므로, 지난 공구가는
 // "당시" 라고 못박고 대체 구매처 가격은 확인 시점을 함께 적는다. 실시간 조회가 아니라서
 // 확인한 가격이 없으면 숫자를 아예 쓰지 않고 "가격 확인하기"로만 보낸다.
+//
+// 링크를 같은 상품(kind=same)과 비슷한 용도의 다른 상품(kind=alternative)으로 나눠 다르게
+// 그린다. "오르다 매쓰파워빌더스"·"르베르360유모카"처럼 니치 브랜드는 쿠팡 파트너스에
+// 동일 상품 자체가 없는 경우가 실제로 있었다(D-030에서 예상했던 신호). 같은 상품이 있으면
+// 그것만 "구매하기"로 보여주고, 없을 때만 대체 상품을 — 다른 상품이라는 걸 분명히 밝히고
+// 보여준다. 섞어서 "구매하기"로 내밀면 다른 상품을 같은 상품인 것처럼 파는 셈이 된다.
 
 interface Props {
   post: Post
@@ -38,7 +44,32 @@ function isDisclosureText(note: string, platform: PurchaseLink['platform']): boo
 }
 
 export default function EndedDealNotice({ post, purchaseLinks, related, section, relatedKind = 'category', categoryLabel = '' }: Props) {
-  const notes = purchaseLinks.filter(l => l.note && !isDisclosureText(l.note, l.platform))
+  const sameLinks = purchaseLinks.filter(isSameProduct)
+  const altLinks = purchaseLinks.filter(l => !isSameProduct(l))
+  const notesOf = (links: PurchaseLink[]) => links.filter(l => l.note && !isDisclosureText(l.note, l.platform))
+
+  const renderLinks = (links: PurchaseLink[], onClickType: (l: PurchaseLink) => ClickType) => (
+    <div className="ended-links">
+      {links.map(link => (
+        <a
+          key={`${link.platform}-${link.url}`}
+          href={link.url}
+          target="_blank"
+          rel="noopener noreferrer sponsored"
+          className="ended-link-btn"
+          onClick={() => track('click', { postId: post.id, clickType: onClickType(link) })}
+        >
+          <ShoppingBag size={15} />
+          <span>
+            {PLATFORM_LABEL[link.platform]}에서{' '}
+            {link.price ? `${link.price.toLocaleString()}원에 구매하기` : '가격 확인하기'}
+          </span>
+          <ExternalLink size={13} />
+        </a>
+      ))}
+    </div>
+  )
+
   return (
     <div className="ended-wrap">
       {section !== 'related' && (
@@ -53,32 +84,14 @@ export default function EndedDealNotice({ post, purchaseLinks, related, section,
           </div>
         )}
 
-        {purchaseLinks.length > 0 ? (
+        {sameLinks.length > 0 ? (
           <>
             <p className="ended-lead">지금 바로 필요하다면 아래에서 구매할 수 있어요.</p>
-            <div className="ended-links">
-              {purchaseLinks.map(link => (
-                <a
-                  key={`${link.platform}-${link.url}`}
-                  href={link.url}
-                  target="_blank"
-                  rel="noopener noreferrer sponsored"
-                  className="ended-link-btn"
-                  onClick={() => track('click', { postId: post.id, clickType: link.platform })}
-                >
-                  <ShoppingBag size={15} />
-                  <span>
-                    {PLATFORM_LABEL[link.platform]}에서{' '}
-                    {link.price ? `${link.price.toLocaleString()}원에 구매하기` : '가격 확인하기'}
-                  </span>
-                  <ExternalLink size={13} />
-                </a>
-              ))}
-            </div>
+            {renderLinks(sameLinks, l => l.platform as ClickType)}
 
-            {notes.length > 0 && (
+            {notesOf(sameLinks).length > 0 && (
               <ul className="ended-notes">
-                {notes.map(l => (
+                {notesOf(sameLinks).map(l => (
                   <li key={`note-${l.platform}`}>{PLATFORM_LABEL[l.platform]}: {l.note}</li>
                 ))}
               </ul>
@@ -86,12 +99,37 @@ export default function EndedDealNotice({ post, purchaseLinks, related, section,
 
             <p className="ended-caution">
               ※ 공동구매는 종료되었습니다. 현재 판매처의 가격은 당시 공동구매 가격과 다를 수 있습니다
-              {purchaseLinks.some(l => l.checked_at)
-                && ` (가격 확인: ${purchaseLinks.find(l => l.checked_at)!.checked_at!.slice(0, 10)})`}
+              {sameLinks.some(l => l.checked_at)
+                && ` (가격 확인: ${sameLinks.find(l => l.checked_at)!.checked_at!.slice(0, 10)})`}
               .
             </p>
             <p className="ended-disclosure">
-              {[...new Set(purchaseLinks.map(l => PLATFORM_DISCLOSURE[l.platform]))].join(' ')}
+              {[...new Set(sameLinks.map(l => PLATFORM_DISCLOSURE[l.platform]))].join(' ')}
+            </p>
+          </>
+        ) : altLinks.length > 0 ? (
+          <>
+            {/* 똑같은 상품 링크를 못 찾았을 때만 여기로 온다. "구매하기"와 문구·톤을 분명히
+                갈라서, 다른 상품을 같은 상품인 것처럼 파는 일이 없게 한다 */}
+            <p className="ended-lead">
+              똑같은 상품은 찾지 못했어요. 대신 비슷한 용도로 지금 살 수 있는 상품이에요.
+            </p>
+            {renderLinks(altLinks, () => 'other')}
+
+            {notesOf(altLinks).length > 0 && (
+              <ul className="ended-notes">
+                {notesOf(altLinks).map(l => (
+                  <li key={`note-${l.platform}`}>{PLATFORM_LABEL[l.platform]}: {l.note}</li>
+                ))}
+              </ul>
+            )}
+
+            <p className="ended-caution">
+              ※ 이 공구와 같은 상품이 아니라서 저희가 가격을 비교하지 않았어요. 구성·품질을
+              직접 확인하고 골라주세요.
+            </p>
+            <p className="ended-disclosure">
+              {[...new Set(altLinks.map(l => PLATFORM_DISCLOSURE[l.platform]))].join(' ')}
             </p>
           </>
         ) : (

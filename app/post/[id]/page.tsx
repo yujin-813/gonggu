@@ -4,7 +4,7 @@ import { loadPosts } from '@/lib/store'
 import { isCustomerVisible, isPagePublic, isExpired, getPeriodState, periodLabel } from '@/lib/period'
 import { SITE_URL } from '@/lib/landing'
 import { CATEGORY_LABEL } from '@/lib/categoryIcons'
-import { visiblePurchaseLinks } from '@/lib/purchaseLinks'
+import { visiblePurchaseLinks, sameProductLinks } from '@/lib/purchaseLinks'
 import { getDealVerdict } from '@/lib/dealGrade'
 import { relatedPosts, type RelatedKind } from '@/lib/relatedPosts'
 import JsonLd, { productSchema, breadcrumbSchema } from '@/components/JsonLd'
@@ -119,7 +119,11 @@ export default function PostPage({ params }: { params: { id: string } }) {
       <PostDetailClient
         post={post}
         ended={ended}
-        purchaseLinks={ended || betterPrice ? visiblePurchaseLinks(post) : []}
+        purchaseLinks={
+          ended ? visiblePurchaseLinks(post)         // 마감: 같은 상품·대체 상품 다 넘기고 컴포넌트가 나눠 그린다
+          : betterPrice ? sameProductLinks(post)      // 아쉽딜: "더 싸다"는 같은 상품일 때만 말할 수 있다
+          : []
+        }
         upcoming={upcoming}
         betterPrice={betterPrice}
         related={related.posts}

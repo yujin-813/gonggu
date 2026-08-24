@@ -2,7 +2,7 @@
 import { useState, useEffect, useMemo, useCallback } from 'react'
 import type { Post, ScraperStatus, InfluencerSource, Collection, PurchaseLink } from '@/lib/types'
 import { daysLeft, periodLabel, isExpired, isCustomerVisible, isPagePublic, fmtDate, getPeriodState, DEADLINE_UNKNOWN_DAYS } from '@/lib/period'
-import { hasPurchaseLink, normalizePurchaseLinks, brokenPurchaseLinks, isAffiliateLink, PLATFORM_LABEL } from '@/lib/purchaseLinks'
+import { hasPurchaseLink, normalizePurchaseLinks, brokenPurchaseLinks, isAffiliateLink, isSameProduct, PLATFORM_LABEL } from '@/lib/purchaseLinks'
 import { getDealVerdict, isMultiOption } from '@/lib/dealGrade'
 import { partnerSearchQuery } from '@/lib/searchQuery'
 import { getCompareState, COMPARE_STATE_LABEL, CLEAR_COMPARE_NONE, type CompareState } from '@/lib/compareState'
@@ -2768,20 +2768,33 @@ function DeadlineFillRow({ post, views, onSaved }: { post: Post; views: number; 
 /** 종료·링크없음 — 제휴 대체 구매 링크를 채운다. 고객 화면에 버튼 + 고지 문구로 뜬다. */
 function EndedFillRow({ post, views, onSaved }: { post: Post; views: number; onSaved: () => void }) {
   const existing = normalizePurchaseLinks(post)
-  const [coupangUrl, setCoupangUrl] = useState(existing.find(l => l.platform === 'coupang')?.url ?? '')
-  const [coupang, setCoupang] = useState(String(existing.find(l => l.platform === 'coupang')?.price ?? ''))
-  const [naverUrl, setNaverUrl] = useState(existing.find(l => l.platform === 'naver')?.url ?? '')
-  const [naver, setNaver] = useState(String(existing.find(l => l.platform === 'naver')?.price ?? ''))
+  const sameExisting = existing.filter(isSameProduct)
+  const altExisting = existing.filter(l => !isSameProduct(l))
+
+  const [coupangUrl, setCoupangUrl] = useState(sameExisting.find(l => l.platform === 'coupang')?.url ?? '')
+  const [coupang, setCoupang] = useState(String(sameExisting.find(l => l.platform === 'coupang')?.price ?? ''))
+  const [naverUrl, setNaverUrl] = useState(sameExisting.find(l => l.platform === 'naver')?.url ?? '')
+  const [naver, setNaver] = useState(String(sameExisting.find(l => l.platform === 'naver')?.price ?? ''))
+
+  // 똑같은 상품을 못 찾을 때만 쓴다 — "오르다 매쓰파워빌더스"·"르베르360유모카"처럼 니치
+  // 브랜드는 쿠팡 파트너스에 동일 상품 자체가 없는 경우가 실제로 있었다(D-030에서 예상했던
+  // 신호). 접어 두는 이유는 같은 상품 링크가 있으면 이 칸을 볼 일이 없어서다.
+  const [showAlt, setShowAlt] = useState(altExisting.length > 0)
+  const [altUrl, setAltUrl] = useState(altExisting[0]?.url ?? '')
+  const [altPrice, setAltPrice] = useState(String(altExisting[0]?.price ?? ''))
+  const [altNote, setAltNote] = useState(altExisting[0]?.note ?? '')
+
   const [saving, setSaving] = useState(false)
   const [done, setDone] = useState(false)
 
-  const canSave = !!(coupangUrl.trim() || naverUrl.trim())
+  const canSave = !!(coupangUrl.trim() || naverUrl.trim() || altUrl.trim())
   async function save() {
     setSaving(true)
     const now = new Date().toISOString()
     const links = []
-    if (coupangUrl.trim()) links.push({ platform: 'coupang' as const, url: coupangUrl.trim(), price: parseInt(coupang) || null, visible: true, checked_at: now })
-    if (naverUrl.trim())   links.push({ platform: 'naver' as const, url: naverUrl.trim(), price: parseInt(naver) || null, visible: true, checked_at: now })
+    if (coupangUrl.trim()) links.push({ platform: 'coupang' as const, kind: 'same' as const, url: coupangUrl.trim(), price: parseInt(coupang) || null, visible: true, checked_at: now })
+    if (naverUrl.trim())   links.push({ platform: 'naver' as const, kind: 'same' as const, url: naverUrl.trim(), price: parseInt(naver) || null, visible: true, checked_at: now })
+    if (altUrl.trim())     links.push({ platform: 'coupang' as const, kind: 'alternative' as const, url: altUrl.trim(), price: parseInt(altPrice) || null, note: altNote.trim() || null, visible: true, checked_at: now })
     await fetch(`/api/posts/${post.id}`, {
       method: 'PATCH', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ purchase_links: links }),
@@ -2791,7 +2804,12 @@ function EndedFillRow({ post, views, onSaved }: { post: Post; views: number; onS
 
   return (
     <div style={{ border: '1px solid #e2e8f0', borderRadius: 10, padding: 12, background: done ? '#f0fdf4' : '#fff' }}>
-      <FillRowHead post={post} mode="ended" />
+      <FillRowHead post={post} mode="ended"
+        badge={altExisting.length > 0 ? (
+          <span style={{ fontSize: 11, fontWeight: 700, color: '#92400e', background: '#fef3c7', borderRadius: 6, padding: '2px 8px' }}>
+            대체 상품 안내 중
+          </span>
+        ) : undefined} />
       {views > 0 && (
         <p style={{ fontSize: 11.5, color: '#475569', margin: '0 0 8px' }}>
           최근 14일 <strong style={{ color: '#0f172a' }}>{views}명</strong>이 이 페이지에 들어왔어요 — 살 곳을 못 알려주고 그대로 나갔습니다
@@ -2800,9 +2818,9 @@ function EndedFillRow({ post, views, onSaved }: { post: Post; views: number; onS
       <FillTools post={post} />
       <div className="admin-2col" style={{ gap: 8 }}>
         <input type="url" value={coupangUrl} onChange={e => { setCoupangUrl(e.target.value); setDone(false) }}
-          placeholder="쿠팡 파트너스 링크" style={{ ...fillInput, fontSize: 13 }} />
+          placeholder="쿠팡 파트너스 링크 (동일 상품)" style={{ ...fillInput, fontSize: 13 }} />
         <input type="url" value={naverUrl} onChange={e => { setNaverUrl(e.target.value); setDone(false) }}
-          placeholder="네이버 제휴 링크" style={{ ...fillInput, fontSize: 13 }} />
+          placeholder="네이버 제휴 링크 (동일 상품)" style={{ ...fillInput, fontSize: 13 }} />
       </div>
       <div className="admin-2col" style={{ gap: 8, marginTop: 6 }}>
         <input type="number" value={coupang} onChange={e => setCoupang(e.target.value)}
@@ -2814,6 +2832,40 @@ function EndedFillRow({ post, views, onSaved }: { post: Post; views: number; onS
         제휴 링크만 넣어주세요 — 고객 화면에 구매 버튼으로 뜨고 파트너스 고지 문구가 함께 붙습니다.
         가격을 모르면 비워두면 &quot;가격 확인하기&quot;로 보냅니다.
       </p>
+
+      {showAlt ? (
+        <div style={{ marginTop: 10, padding: 10, borderRadius: 8, background: '#fafaf9', border: '1px solid #e7e5e4' }}>
+          <div style={{ fontSize: 12.5, fontWeight: 700, color: '#44403c', marginBottom: 7 }}>
+            똑같은 상품을 못 찾았을 때 — 비슷한 상품
+          </div>
+          <input type="url" value={altUrl} onChange={e => { setAltUrl(e.target.value); setDone(false) }}
+            placeholder="쿠팡 파트너스 링크 (다른 상품)" style={{ ...fillInput, fontSize: 13 }} />
+          <div className="admin-2col" style={{ gap: 8, marginTop: 6 }}>
+            <input type="number" value={altPrice} onChange={e => setAltPrice(e.target.value)}
+              placeholder="가격 (선택)" style={{ ...fillInput, fontSize: 12 }} />
+            <input value={altNote} onChange={e => setAltNote(e.target.value)}
+              placeholder="차이점 한 줄 (선택 — 예: 용량이 달라요)" style={{ ...fillInput, fontSize: 12 }} />
+          </div>
+          <p style={{ fontSize: 11, color: '#a8a29e', margin: '8px 0 0', lineHeight: 1.6 }}>
+            고객 화면에 &quot;똑같은 상품은 못 찾았어요&quot;라고 먼저 밝히고, 판정(가격 비교)에는
+            안 쓰여요. 다른 상품을 같은 상품으로 속이지 않기 위해서예요.
+          </p>
+          {!altExisting.length && (
+            <button onClick={() => { setShowAlt(false); setAltUrl(''); setAltPrice(''); setAltNote('') }}
+              style={{ marginTop: 8, padding: 0, border: 'none', background: 'none', cursor: 'pointer',
+                fontSize: 11.5, color: '#94a3b8', fontWeight: 600 }}>
+              접기
+            </button>
+          )}
+        </div>
+      ) : (
+        <button type="button" onClick={() => setShowAlt(true)}
+          style={{ marginTop: 8, padding: 0, border: 'none', background: 'none', cursor: 'pointer',
+            fontSize: 11.5, color: '#94a3b8', fontWeight: 600 }}>
+          + 똑같은 상품을 못 찾았어요 — 비슷한 상품으로 안내
+        </button>
+      )}
+
       <SaveButton canSave={canSave} saving={saving} done={done} onClick={save} />
     </div>
   )

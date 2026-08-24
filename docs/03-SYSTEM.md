@@ -1,7 +1,7 @@
 # 03 · 시스템 — 지금 상태
 
 > **"지금"만 쓴다.** 변경 이력과 "예전에는 ○○였다"는 여기 쓰지 않는다. 과거는 `02-DECISIONS.md`에 있다.
-> 마지막 갱신: 2026-08-24
+> 마지막 갱신: 2026-08-25
 
 ---
 
@@ -12,7 +12,7 @@
 | 단계 | 운영 중 · 실사용자 있음 (2026-08-19 기준 사람 방문 고유 IP 163명/2일) |
 | 스택 | Next.js 14 (App Router) · React 18 · TypeScript · 파이썬 수집기 |
 | 저장소 | **파일 기반** — `data/*.json`. DB 없음 |
-| 코드 규모 | `lib/` 2,967줄 · `app/admin` + `components/` 5,333줄 · 파이썬 2,986줄 |
+| 코드 규모 | `lib/` 2,967줄 · `app/admin` + `components/` 5,423줄 · 파이썬 2,986줄 |
 | 데이터 규모 | 게시물 2,317건 (공개 277건) · 인플루언서 소스 58개 · analytics 31일치 |
 | 배포 | EC2 `13.125.121.62`(t3.small) · PM2(fork) + nginx · `bash deploy.sh` — **무중단**(3002↔3003 슬롯 교대, `D-028`) |
 | 도메인 | https://gonggu.asknuggetdata.com |
@@ -287,7 +287,9 @@ getDealVerdict(post)
   읽어서, 클라이언트 컴포넌트가 상수 하나 때문에 import하면 전 페이지가 500난다.
 - **`purchase_links[].kind`가 `alternative`면 비교가로 안 쓴다.** 다른 상품 가격으로 할인율을
   내면 화면에 틀린 숫자가 나간다. `hasPurchaseLink()`도 `same`만 센다 — "지금 살 수 있어요"에
-  다른 상품이 뜨면 그 문장이 거짓이 된다. 입력칸·화면은 아직 없다 (`D-030`)
+  다른 상품이 뜨면 그 문장이 거짓이 된다. `BetterPriceNotice`(아쉽딜)도 `sameProductLinks()`만
+  받는다. 채우기 「종료·링크없음」에 접이식 대체 상품 칸이 있고, 종료 상세는 `same`이 없을 때만
+  "똑같은 상품은 찾지 못했어요"로 다르게 그린다 (`D-031`)
 - - **돈이 되는 클릭은 `coupang`·`naver`·`other`뿐이다.** `groupbuy`는 판매자 링크라 수수료가 없다.
 - - **쿠팡에서 찾은 비교가는 `market_price`가 아니라 `purchase_links`에 url 없이 넣는다.**
   `market_price`는 고객 화면에 무조건 "네이버 최저가"로 표시되기 때문이다. `purchase_links`는
