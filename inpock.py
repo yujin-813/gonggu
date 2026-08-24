@@ -1440,13 +1440,20 @@ def collect(handles, source_obj=None, write_result=True):
             new_count += 1
             print(f"  + (오픈예정) {s['title'][:30]} {s['start']}~{s['end']}")
 
-        # 정식 공구로 수집된 일정의 자리표시자는 중복이므로 목록에서 내린다
+        # 정식 공구로 수집된 일정의 자리표시자는 중복이므로 목록에서 내린다.
+        #
+        # "not p.get('published')" 조건이 있었는데, D-029로 오픈 예정 공구를 미리 공개하기
+        # 시작하면서 이 조건이 항상 걸림돌이 됐다 — published=True인 자리표시자는 정식
+        # 공구가 수집돼도 절대 안 내려갔다. 실제로 "루엔 회전책장" 자리표시자가 그 상태로
+        # 남아 정식 수집분(needs_review)과 중복됐다. published 여부와 무관하게 내린다 —
+        # 자리표시자가 지금 고객에게 보이고 있었다면 그건 더더욱 빨리 내려야 하는 상태다.
         for s_id in matched_sched_ids:
             prefix = f"inpock_cal_{s_id}_"
             for p in posts:
                 if ((p.get("shortcode") or "").startswith(prefix)
-                        and p.get("status") == "upcoming" and not p.get("published")):
+                        and p.get("status") == "upcoming"):
                     p["status"] = "excluded"
+                    p["published"] = False
                     p["review_reason"] = ["실제 공구로 등록됨"]
 
     save_posts(posts)

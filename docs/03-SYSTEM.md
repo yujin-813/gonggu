@@ -12,7 +12,7 @@
 | 단계 | 운영 중 · 실사용자 있음 (2026-08-19 기준 사람 방문 고유 IP 163명/2일) |
 | 스택 | Next.js 14 (App Router) · React 18 · TypeScript · 파이썬 수집기 |
 | 저장소 | **파일 기반** — `data/*.json`. DB 없음 |
-| 코드 규모 | `lib/` 3,139줄 · `app/admin` + `components/` 5,723줄 · 파이썬 2,995줄 |
+| 코드 규모 | `lib/` 3,139줄 · `app/admin` + `components/` 5,723줄 · 파이썬 3,002줄 |
 | 데이터 규모 | 게시물 2,317건 (공개 277건) · 인플루언서 소스 58개 · analytics 31일치 |
 | 배포 | EC2 `13.125.121.62`(t3.small) · PM2(fork) + nginx · `bash deploy.sh` — **무중단**(3002↔3003 슬롯 교대, `D-028`) |
 | 도메인 | https://gonggu.asknuggetdata.com |
@@ -196,6 +196,7 @@ public/scraped/   수집 이미지 431MB
 | `AUTO_MATCH_FLOOR = 0.5` | 낮추면 잘못된 자동 매칭이 판정을 뒤집는다 (`D-006`). `lib/compareCandidates.ts`가 이 값을 읽어 "왜 후보가 판정에서 빠졌는지"를 설명한다 |
 | `lib/compareCandidates.ts`의 매칭 문턱 | 풀면 엉뚱한 상품이 후보로 뜨고, 관리자가 고르는 순간 그대로 틀린 비교가가 된다 (`D-023`) |
 | `lib/postGuards.ts` | 구매 링크 없는 공구의 공개를 막는 유일한 장치 |
+| 자리표시자 정리(`inpock.py`) | `status='upcoming'`인데 `price`가 채워져 있으면 정리가 안 된 것이다(정상은 항상 비어 있어야 함) — `D-036` |
 | 날짜 경계 계산 | **서버 타임존이 UTC다.** `new Date()`/`date.today()`를 그냥 쓰면 KST 새벽(UTC 15:00~23:59) 9시간 동안 하루가 밀린다. 반드시 `lib/kst.ts`(TS)·`kst_today()`(`check_links.py`)를 거칠 것 — `inpock.py`·`lib/analytics.ts`·`scripts/*-upcoming.js`는 아직 이 패턴을 안 따른다 (`D-034`) |
 | `DEADLINE_UNKNOWN_DAYS = 21` | **`lib/period.ts`와 `check_links.py` 양쪽에 있다.** 한쪽만 고치면 고객 화면과 링크 점검 대상이 갈라진다 (`D-024`) |
 | `app/api/posts/[id]/route.ts`의 필드 allowlist | 여기 없는 필드는 관리자가 저장해도 **조용히 무시된다.** 새 필드를 추가하면 PATCH·PUT 양쪽에 넣어야 한다 |
