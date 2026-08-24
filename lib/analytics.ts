@@ -41,7 +41,32 @@ interface AnalyticsData {
    * 상세로 넘어간 것도 검색으로 잡힌다 — 그 사람을 데려온 건 검색이 맞다.
    */
   postSources?: Record<string, Record<string, Record<string, number>>>
+  /**
+   * 최근 방문의 개별 동작 — 집계만으로는 못 보는 것을 본다.
+   *
+   * daily.sources는 "네이버 74건"까지만 알려주고, 그 74명이 **들어와서 뭘 하고 나갔는지**는
+   * 답하지 못한다. 세션을 따라가 보려면 사건이 순서대로 남아 있어야 한다.
+   *
+   * 링 버퍼로 최근 것만 들고 있는다. 하루 이벤트가 40건이라 300건이면 대략 일주일치이고
+   * 파일은 50KB쯤 는다. 오래 보관할 값이 아니다 — 추세는 daily가 이미 갖고 있다.
+   *
+   * 필드 이름을 한 글자로 줄인 건 같은 구조가 300번 반복되기 때문이다.
+   * at=시각 · s=세션 · v=방문자 · t=종류 · p=상품 · c=클릭종류 · src=유입경로
+   */
+  recent?: RecentEvent[]
 }
+
+export interface RecentEvent {
+  at: string
+  s: string
+  v?: string
+  t: string
+  p?: number
+  c?: ClickType
+  src?: string
+}
+
+const RECENT_LIMIT = 300
 
 function load(): AnalyticsData {
   if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true })
@@ -229,6 +254,20 @@ export function recordEvent(type: string, sessionId: string, opts?: { visitorId?
   }
 
   day.events[type] = (day.events[type] || 0) + 1
+
+  // 개별 사건도 최근 것만 남긴다 — 세션 흐름을 따라가려면 순서가 있어야 한다
+  if (!data.recent) data.recent = []
+  data.recent.push({
+    at: new Date().toISOString(),
+    s: sessionId,
+    ...(opts?.visitorId ? { v: opts.visitorId } : {}),
+    t: type,
+    ...(opts?.postId ? { p: opts.postId } : {}),
+    ...(opts?.clickType ? { c: opts.clickType } : {}),
+    ...(opts?.source ? { src: opts.source } : {}),
+  })
+  if (data.recent.length > RECENT_LIMIT) data.recent = data.recent.slice(-RECENT_LIMIT)
+
   save(data)
 }
 
@@ -334,6 +373,47 @@ export function getPostSourceCounts(days = 14): Record<number, Record<string, nu
     }
   }
   return out
+}
+
+/**
+ * 최근 방문을 세션 단위로 묶어 돌려준다 — 관리자 「데이터」 화면용.
+ *
+ * 한 사람이 들어와서 무엇을 했는지가 한 줄이어야 읽힌다. 이벤트 목록만 나열하면
+ * 누구 것인지 알 수 없다.
+ */
+export function getRecentSessions(limit = 40): {
+  sessionId: string
+  startedAt: string
+  lastAt: string
+  source: string | null
+  isReturning: boolean
+  events: RecentEvent[]
+}[] {
+  const data = load()
+  const bySession = new Map<string, RecentEvent[]>()
+  for (const e of data.recent || []) {
+    const list = bySession.get(e.s) || []
+    list.push(e)
+    bySession.set(e.s, list)
+  }
+  const firstSeen = data.visitorFirstSeen || {}
+  return [...bySession.entries()]
+    .map(([sessionId, events]) => {
+      const sorted = [...events].sort((a, b) => a.at.localeCompare(b.at))
+      const vid = sorted.find(e => e.v)?.v
+      const day = sorted[0].at.slice(0, 10)
+      return {
+        sessionId,
+        startedAt: sorted[0].at,
+        lastAt: sorted[sorted.length - 1].at,
+        source: sorted.find(e => e.src)?.src ?? null,
+        // 이 방문자를 오늘 이전에 본 적이 있으면 재방문이다
+        isReturning: !!vid && !!firstSeen[vid] && firstSeen[vid] < day,
+        events: sorted,
+      }
+    })
+    .sort((a, b) => b.lastAt.localeCompare(a.lastAt))
+    .slice(0, limit)
 }
 
 /** 최근 N일 클릭이 많은 순으로 상품 id를 돌려준다 */

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { recordEvent, getSummary, getTopPosts, getTopSharedPosts, getSourceCounts, getClickCounts, getClickBreakdown, getPostSourceCounts, classifySource, CLICK_TYPES } from '@/lib/analytics'
+import { recordEvent, getSummary, getTopPosts, getTopSharedPosts, getSourceCounts, getClickCounts, getClickBreakdown, getPostSourceCounts, getRecentSessions, classifySource, CLICK_TYPES } from '@/lib/analytics'
 import { loadPosts } from '@/lib/store'
 import { AUTH_COOKIE, computeToken, safeEqual } from '@/lib/auth'
 import { ADMIN_SEEN_COOKIE, isAdminIp, clientIp, isBotRequest } from '@/lib/adminTrace'
@@ -67,5 +67,6 @@ export async function GET() {
   // 수익화 현황 표 — 상품별 클릭을 종류별로, 그리고 유입 경로별로 함께 내려준다
   const clickBreakdown = getClickBreakdown(14)
   const postSources = getPostSourceCounts(14)
-  return NextResponse.json({ summary, topPosts, topSharedPosts, sources, detailViews, clickBreakdown, postSources })
+  const recentSessions = getRecentSessions(40)
+  return NextResponse.json({ summary, topPosts, topSharedPosts, sources, detailViews, clickBreakdown, postSources, recentSessions })
 }

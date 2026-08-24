@@ -157,6 +157,8 @@ export default function AdminPage() {
   // 상품별 클릭(종류별)과 유입 경로 — 수익화 현황 표
   const [clickBreakdown, setClickBreakdown] = useState<Record<string, Record<string, number>>>({})
   const [postSources, setPostSources] = useState<Record<string, Record<string, number>>>({})
+  // 최근 방문의 개별 동작 — 세션 단위로 묶어 흐름을 본다
+  const [recentSessions, setRecentSessions] = useState<RecentSession[]>([])
   const [influencerSources, setInfluencerSources] = useState<InfluencerSource[]>([])
   const [newSourceUrl, setNewSourceUrl] = useState('')
   const [newSourceName, setNewSourceName] = useState('')
@@ -165,7 +167,7 @@ export default function AdminPage() {
   const [instPostUrl, setInstPostUrl] = useState('')
   const [instPostBusy, setInstPostBusy] = useState(false)
   const [instPostMsg, setInstPostMsg] = useState('')
-  const [adminTab, setAdminTab] = useState<'posts' | 'influencers' | 'collections' | 'verdict' | 'revenue' | 'settings'>('posts')
+  const [adminTab, setAdminTab] = useState<'posts' | 'influencers' | 'collections' | 'verdict' | 'revenue' | 'data' | 'settings'>('posts')
   const [collections, setCollections] = useState<Collection[]>([])
   const [editingInfluencer, setEditingInfluencer] = useState<string | null>(null)
   const [editInfluencerDraft, setEditInfluencerDraft] = useState<Partial<InfluencerSource>>({})
@@ -202,6 +204,7 @@ export default function AdminPage() {
       setDetailViews(d.detailViews || {})
       setClickBreakdown(d.clickBreakdown || {})
       setPostSources(d.postSources || {})
+      setRecentSessions(d.recentSessions || [])
     }
   }, [])
 
@@ -579,6 +582,7 @@ export default function AdminPage() {
             { key: 'collections', label: '컬렉션 관리' },
             { key: 'verdict',     label: '채우기' },
             { key: 'revenue',     label: '수익화 현황' },
+            { key: 'data',        label: '데이터' },
             { key: 'settings',    label: '통계 설정' },
           ] as const).map(({ key, label }) => (
             <button key={key} onClick={() => setAdminTab(key)}
@@ -716,6 +720,8 @@ export default function AdminPage() {
 
         {/* 통계 설정 탭 — 관리자 방문이 고객 통계에 섞이지 않게 관리 */}
         {adminTab === 'verdict' && <VerdictFiller posts={posts} views={detailViews} onSaved={fetchPosts} />}
+
+        {adminTab === 'data' && <VisitorFlow sessions={recentSessions} posts={posts} onRefresh={fetchAnalytics} />}
 
         {adminTab === 'revenue' && <RevenueBoard posts={posts} clicks={clickBreakdown} sources={postSources} onGoFill={() => setAdminTab('verdict')} onSaved={fetchPosts} />}
 
@@ -1806,6 +1812,108 @@ function AdminIpManager() {
       )}
     </div>
   )
+}
+
+interface RecentSession {
+  sessionId: string
+  startedAt: string
+  lastAt: string
+  source: string | null
+  isReturning: boolean
+  events: { at: string; s: string; v?: string; t: string; p?: number; c?: string; src?: string }[]
+}
+
+/**
+ * 최근 방문 흐름 — 한 사람이 들어와서 무엇을 했는지 한 줄로 본다.
+ *
+ * 유입 경로 표는 "네이버 74건"까지만 알려주고 그 74명이 뭘 하고 나갔는지는 답하지 못한다.
+ * 판정을 보러 왔는데 못 보고 나갔는지, 공구 링크까지 갔는지는 흐름을 봐야 안다.
+ *
+ * 최근 300건만 남긴다(대략 일주일치). 추세는 daily가 이미 갖고 있고, 여기는 "지금 무슨 일이
+ * 일어나는지" 보는 자리다. sessionId는 익명 난수이고 IP는 저장하지 않는다.
+ */
+function VisitorFlow({ sessions, posts, onRefresh }: { sessions: RecentSession[]; posts: Post[]; onRefresh: () => void }) {
+  const title = (id?: number) => (id ? posts.find(p => p.id === id)?.title || `#${id}` : '')
+  const when = (iso: string) => {
+    const m = Math.floor((Date.now() - new Date(iso).getTime()) / 60000)
+    if (m < 1) return '방금'
+    if (m < 60) return `${m}분 전`
+    if (m < 1440) return `${Math.floor(m / 60)}시간 전`
+    return `${Math.floor(m / 1440)}일 전`
+  }
+  const label = (e: RecentSession['events'][number]) => {
+    if (e.t === 'view') return '페이지 열기'
+    if (e.t === 'category') return '카테고리 보기'
+    if (e.t === 'search') return '검색'
+    if (e.t === 'bookmark') return `찜 ${title(e.p)}`.trim()
+    if (e.t === 'share') return `공유 ${title(e.p)}`.trim()
+    if (e.t === 'join') return `공구 보러가기 → ${title(e.p)}`
+    if (e.t === 'click' && e.c === 'detail') return `상세 ${title(e.p)}`
+    if (e.t === 'click') return `${e.c} 링크 → ${title(e.p)}`
+    return e.t
+  }
+  // 돈이 되는 동작만 눈에 띄게 — 나머지는 흐름을 읽는 배경이다
+  const isMoney = (t: string, c?: string) => t === 'click' && (c === 'coupang' || c === 'naver' || c === 'other')
+
+  return (
+    <div style={{ background: '#fff', borderRadius: 12, padding: 20, border: '1px solid #e2e8f0' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 6, flexWrap: 'wrap' }}>
+        <h2 style={{ fontSize: 17, fontWeight: 800 }}>최근 방문 흐름</h2>
+        <button onClick={onRefresh}
+          style={{ marginLeft: 'auto', padding: '6px 12px', borderRadius: 8, border: '1px solid #cbd5e1',
+            background: '#fff', cursor: 'pointer', fontSize: 12.5, fontWeight: 600, color: '#475569' }}>
+          새로고침
+        </button>
+      </div>
+      <p style={{ fontSize: 13, color: '#64748b', lineHeight: 1.7, marginBottom: 16 }}>
+        한 사람이 들어와서 무엇을 했는지 순서대로예요. 최근 300건만 남기니 대략 일주일치입니다.
+        <br />
+        <span style={{ color: '#94a3b8' }}>기록은 2026-08-24부터 쌓입니다 — 그 전 방문은 집계만 있고 흐름이 없어요.</span>
+      </p>
+
+      {sessions.length === 0 ? (
+        <p style={{ textAlign: 'center', padding: '28px 0', fontSize: 14, fontWeight: 700, color: '#64748b' }}>
+          아직 쌓인 방문이 없어요
+        </p>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+          {sessions.map(s => (
+            <div key={s.sessionId}
+              style={{ border: '1px solid #e2e8f0', borderRadius: 10, padding: '11px 13px' }}>
+              <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', marginBottom: 7 }}>
+                <span style={{ fontSize: 12.5, fontWeight: 700, color: '#0f172a' }}>
+                  {SOURCE_KO[s.source || 'direct'] || s.source || '직접 방문'}
+                </span>
+                {s.isReturning && (
+                  <span style={{ fontSize: 11, fontWeight: 700, color: '#15803d', background: '#dcfce7', borderRadius: 5, padding: '1px 6px' }}>
+                    재방문
+                  </span>
+                )}
+                <span style={{ fontSize: 12, color: '#94a3b8' }}>{when(s.lastAt)} · {s.events.length}동작</span>
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+                {s.events.map((e, i) => (
+                  <div key={i} style={{ fontSize: 12.5, color: isMoney(e.t, e.c) ? '#15803d' : '#475569',
+                    fontWeight: isMoney(e.t, e.c) ? 700 : 400, display: 'flex', gap: 8 }}>
+                    <span style={{ color: '#cbd5e1', flexShrink: 0 }}>{i + 1}</span>
+                    <span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {label(e)}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+const SOURCE_KO: Record<string, string> = {
+  naver_search: '네이버 검색', google_search: '구글 검색', other_search: '기타 검색',
+  instagram: '인스타그램', kakao: '카카오톡', calendar: '캘린더 알림',
+  inapp: '앱 안에서', external: '외부 링크', direct: '직접 방문',
 }
 
 /**
