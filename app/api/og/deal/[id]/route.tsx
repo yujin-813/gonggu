@@ -90,7 +90,7 @@ export async function GET(_req: Request, { params }: { params: { id: string } })
           <div style={{ display: 'flex', flexDirection: 'column' }}>
             <span style={{ fontSize: 19, color: '#888888', fontWeight: 600 }}>공구가</span>
             <span style={{ fontSize: 52, fontWeight: 900, color: '#1A1A1A', lineHeight: 1.1 }}>
-              {post.price.toLocaleString()}원
+              {post.price ? `${post.price.toLocaleString()}원` : '가격 공개 전'}
             </span>
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 4, paddingBottom: 8 }}>

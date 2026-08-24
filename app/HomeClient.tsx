@@ -390,7 +390,7 @@ export default function HomeClient({ sections }: { sections?: React.ReactNode })
                     <a key={id} className="recent-item" href={link || '#'} target="_blank" rel="noopener noreferrer"
                       onClick={() => track('join', { postId: id })}>
                       {p.img ? <img src={p.img} alt={p.title} /> : <div className="recent-placeholder"><CatIcon size={24} strokeWidth={1.5} /></div>}
-                      <div className="recent-item-price">{p.price.toLocaleString()}원</div>
+                      <div className="recent-item-price">{p.price ? `${p.price.toLocaleString()}원` : "가격 미정"}</div>
                     </a>
                   )
                 })}

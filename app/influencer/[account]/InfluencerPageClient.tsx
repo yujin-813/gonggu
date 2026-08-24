@@ -128,7 +128,7 @@ export default function InfluencerPage({ params }: { params: { account: string }
                 )}
                 <div className="card-title">{item.title}</div>
                 <div className="price-block">
-                  <span className="price-sale-big">{item.price.toLocaleString()}원</span>
+                  <span className="price-sale-big">{item.price ? `${item.price.toLocaleString()}원` : "가격 미정"}</span>
                 </div>
               </div>
             </a>

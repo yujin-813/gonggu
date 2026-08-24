@@ -97,7 +97,7 @@ export default function PostCard({
 
   async function handleShare(e: React.MouseEvent) {
     e.stopPropagation()
-    const priceLine = `공구가 ${post.price.toLocaleString()}원`
+    const priceLine = post.price ? `공구가 ${post.price.toLocaleString()}원` : '가격 공개 전'
     const compareLine = verdict.referencePrice
       ? ` · ${verdict.referenceLabel} ${verdict.referencePrice.toLocaleString()}원`
       : ''
@@ -215,12 +215,21 @@ export default function PostCard({
 
         {/* 가장 중요한 정보: 얼마인지 · 얼마나 싼지 — 카드에서 가장 크게 */}
         {/* 세트가 여러 개면 가격 하나만 보여주면 어느 구성인지 알 수 없다 — "N원부터"로 알린다 */}
-        <div className="price-block">
-          <span className="price-sale-big">
-            {verdict.fromPrice ? `${verdict.fromPrice.toLocaleString()}원부터` : `${post.price.toLocaleString()}원`}
-          </span>
-          {savedChip && <span className="discount-chip">{savedChip}</span>}
-        </div>
+        {/* 오픈 예정 공구는 가격이 아직 없다(인포크 예고 블록이라 상품 페이지가 없다).
+            없는 가격을 0원으로 쓰지 않고 블록을 통째로 비운다 — 예전에는 여기서 null을
+            toLocaleString 해서 /today·/monthly·/category가 통째로 500이 났다 */}
+        {(verdict.fromPrice || post.price) ? (
+          <div className="price-block">
+            <span className="price-sale-big">
+              {verdict.fromPrice ? `${verdict.fromPrice.toLocaleString()}원부터` : `${post.price.toLocaleString()}원`}
+            </span>
+            {savedChip && <span className="discount-chip">{savedChip}</span>}
+          </div>
+        ) : (
+          <div className="price-block">
+            <span className="price-sale-big" style={{ fontSize: 15, color: 'var(--gray-4)' }}>가격 미정</span>
+          </div>
+        )}
         {verdict.options.length > 1 && (
           <div className="price-from-note">
             총 {verdict.options.length}개 구성
@@ -229,7 +238,7 @@ export default function PostCard({
         )}
         {/* 취소선 가격도 판정이 실제로 기준으로 삼은 값만 쓴다 — origPrice가 신뢰도 검사에서
             빠진 값이면 화면에만 남아 할인율과 어긋난다 */}
-        {!verdict.options.length && verdict.referencePrice && verdict.referencePrice > post.price && (
+        {!verdict.options.length && verdict.referencePrice && post.price && verdict.referencePrice > post.price && (
           post.market_url
             ? <a href={post.market_url} target="_blank" rel="noopener noreferrer" className="price-orig" style={{ textDecoration: 'none', display: 'inline-block', marginBottom: post.market_price ? 2 : 8 }}>
                 {verdict.referenceLabel} {verdict.referencePrice.toLocaleString()}원 →

@@ -34,7 +34,9 @@ export default function ShareInvite({ post }: { post: Post }) {
     setBusy(true)
     const result = await shareContent({
       title: `${post.title} — ${summary}`,
-      description: verdict.referencePrice
+      description: !post.price
+        ? '가격 공개 전'
+        : verdict.referencePrice
         ? `공구가 ${post.price.toLocaleString()}원 · ${verdict.referenceLabel} ${verdict.referencePrice.toLocaleString()}원`
         : `공구가 ${post.price.toLocaleString()}원`,
       imageUrl: `${SITE_URL}/api/og/deal/${post.id}`,
