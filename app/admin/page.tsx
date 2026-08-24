@@ -2025,28 +2025,40 @@ function InquiryList({ inquiries, onRefresh }: { inquiries: Inquiry[]; onRefresh
  * 저장 전에 파트너스 링크인지 검사한다 — url 자리에 상품명을 그대로 붙여넣은 데이터가
  * 실제로 있었다("앱솔리 또또뻥 호라산밀 앤 파로 뻥튀기, 5개, 95g"). 그런 값은 고객 화면에
  * 안 뜨는데, 관리자는 넣었다고 생각하고 넘어간다. 입구에서 막는 편이 낫다.
+ *
+ * 동일 상품을 못 찾을 때를 위한 대체 상품 칸도 있다(D-031) — 채우기 「종료·링크없음」에는
+ * 있었는데 여기 없어서, 이 창으로 먼저 들어온 관리자가 "다른 상품 추천할 링크는 넣을 수가
+ * 없다"고 막혔다. 두 입구가 같은 기능을 갖춰야 한다.
  */
 function PurchaseLinkModal({ post, onClose, onSaved }: { post: Post; onClose: () => void; onSaved: () => void }) {
   const existing = normalizePurchaseLinks(post)
-  const current = existing.find(l => l.platform === 'coupang')
+  const current = existing.find(l => l.platform === 'coupang' && isSameProduct(l))
   const [url, setUrl] = useState(current?.url ?? '')
   const [price, setPrice] = useState(String(current?.price ?? ''))
+
+  const altExisting = existing.find(l => !isSameProduct(l))
+  const [showAlt, setShowAlt] = useState(!!altExisting)
+  const [altUrl, setAltUrl] = useState(altExisting?.url ?? '')
+  const [altPrice, setAltPrice] = useState(String(altExisting?.price ?? ''))
+  const [altNote, setAltNote] = useState(altExisting?.note ?? '')
+
   const [saving, setSaving] = useState(false)
 
   const trimmed = url.trim()
   const looksOk = !trimmed || isAffiliateLink({ platform: 'coupang', url: trimmed })
-  const canSave = !!trimmed && looksOk
+  const altTrimmed = altUrl.trim()
+  const altLooksOk = !altTrimmed || isAffiliateLink({ platform: 'coupang', url: altTrimmed })
+  const canSave = (!!trimmed || !!altTrimmed) && looksOk && altLooksOk
 
   async function save() {
     setSaving(true)
-    const rest = existing.filter(l => l.platform !== 'coupang')
-    const links = [...rest, {
-      platform: 'coupang' as const,
-      url: trimmed,
-      price: parseInt(price) || null,
-      visible: true,
-      checked_at: new Date().toISOString(),
-    }]
+    // 이 창이 다루는 건 coupang 동일상품 + coupang 대체상품 둘뿐이다. 그 외 플랫폼(네이버 등)
+    // 은 건드리지 않고 그대로 남긴다
+    const untouched = existing.filter(l => l.platform !== 'coupang')
+    const now = new Date().toISOString()
+    const links = [...untouched]
+    if (trimmed) links.push({ platform: 'coupang' as const, kind: 'same' as const, url: trimmed, price: parseInt(price) || null, visible: true, checked_at: now })
+    if (altTrimmed) links.push({ platform: 'coupang' as const, kind: 'alternative' as const, url: altTrimmed, price: parseInt(altPrice) || null, note: altNote.trim() || null, visible: true, checked_at: now })
     await fetch(`/api/posts/${post.id}`, {
       method: 'PATCH', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ purchase_links: links }),
@@ -2084,6 +2096,44 @@ function PurchaseLinkModal({ post, onClose, onSaved }: { post: Post; onClose: ()
           고객 화면에 구매 버튼으로 뜨고 공정위 제휴 고지가 함께 붙어요. 그래서 진짜 파트너스
           링크만 넣어야 합니다.
         </p>
+
+        {showAlt ? (
+          <div style={{ marginTop: 12, padding: 10, borderRadius: 8, background: '#fafaf9', border: '1px solid #e7e5e4' }}>
+            <div style={{ fontSize: 12.5, fontWeight: 700, color: '#44403c', marginBottom: 7 }}>
+              똑같은 상품을 못 찾았을 때 — 비슷한 상품
+            </div>
+            <input type="url" value={altUrl} onChange={e => setAltUrl(e.target.value)}
+              placeholder="쿠팡 파트너스 링크 (다른 상품)" style={{ ...fillInput, fontSize: 13 }} />
+            {!altLooksOk && (
+              <p style={{ fontSize: 12, color: '#b91c1c', margin: '6px 0 0', lineHeight: 1.6 }}>
+                파트너스 링크가 아니에요. 상품명이 복사된 것 같아요.
+              </p>
+            )}
+            <div className="admin-2col" style={{ gap: 8, marginTop: 6 }}>
+              <input type="number" value={altPrice} onChange={e => setAltPrice(e.target.value)}
+                placeholder="가격 (선택)" style={{ ...fillInput, fontSize: 12 }} />
+              <input value={altNote} onChange={e => setAltNote(e.target.value)}
+                placeholder="차이점 한 줄 (선택 — 예: 용량이 달라요)" style={{ ...fillInput, fontSize: 12 }} />
+            </div>
+            <p style={{ fontSize: 11, color: '#a8a29e', margin: '8px 0 0', lineHeight: 1.6 }}>
+              고객 화면에 &quot;똑같은 상품은 못 찾았어요&quot;라고 먼저 밝히고, 판정(가격 비교)에는
+              안 쓰여요. 다른 상품을 같은 상품으로 속이지 않기 위해서예요.
+            </p>
+            {!altExisting && (
+              <button onClick={() => { setShowAlt(false); setAltUrl(''); setAltPrice(''); setAltNote('') }}
+                style={{ marginTop: 8, padding: 0, border: 'none', background: 'none', cursor: 'pointer',
+                  fontSize: 11.5, color: '#94a3b8', fontWeight: 600 }}>
+                접기
+              </button>
+            )}
+          </div>
+        ) : (
+          <button type="button" onClick={() => setShowAlt(true)}
+            style={{ marginTop: 10, padding: 0, border: 'none', background: 'none', cursor: 'pointer',
+              fontSize: 11.5, color: '#94a3b8', fontWeight: 600 }}>
+            + 똑같은 상품을 못 찾았어요 — 비슷한 상품으로 안내
+          </button>
+        )}
 
         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 14 }}>
           <button onClick={onClose}
@@ -2292,6 +2342,8 @@ function RevenueBoard({ posts, clicks, sources, onGoFill, onSaved }: {
         search: searchIn(p.id),
         linked: hasPurchaseLink(p),
         broken: brokenPurchaseLinks(p).length > 0,
+        // 대체 상품만 있고 동일 상품은 없는 상태 — "없음"이라고 하면 이미 채운 걸 또 채우려 든다
+        hasAlt: alternativeLinks(p).length > 0,
         ended: isExpired(p),
       }))
       .filter(r => r.detail > 0 || r.groupbuy > 0)
@@ -2376,9 +2428,9 @@ function RevenueBoard({ posts, clicks, sources, onGoFill, onSaved }: {
                     title={r.linked ? '링크를 고칩니다' : '여기서 바로 넣습니다'}
                     style={{ border: 'none', background: 'none', cursor: 'pointer', padding: '2px 6px',
                       borderRadius: 6, fontSize: 11.5, fontWeight: 700,
-                      color: r.linked ? '#15803d' : r.broken ? '#b45309' : '#dc2626',
+                      color: r.linked ? '#15803d' : r.broken ? '#b45309' : r.hasAlt ? '#92400e' : '#dc2626',
                       textDecoration: r.linked ? 'none' : 'underline' }}>
-                    {r.linked ? '있음' : r.broken ? '링크 오류' : '없음'}
+                    {r.linked ? '있음' : r.broken ? '링크 오류' : r.hasAlt ? '대체 상품' : '없음'}
                   </button>
                 </td>
               </tr>
