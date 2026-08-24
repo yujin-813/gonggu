@@ -148,9 +148,15 @@ export function isPagePublic(post: Pick<Post, 'status' | 'published'>): boolean 
 }
 
 /** 고객 화면에 노출해도 되는 상품인지 — api/posts, api/collections/[id] 등에서 공통으로 쓴다 */
-export function isCustomerVisible(post: Pick<Post, 'status' | 'published' | 'is_evergreen_deal' | 'is_always_on' | 'sale_until_sold_out' | 'deadline' | 'start_date' | 'scraped_at' | 'ended_at'>): boolean {
+export function isCustomerVisible(post: Pick<Post, 'status' | 'published' | 'is_evergreen_deal' | 'is_always_on' | 'sale_until_sold_out' | 'deadline' | 'start_date' | 'scraped_at' | 'ended_at' | 'price'>): boolean {
   // 아직 안 열린 공구는 마감일과 무관하게 보여준다 (오픈 예정 카드)
   if (isStillUpcoming(post)) return post.published !== false
+  // 오픈일은 지났는데 수집기가 아직 실제 내용을 못 가져온 자리표시자는, 마감일이 이미
+  // 박혀 있어도 일반 공구처럼 보여주지 않는다. 예전에는 "오픈일이 지나면 마감일 검사만
+  // 탄다"고 짜여 있어서, 가격도 이미지도 없는 카드가 마감일까지 며칠씩 "가격 미정"으로
+  // 실제 공구들 사이에 섞여 노출됐다 — 판정할 숫자가 없으면 틀린 판정보다 안 보여주는 게
+  // 낫다(원칙 2).
+  if (!post.price) return false
   // 오픈일이 지난 오픈예정 글은 이제 일반 공구로 취급 — 아래 마감일 검사를 그대로 탄다.
   // 예전에는 여기서 바로 true를 돌려줘서, 마감일이 지나도 고객 화면에 계속 남아 있었다.
   const isPublished =
