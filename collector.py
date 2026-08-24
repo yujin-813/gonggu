@@ -80,7 +80,9 @@ def collect_inpock(source):
 
 
 def collect_linkhub(source):
-    """링크트리·릿.리 등 링크허브 페이지 — 외부 링크를 수동 검수 후보로 출력."""
+    """링크트리·릿.리·tuk.link·linkon.id 등 사이트별 파서를 만들 만큼 흔하지 않은 링크허브
+    페이지 — 사이트마다 크롤러를 따로 만들지 않는다는 방침(CLAUDE.md)에 따라, 페이지에
+    정적으로 박힌 <a href> 링크를 그대로 뽑아 수동 검수 후보로 출력만 한다."""
     try:
         import requests
         from bs4 import BeautifulSoup
@@ -147,7 +149,7 @@ def run():
         try:
             if st == "inpock":
                 new, skipped = collect_inpock(source)
-            elif st in ("linktree", "littly"):
+            elif st in ("linktree", "littly", "linkhub"):
                 new, skipped = collect_linkhub(source)
             else:
                 new, skipped = collect_unknown(source)
