@@ -128,6 +128,10 @@ export default function AdminPage() {
   // 최근 방문의 개별 동작 — 세션 단위로 묶어 흐름을 본다
   const [recentSessions, setRecentSessions] = useState<RecentSession[]>([])
   const [inquiries, setInquiries] = useState<Inquiry[]>([])
+  // 「오늘 손보면 돈 되는 일」에서 '목록으로 →'를 누르면 채우기 탭의 어느 세부 탭으로
+  // 갈지 함께 정한다 — 탭만 바꾸면 항상 '미확인'으로 열려서, ⚠️ 종료+대체상품없음 항목을
+  // 눌러도 엉뚱한 목록이 뜨는 문제가 있었다
+  const [verdictMode, setVerdictMode] = useState<'unchecked' | 'ended' | 'deadline'>('unchecked')
   const [influencerSources, setInfluencerSources] = useState<InfluencerSource[]>([])
   const [newSourceUrl, setNewSourceUrl] = useState('')
   const [newSourceName, setNewSourceName] = useState('')
@@ -516,7 +520,8 @@ export default function AdminPage() {
             "오늘 어떤 상품을 손보면 돈이 될까?"로 바꾼다 — 통계 카드는 그 질문에 답을 못
             했다. 공개·검수·후보 건수는 '공구 관리' 탭의 필터 칩에 그대로 남아 있다 */}
         <TodayPriorities posts={posts} detailViews={detailViews} clickBreakdown={clickBreakdown}
-          postSources={postSources} sources={sources} onGoTo={setAdminTab} />
+          postSources={postSources} sources={sources}
+          onGoTo={(tab, mode) => { setAdminTab(tab); if (mode) setVerdictMode(mode) }} />
 
         {/* 방문자 분석 */}
         <AnalyticsSection data={analytics} topPosts={topPosts} topSharedPosts={topSharedPosts} sources={sources} />
@@ -533,7 +538,7 @@ export default function AdminPage() {
             { key: 'inquiries',   label: `제휴 문의${inquiries.filter(i => !i.handled).length ? ` ${inquiries.filter(i => !i.handled).length}` : ''}` },
             { key: 'settings',    label: '통계 설정' },
           ] as const).map(({ key, label }) => (
-            <button key={key} onClick={() => setAdminTab(key)}
+            <button key={key} onClick={() => { setAdminTab(key); if (key === 'verdict') setVerdictMode('unchecked') }}
               style={{
                 padding: '10px 20px', border: 'none', background: 'none', cursor: 'pointer',
                 fontWeight: 700, fontSize: 14, color: adminTab === key ? '#6366f1' : '#64748b',
@@ -667,7 +672,7 @@ export default function AdminPage() {
         )}
 
         {/* 통계 설정 탭 — 관리자 방문이 고객 통계에 섞이지 않게 관리 */}
-        {adminTab === 'verdict' && <VerdictFiller posts={posts} views={detailViews} onSaved={fetchPosts} />}
+        {adminTab === 'verdict' && <VerdictFiller posts={posts} views={detailViews} onSaved={fetchPosts} initialMode={verdictMode} />}
 
         {adminTab === 'data' && <VisitorFlow sessions={recentSessions} posts={posts} clickBreakdown={clickBreakdown} postSources={postSources} sources={sources} onRefresh={fetchAnalytics} />}
 
@@ -2133,7 +2138,7 @@ function TodayPriorities({ posts, detailViews, clickBreakdown, postSources, sour
   clickBreakdown: Record<string, Record<string, number>>
   postSources: Record<string, Record<string, number>>
   sources: { source: string; label: string; count: number }[]
-  onGoTo: (tab: 'verdict' | 'revenue') => void
+  onGoTo: (tab: 'verdict' | 'revenue', verdictMode?: 'unchecked' | 'ended' | 'deadline') => void
 }) {
   const views = (id: number) => detailViews[id] || 0
   const searchIn = (id: number) => {
@@ -2170,10 +2175,12 @@ function TodayPriorities({ posts, detailViews, clickBreakdown, postSources, sour
     .filter(p => isPagePublic(p) && isExpired(p) && !hasPurchaseLink(p) && alternativeLinks(p).length === 0 && views(p.id) > 0)
     .sort((a, b) => views(b.id) - views(a.id))
 
-  const buckets: { emoji: string; label: string; items: Post[]; metric: (p: Post) => string; tab: 'verdict' | 'revenue' }[] = [
-    { emoji: '🔥', label: '검색 유입 있는데 비교가 없는 상품', items: bucketA, metric: p => `검색 ${searchIn(p.id)}회`, tab: 'verdict' },
+  const buckets: { emoji: string; label: string; items: Post[]; metric: (p: Post) => string; tab: 'verdict' | 'revenue'; verdictMode?: 'unchecked' | 'ended' | 'deadline' }[] = [
+    { emoji: '🔥', label: '검색 유입 있는데 비교가 없는 상품', items: bucketA, metric: p => `검색 ${searchIn(p.id)}회`, tab: 'verdict', verdictMode: 'unchecked' },
     { emoji: '💰', label: '조회수 있는데 구매 링크가 없는 상품', items: bucketB, metric: p => `조회 ${views(p.id)}회`, tab: 'revenue' },
-    { emoji: '⚠️', label: '공구 종료됐는데 대체 상품도 없는 상품', items: bucketC, metric: p => `조회 ${views(p.id)}회`, tab: 'verdict' },
+    // "종료됐는데 대체 상품도 없는" 상품은 채우기의 「종료·링크없음」 세부 탭에 있다.
+    // 탭만 'verdict'로 바꾸면 항상 '미확인'으로 열려서 이 항목을 못 찾았다 — 세부 탭까지 지정한다
+    { emoji: '⚠️', label: '공구 종료됐는데 대체 상품도 없는 상품', items: bucketC, metric: p => `조회 ${views(p.id)}회`, tab: 'verdict', verdictMode: 'ended' },
   ]
 
   return (
@@ -2201,7 +2208,7 @@ function TodayPriorities({ posts, detailViews, clickBreakdown, postSources, sour
           <div key={b.label} style={{ border: '1px solid #e2e8f0', borderRadius: 10, padding: '11px 13px' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8, flexWrap: 'wrap' }}>
               <span style={{ fontSize: 13.5, fontWeight: 700 }}>{b.emoji} {b.label} {b.items.length}건</span>
-              <button onClick={() => onGoTo(b.tab)}
+              <button onClick={() => onGoTo(b.tab, b.verdictMode)}
                 style={{ marginLeft: 'auto', padding: '5px 12px', borderRadius: 7, border: '1px solid #cbd5e1',
                   background: '#fff', cursor: 'pointer', fontSize: 12, fontWeight: 600, color: '#475569' }}>
                 목록으로 →
@@ -2400,8 +2407,20 @@ function RevenueBoard({ posts, clicks, sources, onGoFill, onSaved }: {
 // 두 가지 대상이 같은 필드(purchase_links)를 채우므로 화면을 나누지 않고 여기서 전환한다.
 //   판정 대기     — 비교 가격이 없어 등급을 못 매기는 공구. 가격이 필요하다.
 //   종료·링크없음 — 마감됐는데 지금 살 곳을 못 알려주는 공구. 링크가 필요하다.
-function VerdictFiller({ posts, views, onSaved }: { posts: Post[]; views: Record<string, number>; onSaved: () => void }) {
-  const [mode, setMode] = useState<CompareState | 'ended' | 'deadline'>('unchecked')
+function VerdictFiller({ posts, views, onSaved, initialMode }: {
+  posts: Post[]
+  views: Record<string, number>
+  onSaved: () => void
+  /** 상위(관리자 첫 화면 우선순위)에서 특정 세부 탭을 지정해 열 때 쓴다. 기본은 '미확인' */
+  initialMode?: CompareState | 'ended' | 'deadline'
+}) {
+  const [mode, setMode] = useState<CompareState | 'ended' | 'deadline'>(initialMode ?? 'unchecked')
+  // TodayPriorities에서 다시 '목록으로 →'를 누르면(예: 🔥 다음에 ⚠️) VerdictFiller가 이미
+  // 마운트돼 있어 useState 초깃값이 다시 안 먹는다. prop이 바뀌면 따라간다
+  useEffect(() => {
+    if (initialMode) setMode(initialMode)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialMode])
   // 목록은 전체 2,300건 기준이라 그대로 펼치면 화면이 못 버티고, 고객에게 안 보이는 공구는
   // 채워도 지금 효과가 없다. 기본은 보이는 것만 — 대신 몇 건을 뺐는지 항상 적는다
   const [visibleOnly, setVisibleOnly] = useState(true)
