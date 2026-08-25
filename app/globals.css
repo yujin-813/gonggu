@@ -239,6 +239,36 @@ header {
   padding-bottom: 8px;
 }
 
+/* 헤더 오른쪽 설정 메뉴 — 아이콘 5개를 늘어놓던 것 대신 아이콘 하나 + 한글 목록
+   드롭다운. 위치 잡는 방식은 category-dropdown-panel과 같다(app-header가 sticky라
+   absolute의 기준이 된다). 카테고리 패널과 달리 폭이 좁고 오른쪽에 붙는다. */
+.header-menu-overlay {
+  position: fixed; inset: 0;
+  background: rgba(15, 23, 42, .35);
+  z-index: 99;
+}
+.header-menu-panel {
+  position: absolute; top: 100%; right: 20px;
+  z-index: 101;
+  min-width: 220px;
+  background: #fff;
+  border-radius: 14px;
+  box-shadow: 0 12px 24px rgba(0, 0, 0, .12);
+  padding: 6px;
+  display: flex; flex-direction: column;
+}
+.header-menu-item {
+  display: flex; align-items: center; gap: 10px;
+  padding: 11px 12px;
+  border-radius: 9px;
+  border: none; background: none;
+  font-size: 13.5px; font-weight: 600; color: var(--text);
+  text-decoration: none;
+  text-align: left; cursor: pointer;
+  white-space: nowrap;
+}
+.header-menu-item:hover { background: var(--gray-1); }
+
 .category-wrap {
   max-width: 680px;
   margin: 0 auto;
@@ -282,7 +312,7 @@ header {
     grid-template-columns: repeat(4, 1fr);
     gap: 14px 4px;
     overflow-x: visible;
-    padding: 14px 10px 4px;
+    padding: 14px 20px 4px;
   }
   .cat-btn {
     flex-direction: column;
@@ -851,26 +881,26 @@ header {
 @media (max-width: 640px) {
 
   /* 헤더 */
-  .header-inner { padding: 10px 14px; gap: 8px; }
+  .header-inner { padding: 10px 20px; gap: 8px; }
   .logo { font-size: 18px; }
   .logo-tagline { display: none; }
   .btn-icon { padding: 7px 10px; font-size: 16px; }
 
   /* 카테고리 */
-  .category-wrap { padding: 10px 14px 0; gap: 6px; }
+  .category-wrap { padding: 10px 20px 0; gap: 6px; }
   .cat-btn { padding: 6px 12px; font-size: 12px; }
 
   /* 탑바 */
-  .topbar { padding: 10px 14px 4px; }
+  .topbar { padding: 10px 20px 4px; }
 
   /* 피드 */
-  .feed { padding: 10px 14px 90px; gap: 12px; }
+  .feed { padding: 10px 20px 90px; gap: 12px; }
 
   /* 카드 이미지 */
   .card-img-wrap { height: 190px; }
 
   /* 카드 본문 */
-  .card-body { padding: 12px 14px 14px; }
+  .card-body { padding: 12px 16px 16px; }
   .price-sale-big { font-size: 24px; }
   .discount-chip { font-size: 13px; }
   .card-cta { padding: 13px 0; font-size: 15px; }
@@ -976,7 +1006,7 @@ header {
 @media (max-width: 640px) {
   /* 헤더 */
   .header-inner {
-    padding: 10px 14px;
+    padding: 10px 20px;
     gap: 8px;
   }
   .logo { font-size: 18px; }
@@ -984,16 +1014,17 @@ header {
   .btn-icon { padding: 7px 10px; font-size: 16px; }
 
   /* 카테고리 */
-  .category-wrap { padding: 10px 14px 0; gap: 6px; }
+  .category-wrap { padding: 10px 20px 0; gap: 6px; }
   .cat-btn { padding: 6px 12px; font-size: 12px; }
 
-  /* 피드 */
-  .feed { padding: 10px 12px 90px; gap: 12px; }
-  .topbar { padding: 10px 14px 4px; }
+  /* 피드 — 데스크톱보다 화면이 좁다고 좌우 여백까지 줄이면 화면 끝까지 카드가
+     붙어버려서 오히려 더 답답해 보인다. 20px로 데스크톱과 맞춘다 */
+  .feed { padding: 10px 20px 90px; gap: 12px; }
+  .topbar { padding: 10px 20px 4px; }
 
   /* 카드 이미지 */
   .card-img-wrap { height: 190px; }
-  .card-body { padding: 12px 14px 14px; }
+  .card-body { padding: 12px 16px 16px; }
   .card-title { font-size: 14px; }
   .price-sale-big { font-size: 22px; }
   .discount-chip { font-size: 12px; padding: 2px 6px; }
