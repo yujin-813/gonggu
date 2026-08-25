@@ -278,14 +278,14 @@ export function influencerSummaries(posts: Post[], limit = 12) {
  */
 /**
  * 홈 중간에 넣는 컬렉션 배너 — 여러 상품을 카드로 돌리던 것(CollectionRoller) 대신
- * 컬렉션 하나를 배너 한 장으로 소개한다. 지금은 활성 컬렉션이 항상 1개뿐이라 첫 번째만
- * 쓴다 — 여러 개를 동시에 밀어야 할 때가 오면 그때 다시 본다.
+ * 컬렉션을 배너 한 장씩으로 소개한다. 활성 컬렉션이 여럿이면 옆으로 넘기는 배너 여러 장 +
+ * 점 페이지네이션으로 보여준다(지금은 실제로 1개뿐이라 점 없이 한 장만 보인다).
  * /api/collections GET의 고객 노출 조건과 같은 기준(상품 있음 + 안 만료)을 쓴다.
  */
-export function featuredCollectionBanner(): { id: string; title: string; description: string; emoji: string; color: string } | null {
-  const c = loadCollections().find(c => c.productIds.length > 0 && !(c.expiresAt && new Date(c.expiresAt) < new Date()))
-  if (!c) return null
-  return { id: c.id, title: c.title, description: c.description, emoji: c.emoji, color: c.color }
+export function featuredCollectionBanners(): { id: string; title: string; description: string; emoji: string; color: string }[] {
+  return loadCollections()
+    .filter(c => c.productIds.length > 0 && !(c.expiresAt && new Date(c.expiresAt) < new Date()))
+    .map(c => ({ id: c.id, title: c.title, description: c.description, emoji: c.emoji, color: c.color }))
 }
 
 export function endedButBuyablePosts(limit = 12): Post[] {

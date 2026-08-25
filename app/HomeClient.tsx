@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from 'react'
 import Link from 'next/link'
 import Header from '@/components/Header'
 import CategoryFilter from '@/components/CategoryFilter'
+import CollectionBannerCarousel from '@/components/CollectionBannerCarousel'
 import PostCard from '@/components/PostCard'
 import Toast from '@/components/Toast'
 import type { Post, Category, SortOrder } from '@/lib/types'
@@ -42,7 +43,7 @@ const KAKAO_CHANNEL_URL = 'http://pf.kakao.com/_WVxgfX/friend'
 // 검색엔진이 상품을 못 읽는다
 interface CollectionBanner { id: string; title: string; description: string; emoji: string; color: string }
 
-export default function HomeClient({ sections, collectionBanner }: { sections?: React.ReactNode; collectionBanner: CollectionBanner | null }) {
+export default function HomeClient({ sections, collectionBanners }: { sections?: React.ReactNode; collectionBanners: CollectionBanner[] }) {
   const [posts, setPosts] = useState<Post[]>([])
   const [bookmarks, setBookmarks] = useState<Set<number>>(new Set())
   const [currentCat, setCurrentCat] = useState<Category | 'all' | 'evergreen' | 'upcoming'>('all')
@@ -335,18 +336,7 @@ export default function HomeClient({ sections, collectionBanner }: { sections?: 
 
       {/* 여기서부터 body — 검색 아래, 카테고리 위라는 참고 화면(쿠팡)과 같은 순서로
           배너를 먼저 두고 카테고리를 그 아래에 둔다. 둘 다 그냥 스크롤되어 넘어간다. */}
-      {collectionBanner && (
-        <Link href={`/collection/${collectionBanner.id}`} className="collection-banner"
-          style={{ background: `linear-gradient(135deg, ${collectionBanner.color}, ${collectionBanner.color}CC)` }}
-          onClick={() => track('click', { clickType: 'other' })}>
-          <span className="collection-banner-emoji">{collectionBanner.emoji}</span>
-          <span className="collection-banner-text">
-            <span className="collection-banner-title">{collectionBanner.title}</span>
-            {collectionBanner.description && <span className="collection-banner-desc">{collectionBanner.description}</span>}
-          </span>
-          <span className="collection-banner-cta">보러가기 →</span>
-        </Link>
-      )}
+      <CollectionBannerCarousel banners={collectionBanners} />
       <CategoryFilter current={currentCat} onSelect={handleCategorySelect} />
 
       {showingMainFeed && !kakaoBannerDismissed && (
