@@ -1,6 +1,7 @@
 'use client'
 import { useState, useEffect, useMemo, useCallback } from 'react'
-import type { Post, ScraperStatus, InfluencerSource, Collection, PurchaseLink } from '@/lib/types'
+import type { Post, ScraperStatus, InfluencerSource, Collection, PurchaseLink, PurchaseLinkRelation } from '@/lib/types'
+import { RELATION_DEFAULT_REASON } from '@/lib/types'
 import { daysLeft, periodLabel, isExpired, isCustomerVisible, isPagePublic, fmtDate, getPeriodState, DEADLINE_UNKNOWN_DAYS } from '@/lib/period'
 import { hasPurchaseLink, normalizePurchaseLinks, brokenPurchaseLinks, isAffiliateLink, isSameProduct, alternativeLinks, PLATFORM_LABEL } from '@/lib/purchaseLinks'
 import { getDealVerdict, isMultiOption } from '@/lib/dealGrade'
@@ -2066,7 +2067,10 @@ function PurchaseLinkModal({ post, onClose, onSaved }: { post: Post; onClose: ()
   const [showAlt, setShowAlt] = useState(!!altExisting)
   const [altUrl, setAltUrl] = useState(altExisting?.url ?? '')
   const [altPrice, setAltPrice] = useState(String(altExisting?.price ?? ''))
-  const [altNote, setAltNote] = useState(altExisting?.note ?? '')
+  const [altRelation, setAltRelation] = useState<PurchaseLinkRelation>(altExisting?.relation ?? 'similar')
+  const [altProductName, setAltProductName] = useState(altExisting?.productName ?? '')
+  const [altReason, setAltReason] = useState(altExisting?.reason ?? RELATION_DEFAULT_REASON[altExisting?.relation ?? 'similar'])
+  const [altMemo, setAltMemo] = useState(altExisting?.adminMemo ?? '')
 
   const [saving, setSaving] = useState(false)
 
@@ -2083,8 +2087,13 @@ function PurchaseLinkModal({ post, onClose, onSaved }: { post: Post; onClose: ()
     const untouched = existing.filter(l => l.platform !== 'coupang')
     const now = new Date().toISOString()
     const links = [...untouched]
-    if (trimmed) links.push({ platform: 'coupang' as const, kind: 'same' as const, url: trimmed, price: parseInt(price) || null, visible: true, checked_at: now })
-    if (altTrimmed) links.push({ platform: 'coupang' as const, kind: 'alternative' as const, url: altTrimmed, price: parseInt(altPrice) || null, note: altNote.trim() || null, visible: true, checked_at: now })
+    if (trimmed) links.push({ platform: 'coupang' as const, kind: 'same' as const, relation: 'same' as const, url: trimmed, price: parseInt(price) || null, visible: true, checked_at: now })
+    if (altTrimmed) links.push({
+      platform: 'coupang' as const, kind: 'alternative' as const, relation: altRelation,
+      url: altTrimmed, price: parseInt(altPrice) || null,
+      productName: altProductName.trim() || null, reason: altReason.trim() || null, adminMemo: altMemo.trim() || null,
+      visible: true, checked_at: now,
+    })
     await fetch(`/api/posts/${post.id}`, {
       method: 'PATCH', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ purchase_links: links }),
@@ -2128,8 +2137,10 @@ function PurchaseLinkModal({ post, onClose, onSaved }: { post: Post; onClose: ()
             <div style={{ fontSize: 12.5, fontWeight: 700, color: '#44403c', marginBottom: 7 }}>
               똑같은 상품을 못 찾았을 때 — 비슷한 상품
             </div>
+            <RelationPicker relation={altRelation} reason={altReason}
+              onChange={(rel, reason) => { setAltRelation(rel); setAltReason(reason) }} />
             <input type="url" value={altUrl} onChange={e => setAltUrl(e.target.value)}
-              placeholder="쿠팡 파트너스 링크 (다른 상품)" style={{ ...fillInput, fontSize: 13 }} />
+              placeholder="쿠팡 파트너스 링크 (다른 상품)" style={{ ...fillInput, fontSize: 13, marginTop: 6 }} />
             {!altLooksOk && (
               <p style={{ fontSize: 12, color: '#b91c1c', margin: '6px 0 0', lineHeight: 1.6 }}>
                 파트너스 링크가 아니에요. 상품명이 복사된 것 같아요.
@@ -2138,15 +2149,20 @@ function PurchaseLinkModal({ post, onClose, onSaved }: { post: Post; onClose: ()
             <div className="admin-2col" style={{ gap: 8, marginTop: 6 }}>
               <input type="number" value={altPrice} onChange={e => setAltPrice(e.target.value)}
                 placeholder="가격 (선택)" style={{ ...fillInput, fontSize: 12 }} />
-              <input value={altNote} onChange={e => setAltNote(e.target.value)}
-                placeholder="차이점 한 줄 (선택 — 예: 용량이 달라요)" style={{ ...fillInput, fontSize: 12 }} />
+              <input value={altProductName} onChange={e => setAltProductName(e.target.value)}
+                placeholder="상품명 (고객 화면에 노출)" style={{ ...fillInput, fontSize: 12 }} />
             </div>
+            <input value={altReason} onChange={e => setAltReason(e.target.value)}
+              placeholder="추천 이유 (고객 화면 문구)" style={{ ...fillInput, fontSize: 12, marginTop: 6 }} />
+            <textarea value={altMemo} onChange={e => setAltMemo(e.target.value)}
+              placeholder="내부 메모 (관리자만 봐요 — 예: 브랜드가 달라요, 팩토는 어때요)" rows={2}
+              style={{ marginTop: 6, width: '100%', fontSize: 12, fontFamily: 'inherit', padding: '8px 10px', border: '1.5px solid #fde68a', background: '#fffbeb', borderRadius: 8, resize: 'vertical', boxSizing: 'border-box' }} />
             <p style={{ fontSize: 11, color: '#a8a29e', margin: '8px 0 0', lineHeight: 1.6 }}>
-              고객 화면에 &quot;똑같은 상품은 못 찾았어요&quot;라고 먼저 밝히고, 판정(가격 비교)에는
+              고객 화면에 &quot;같은 상품은 못 찾았어요&quot;라고 먼저 밝히고, 판정(가격 비교)에는
               안 쓰여요. 다른 상품을 같은 상품으로 속이지 않기 위해서예요.
             </p>
             {!altExisting && (
-              <button onClick={() => { setShowAlt(false); setAltUrl(''); setAltPrice(''); setAltNote('') }}
+              <button onClick={() => { setShowAlt(false); setAltUrl(''); setAltPrice(''); setAltProductName(''); setAltReason(RELATION_DEFAULT_REASON.similar); setAltMemo(''); setAltRelation('similar') }}
                 style={{ marginTop: 8, padding: 0, border: 'none', background: 'none', cursor: 'pointer',
                   fontSize: 11.5, color: '#94a3b8', fontWeight: 600 }}>
                 접기
@@ -2637,6 +2653,38 @@ const fillInput: React.CSSProperties = {
   outline: 'none', width: '100%', boxSizing: 'border-box',
 }
 
+/** 동일 상품/같은 브랜드/비슷한 상품 세 단계 선택. EndedFillRow·PurchaseLinkModal 둘 다 쓴다.
+ * relation을 고르면 kind(same/alternative, 판정 가드레일)가 같이 정해지고, reason이 비어
+ * 있거나 이전 기본 문구 그대로면 새 relation의 기본 문구로 채워준다 — 관리자가 직접 고친
+ * 문구는 안 건드린다. */
+function RelationPicker({ relation, reason, onChange }: {
+  relation: PurchaseLinkRelation
+  reason: string
+  onChange: (relation: PurchaseLinkRelation, reason: string) => void
+}) {
+  return (
+    <div style={{ display: 'flex', gap: 6 }}>
+      {(['same', 'same_brand', 'similar'] as PurchaseLinkRelation[]).map(rel => {
+        const active = relation === rel
+        const label = rel === 'same' ? '동일 상품' : rel === 'same_brand' ? '같은 브랜드 다른 상품' : '비슷한 상품'
+        return (
+          <button key={rel} type="button"
+            onClick={() => {
+              const reasonUntouched = !reason.trim() || Object.values(RELATION_DEFAULT_REASON).includes(reason.trim())
+              onChange(rel, reasonUntouched ? RELATION_DEFAULT_REASON[rel] : reason)
+            }}
+            style={{ flex: 1, padding: '6px 8px', borderRadius: 7, fontSize: 11.5, fontWeight: 700, cursor: 'pointer',
+              border: `1.5px solid ${active ? (rel === 'same' ? '#6366f1' : '#b45309') : '#e2e8f0'}`,
+              background: active ? (rel === 'same' ? '#eef2ff' : '#fffbeb') : '#fff',
+              color: active ? (rel === 'same' ? '#4338ca' : '#b45309') : '#94a3b8' }}>
+            {label}
+          </button>
+        )
+      })}
+    </div>
+  )
+}
+
 // 목적이 다른 두 가지를 한 필드에 담으면 안 된다.
 //
 //   판정용 비교가  → origPrice(정가) · market_price(네이버 최저가) · market_url(근거 링크)
@@ -3102,7 +3150,10 @@ function EndedFillRow({ post, views, onSaved }: { post: Post; views: number; onS
   const [showAlt, setShowAlt] = useState(altExisting.length > 0)
   const [altUrl, setAltUrl] = useState(altExisting[0]?.url ?? '')
   const [altPrice, setAltPrice] = useState(String(altExisting[0]?.price ?? ''))
-  const [altNote, setAltNote] = useState(altExisting[0]?.note ?? '')
+  const [altRelation, setAltRelation] = useState<PurchaseLinkRelation>(altExisting[0]?.relation ?? 'similar')
+  const [altProductName, setAltProductName] = useState(altExisting[0]?.productName ?? '')
+  const [altReason, setAltReason] = useState(altExisting[0]?.reason ?? RELATION_DEFAULT_REASON[altExisting[0]?.relation ?? 'similar'])
+  const [altMemo, setAltMemo] = useState(altExisting[0]?.adminMemo ?? '')
 
   const [saving, setSaving] = useState(false)
   const [done, setDone] = useState(false)
@@ -3112,9 +3163,14 @@ function EndedFillRow({ post, views, onSaved }: { post: Post; views: number; onS
     setSaving(true)
     const now = new Date().toISOString()
     const links = []
-    if (coupangUrl.trim()) links.push({ platform: 'coupang' as const, kind: 'same' as const, url: coupangUrl.trim(), price: parseInt(coupang) || null, visible: true, checked_at: now })
-    if (naverUrl.trim())   links.push({ platform: 'naver' as const, kind: 'same' as const, url: naverUrl.trim(), price: parseInt(naver) || null, visible: true, checked_at: now })
-    if (altUrl.trim())     links.push({ platform: 'coupang' as const, kind: 'alternative' as const, url: altUrl.trim(), price: parseInt(altPrice) || null, note: altNote.trim() || null, visible: true, checked_at: now })
+    if (coupangUrl.trim()) links.push({ platform: 'coupang' as const, kind: 'same' as const, relation: 'same' as const, url: coupangUrl.trim(), price: parseInt(coupang) || null, visible: true, checked_at: now })
+    if (naverUrl.trim())   links.push({ platform: 'naver' as const, kind: 'same' as const, relation: 'same' as const, url: naverUrl.trim(), price: parseInt(naver) || null, visible: true, checked_at: now })
+    if (altUrl.trim())     links.push({
+      platform: 'coupang' as const, kind: 'alternative' as const, relation: altRelation,
+      url: altUrl.trim(), price: parseInt(altPrice) || null,
+      productName: altProductName.trim() || null, reason: altReason.trim() || null, adminMemo: altMemo.trim() || null,
+      visible: true, checked_at: now,
+    })
     await fetch(`/api/posts/${post.id}`, {
       method: 'PATCH', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ purchase_links: links }),
@@ -3158,20 +3214,27 @@ function EndedFillRow({ post, views, onSaved }: { post: Post; views: number; onS
           <div style={{ fontSize: 12.5, fontWeight: 700, color: '#44403c', marginBottom: 7 }}>
             똑같은 상품을 못 찾았을 때 — 비슷한 상품
           </div>
+          <RelationPicker relation={altRelation} reason={altReason}
+            onChange={(rel, reason) => { setAltRelation(rel); setAltReason(reason); setDone(false) }} />
           <input type="url" value={altUrl} onChange={e => { setAltUrl(e.target.value); setDone(false) }}
-            placeholder="쿠팡 파트너스 링크 (다른 상품)" style={{ ...fillInput, fontSize: 13 }} />
+            placeholder="쿠팡 파트너스 링크 (다른 상품)" style={{ ...fillInput, fontSize: 13, marginTop: 6 }} />
           <div className="admin-2col" style={{ gap: 8, marginTop: 6 }}>
             <input type="number" value={altPrice} onChange={e => setAltPrice(e.target.value)}
               placeholder="가격 (선택)" style={{ ...fillInput, fontSize: 12 }} />
-            <input value={altNote} onChange={e => setAltNote(e.target.value)}
-              placeholder="차이점 한 줄 (선택 — 예: 용량이 달라요)" style={{ ...fillInput, fontSize: 12 }} />
+            <input value={altProductName} onChange={e => setAltProductName(e.target.value)}
+              placeholder="상품명 (고객 화면에 노출)" style={{ ...fillInput, fontSize: 12 }} />
           </div>
+          <input value={altReason} onChange={e => setAltReason(e.target.value)}
+            placeholder="추천 이유 (고객 화면 문구)" style={{ ...fillInput, fontSize: 12, marginTop: 6 }} />
+          <textarea value={altMemo} onChange={e => setAltMemo(e.target.value)}
+            placeholder="내부 메모 (관리자만 봐요 — 예: 브랜드가 달라요, 팩토는 어때요)" rows={2}
+            style={{ marginTop: 6, width: '100%', fontSize: 12, fontFamily: 'inherit', padding: '8px 10px', border: '1.5px solid #fde68a', background: '#fffbeb', borderRadius: 8, resize: 'vertical', boxSizing: 'border-box' }} />
           <p style={{ fontSize: 11, color: '#a8a29e', margin: '8px 0 0', lineHeight: 1.6 }}>
-            고객 화면에 &quot;똑같은 상품은 못 찾았어요&quot;라고 먼저 밝히고, 판정(가격 비교)에는
+            고객 화면에 &quot;같은 상품은 못 찾았어요&quot;라고 먼저 밝히고, 판정(가격 비교)에는
             안 쓰여요. 다른 상품을 같은 상품으로 속이지 않기 위해서예요.
           </p>
           {!altExisting.length && (
-            <button onClick={() => { setShowAlt(false); setAltUrl(''); setAltPrice(''); setAltNote('') }}
+            <button onClick={() => { setShowAlt(false); setAltUrl(''); setAltPrice(''); setAltProductName(''); setAltReason(RELATION_DEFAULT_REASON.similar); setAltMemo(''); setAltRelation('similar') }}
               style={{ marginTop: 8, padding: 0, border: 'none', background: 'none', cursor: 'pointer',
                 fontSize: 11.5, color: '#94a3b8', fontWeight: 600 }}>
               접기

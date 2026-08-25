@@ -120,7 +120,10 @@ const siblingDeals: CandidateProvider = {
           providerId: 'sibling',
           label: `다른 공구 "${(other.title || '').slice(0, 30)}"의 비교가`,
           price: ref,
-          url: other.market_url || null,
+          // market_url(네이버쇼핑 등 외부 근거)은 비어 있는 경우가 많아서 "열기"가 아예 안
+          // 뜨는 후보가 흔했다 — 판단에 진짜 필요한 건 어차피 우리 공구 상세(제목·이미지·
+          // 옵션)라, 우리 사이트 자체 링크로 바꾼다. 이건 항상 있다
+          url: `/post/${other.id}`,
           note: '구성이 다를 수 있으니 상품을 확인하고 골라주세요',
           confidence: 'low',
         },

@@ -1,6 +1,7 @@
 'use client'
 import { useState, useEffect, useRef, useMemo } from 'react'
-import type { Post, Category, PurchaseLink, DealOption } from '@/lib/types'
+import type { Post, Category, PurchaseLink, PurchaseLinkRelation, DealOption } from '@/lib/types'
+import { RELATION_DEFAULT_REASON } from '@/lib/types'
 import { normalizePurchaseLinks } from '@/lib/purchaseLinks'
 import { parseOptionLines } from '@/lib/searchQuery'
 
@@ -275,6 +276,9 @@ export default function AddPostModal({ onClose, onSubmit, editPost, existingGrou
           ...l,
           url: l.url.trim(),
           note: (l.note || '').trim() || null,
+          productName: (l.productName || '').trim() || null,
+          reason: (l.reason || '').trim() || null,
+          adminMemo: (l.adminMemo || '').trim() || null,
           checked_at: l.checked_at || new Date().toISOString(),
         }))
       await onSubmit({
@@ -777,37 +781,70 @@ export default function AddPostModal({ onClose, onSubmit, editPost, existingGrou
                 placeholder="https://..."
                 style={{ marginTop: 6 }}
               />
-              <input
-                type="text"
-                value={link.note ?? ''}
-                onChange={e => update({ note: e.target.value })}
-                placeholder={link.kind === 'alternative' ? '차이점 한 줄 (선택 — 예: 용량이 달라요)' : '옵션/구성 참고사항 (선택 — 예: 2개입 기준)'}
-                style={{ marginTop: 6 }}
-              />
-              {/* 같은 상품을 못 찾을 때가 있다(D-031) — 그렇다고 다른 상품을 같은 상품인 척
-                  넣으면 가격 비교·"지금 살 수 있어요" 문구가 둘 다 거짓이 된다. 어떤 링크인지
-                  여기서 명시적으로 갈라서, 대체 상품은 판정에 안 쓰이고 별도 문구로 안내되게 한다. */}
+              {/* 같은 상품을 못 찾을 때가 있다(D-031). 세 단계로 명시해서 "왜 이 상품을
+                  보여주는지"가 고객 문구에 자동으로 반영되게 한다 — 판정에는 same만 쓰인다. */}
               <div style={{ display: 'flex', gap: 6, marginTop: 6 }}>
-                <button type="button" onClick={() => update({ kind: 'same' })}
-                  style={{ flex: 1, padding: '6px 8px', borderRadius: 7, fontSize: 11.5, fontWeight: 700, cursor: 'pointer',
-                    border: `1.5px solid ${(link.kind ?? 'same') === 'same' ? '#6366f1' : '#e2e8f0'}`,
-                    background: (link.kind ?? 'same') === 'same' ? '#eef2ff' : '#fff',
-                    color: (link.kind ?? 'same') === 'same' ? '#4338ca' : '#94a3b8' }}>
-                  동일 상품
-                </button>
-                <button type="button" onClick={() => update({ kind: 'alternative' })}
-                  style={{ flex: 1, padding: '6px 8px', borderRadius: 7, fontSize: 11.5, fontWeight: 700, cursor: 'pointer',
-                    border: `1.5px solid ${link.kind === 'alternative' ? '#b45309' : '#e2e8f0'}`,
-                    background: link.kind === 'alternative' ? '#fffbeb' : '#fff',
-                    color: link.kind === 'alternative' ? '#b45309' : '#94a3b8' }}>
-                  다른 상품 (비슷한 대체)
-                </button>
+                {(['same', 'same_brand', 'similar'] as PurchaseLinkRelation[]).map(rel => {
+                  const active = (link.relation ?? 'same') === rel
+                  const label = rel === 'same' ? '동일 상품' : rel === 'same_brand' ? '같은 브랜드 다른 상품' : '비슷한 상품'
+                  return (
+                    <button key={rel} type="button"
+                      onClick={() => {
+                        // reason이 비어 있거나 아직 이전 relation의 기본 문구 그대로면 새 기본
+                        // 문구로 바꿔준다 — 관리자가 직접 고친 문구는 relation을 바꿔도 안 건드린다
+                        const reasonUntouched = !link.reason?.trim() || Object.values(RELATION_DEFAULT_REASON).includes(link.reason.trim())
+                        update({
+                          relation: rel,
+                          kind: rel === 'same' ? 'same' : 'alternative',
+                          reason: reasonUntouched ? RELATION_DEFAULT_REASON[rel] : link.reason,
+                        })
+                      }}
+                      style={{ flex: 1, padding: '6px 8px', borderRadius: 7, fontSize: 11.5, fontWeight: 700, cursor: 'pointer',
+                        border: `1.5px solid ${active ? (rel === 'same' ? '#6366f1' : '#b45309') : '#e2e8f0'}`,
+                        background: active ? (rel === 'same' ? '#eef2ff' : '#fffbeb') : '#fff',
+                        color: active ? (rel === 'same' ? '#4338ca' : '#b45309') : '#94a3b8' }}>
+                      {label}
+                    </button>
+                  )
+                })}
               </div>
-              {link.kind === 'alternative' && (
-                <p style={{ fontSize: 11, color: '#a8a29e', margin: '6px 0 0', lineHeight: 1.6 }}>
-                  고객 화면에 &quot;똑같은 상품은 못 찾았어요&quot;라고 먼저 밝히고 안내돼요. 가격
-                  비교(판정)에는 안 쓰여요 — 다른 상품을 같은 상품으로 속이지 않기 위해서예요.
-                </p>
+
+              {(link.relation ?? 'same') === 'same' ? (
+                <input
+                  type="text"
+                  value={link.note ?? ''}
+                  onChange={e => update({ note: e.target.value })}
+                  placeholder="옵션/구성 참고사항 (선택 — 예: 2개입 기준)"
+                  style={{ marginTop: 6 }}
+                />
+              ) : (
+                <>
+                  <p style={{ fontSize: 11, color: '#a8a29e', margin: '6px 0 0', lineHeight: 1.6 }}>
+                    고객 화면에 &quot;같은 상품은 못 찾았어요&quot;라고 먼저 밝히고 안내돼요. 가격
+                    비교(판정)에는 안 쓰여요 — 다른 상품을 같은 상품으로 속이지 않기 위해서예요.
+                  </p>
+                  <input
+                    type="text"
+                    value={link.productName ?? ''}
+                    onChange={e => update({ productName: e.target.value })}
+                    placeholder="상품명 (선택 — 고객 화면에 노출)"
+                    style={{ marginTop: 6 }}
+                  />
+                  <input
+                    type="text"
+                    value={link.reason ?? ''}
+                    onChange={e => update({ reason: e.target.value })}
+                    placeholder="추천 이유 (고객 화면 문구 — relation 선택 시 기본값이 채워져요)"
+                    style={{ marginTop: 6 }}
+                  />
+                  <textarea
+                    value={link.adminMemo ?? ''}
+                    onChange={e => update({ adminMemo: e.target.value })}
+                    placeholder="내부 메모 (관리자만 봐요 — 예: 브랜드가 달라요, 팩토는 어때요)"
+                    rows={2}
+                    style={{ marginTop: 6, width: '100%', fontSize: 13, fontFamily: 'inherit', padding: '8px 10px', border: '1.5px solid #fde68a', background: '#fffbeb', borderRadius: 8, resize: 'vertical' }}
+                  />
+                </>
               )}
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 8 }}>
                 <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontWeight: 400, fontSize: 13 }}>
@@ -838,7 +875,7 @@ export default function AddPostModal({ onClose, onSubmit, editPost, existingGrou
 
         <button
           type="button"
-          onClick={() => setPurchaseLinks(prev => [...prev, { platform: 'coupang', kind: 'same', url: '', price: null, note: null, visible: true }])}
+          onClick={() => setPurchaseLinks(prev => [...prev, { platform: 'coupang', kind: 'same', relation: 'same', url: '', price: null, note: null, visible: true }])}
           style={{ padding: '7px 12px', background: '#f1f5f9', color: '#475569', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 12, fontWeight: 600, marginBottom: 4 }}>
           + 구매 링크 추가
         </button>

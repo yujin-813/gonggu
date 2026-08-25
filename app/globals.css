@@ -1045,6 +1045,22 @@ header {
 .ended-link-btn span { flex: 1; }
 .ended-link-btn:hover { background: #D98E00; }
 
+/* 대체 상품 카드 — PostCard.tsx의 인라인 대체 링크와 같은 파란 계열을 쓴다(이미 있는
+   "동일 상품 아님" 색 규칙 재사용). 브랜드 주황은 꿀딜/CTA 전용이라 여기 쓰면 "이게
+   제일 싸다"는 신호로 오해된다 */
+.ended-alt-list { display: flex; flex-direction: column; gap: 10px; }
+.ended-alt-card {
+  display: flex; flex-direction: column; gap: 4px;
+  padding: 12px 14px; border-radius: 10px;
+  border: 1px solid #bae6fd; background: #f0f9ff;
+  text-decoration: none;
+}
+.ended-alt-name { font-size: 13.5px; font-weight: 700; color: var(--text); }
+.ended-alt-reason { font-size: 12.5px; color: var(--gray-4); line-height: 1.5; }
+.ended-alt-row { display: flex; align-items: center; justify-content: space-between; margin-top: 4px; gap: 8px; }
+.ended-alt-price { font-size: 15px; font-weight: 800; color: var(--text); }
+.ended-alt-cta { display: inline-flex; align-items: center; gap: 4px; font-size: 12.5px; font-weight: 700; color: #0369a1; white-space: nowrap; }
+
 .ended-notes { margin: 10px 0 0; padding-left: 16px; }
 .ended-notes li { font-size: 12px; color: var(--gray-4); line-height: 1.6; }
 

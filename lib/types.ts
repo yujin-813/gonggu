@@ -177,16 +177,40 @@ export type PurchasePlatform = 'naver' | 'coupang' | 'other'
  */
 export type PurchaseLinkKind = 'same' | 'alternative'
 
+/**
+ * 대체 상품일 때 "왜 이걸 보여주는지" — 동일 상품/같은 브랜드/비슷한 상품 세 단계.
+ * `kind`(same/alternative, 판정 가드레일)는 그대로 두고, 이건 고객 문구를 자동으로
+ * 만들기 위한 좀 더 세분화된 값이다. `relation === 'same'`이면 `kind`는 항상 `same`,
+ * 나머지 둘은 항상 `kind: alternative`다.
+ */
+export type PurchaseLinkRelation = 'same' | 'same_brand' | 'similar'
+
+export const RELATION_DEFAULT_REASON: Record<PurchaseLinkRelation, string> = {
+  same:        '쿠팡에서도 같은 상품을 확인할 수 있어요.',
+  same_brand:  '같은 브랜드의 다른 제품도 함께 비교해보세요.',
+  similar:     '동일 상품은 아니지만 비슷한 용도로 찾는 제품이에요.',
+}
+
 /** 공구가 아닌 일반 판매처 링크. 공구 종료 후 "지금 바로 사고 싶은" 사용자를 위한 대체 경로. */
 export interface PurchaseLink {
   platform: PurchasePlatform
-  /** 같은 상품인가, 비슷한 용도의 다른 상품인가. 없으면 same */
+  /** 같은 상품인가, 비슷한 용도의 다른 상품인가. 없으면 same — relation에서 자동으로 정해진다 */
   kind?: PurchaseLinkKind
+  /** 동일 상품/같은 브랜드/비슷한 상품 — 없으면 same(옛 데이터 호환) */
+  relation?: PurchaseLinkRelation
   url: string
   /** 확인 당시 가격. 실시간 조회가 아니므로 화면에는 "확인 시점"과 함께 조심스럽게 쓴다 */
   price?: number | null
-  /** 옵션이 공구와 달라 가격을 단순 비교하면 안 될 때 관리자가 남기는 참고 문구 */
+  /** 쿠팡 등에서 확인한 상품명 — 고객 화면에 노출 */
+  productName?: string | null
+  /** "왜 이 상품을 보여주는지" 고객 화면 문구. relation 기본값을 채워주고 관리자가 고칠 수 있다 */
+  reason?: string | null
+  /** 옵션이 공구와 달라 가격을 단순 비교하면 안 될 때 관리자가 남기는 참고 문구 — 고객 화면에 노출 */
   note?: string | null
+  /** "브랜드가 달라요, 팩토는 어때요" 같은 관리자 내부 판단 메모 — 고객 화면에 절대 노출하지 않는다.
+   * reason(고객용 이유)과 분리한 이유가 이거다 — 관리자가 왜 이 상품을 골랐는지 적은 메모가
+   * 그대로 고객 화면에 나가면 안 된다 */
+  adminMemo?: string | null
   checked_at?: string | null
   /** 고객 화면 노출 여부 — 확인이 끝난 링크만 켠다 */
   visible?: boolean

@@ -1,4 +1,5 @@
-import type { Post, PurchaseLink, PurchasePlatform } from './types'
+import type { Post, PurchaseLink, PurchasePlatform, PurchaseLinkRelation } from './types'
+import { RELATION_DEFAULT_REASON } from './types'
 
 // 대체 구매 링크(공구가 아닌 일반 판매처)를 다루는 곳. 화면·API 어디서든 여기만 거쳐서
 // 읽는다 — 예전 단일 필드(partners_*)와 새 배열(purchase_links)이 섞여 있어도
@@ -93,6 +94,17 @@ export function sameProductLinks(post: Parameters<typeof normalizePurchaseLinks>
 /** 비슷한 용도의 다른 상품 — 권할 수는 있어도 판정 근거로는 절대 못 쓴다 */
 export function alternativeLinks(post: Parameters<typeof normalizePurchaseLinks>[0]): PurchaseLink[] {
   return visiblePurchaseLinks(post).filter(l => !isSameProduct(l))
+}
+
+/** 링크의 relation — 없는 옛 데이터는 kind로 추정한다(same이면 same, 아니면 similar) */
+export function linkRelation(link: Pick<PurchaseLink, 'kind' | 'relation'>): PurchaseLinkRelation {
+  return link.relation ?? (isSameProduct(link) ? 'same' : 'similar')
+}
+
+/** 고객 화면에 보여줄 "왜 이 상품인지" 문구 — 관리자가 직접 쓴 게 있으면 그걸, 없으면
+ * relation 기본 문구를 쓴다. note(관리자 메모)는 절대 여기 안 섞는다 — 고객 노출 금지 */
+export function linkReason(link: Pick<PurchaseLink, 'kind' | 'relation' | 'reason'>): string {
+  return link.reason?.trim() || RELATION_DEFAULT_REASON[linkRelation(link)]
 }
 
 /** 고객 화면에 실제로 띄울 링크만 — 관리자가 확인해 켠 것 중, 진짜 제휴 링크만 */

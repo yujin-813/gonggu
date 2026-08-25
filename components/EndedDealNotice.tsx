@@ -2,7 +2,7 @@
 import Link from 'next/link'
 import { ExternalLink, ShoppingBag } from 'lucide-react'
 import type { Post, PurchaseLink } from '@/lib/types'
-import { PLATFORM_LABEL, PLATFORM_DISCLOSURE, isSameProduct } from '@/lib/purchaseLinks'
+import { PLATFORM_LABEL, PLATFORM_DISCLOSURE, isSameProduct, linkReason } from '@/lib/purchaseLinks'
 import { fmtDate, isExpired } from '@/lib/period'
 import { track, type ClickType } from '@/lib/track'
 
@@ -110,19 +110,35 @@ export default function EndedDealNotice({ post, purchaseLinks, related, section,
         ) : altLinks.length > 0 ? (
           <>
             {/* 똑같은 상품 링크를 못 찾았을 때만 여기로 온다. "구매하기"와 문구·톤을 분명히
-                갈라서, 다른 상품을 같은 상품인 것처럼 파는 일이 없게 한다 */}
+                갈라서, 다른 상품을 같은 상품인 것처럼 파는 일이 없게 한다. 단순 "구매하기"
+                버튼이 아니라 상품명·추천 이유를 먼저 보여줘 광고처럼 안 읽히게 한다 */}
             <p className="ended-lead">
-              똑같은 상품은 찾지 못했어요. 대신 비슷한 용도로 지금 살 수 있는 상품이에요.
+              공구 상품은 {PLATFORM_LABEL[altLinks[0].platform]}에서 못 찾았어요.<br />
+              대신 비슷하게 비교해볼 만한 상품이에요.
             </p>
-            {renderLinks(altLinks, () => 'other')}
-
-            {notesOf(altLinks).length > 0 && (
-              <ul className="ended-notes">
-                {notesOf(altLinks).map(l => (
-                  <li key={`note-${l.platform}`}>{PLATFORM_LABEL[l.platform]}: {l.note}</li>
-                ))}
-              </ul>
-            )}
+            <div className="ended-alt-list">
+              {altLinks.map(link => (
+                <a
+                  key={`${link.platform}-${link.url}`}
+                  href={link.url}
+                  target="_blank"
+                  rel="noopener noreferrer sponsored"
+                  className="ended-alt-card"
+                  onClick={() => track('click', { postId: post.id, clickType: 'other' })}
+                >
+                  {link.productName && <span className="ended-alt-name">{link.productName}</span>}
+                  <span className="ended-alt-reason">{linkReason(link)}</span>
+                  <span className="ended-alt-row">
+                    <span className="ended-alt-price">
+                      {link.price ? `${link.price.toLocaleString()}원` : '가격 확인하기'}
+                    </span>
+                    <span className="ended-alt-cta">
+                      {PLATFORM_LABEL[link.platform]}에서 비교해보기 <ExternalLink size={12} />
+                    </span>
+                  </span>
+                </a>
+              ))}
+            </div>
 
             <p className="ended-caution">
               ※ 이 공구와 같은 상품이 아니라서 저희가 가격을 비교하지 않았어요. 구성·품질을
