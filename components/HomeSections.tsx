@@ -1,6 +1,5 @@
 'use client'
 import { useState, useEffect } from 'react'
-import Link from 'next/link'
 import type { Post, Category } from '@/lib/types'
 import { CATEGORY_LABEL, categoryIcon } from '@/lib/categoryIcons'
 import Toast from '@/components/Toast'
@@ -36,13 +35,10 @@ interface Props {
   influencers: InfluencerSummary[]
   /** 공구는 끝났지만 대체 구매처가 있는 상품 */
   endedButBuyable: Post[]
-  /** 컬렉션 소개 배너 — 상품 카드를 여러 장 돌리던 것 대신 한 장으로 소개한다 */
-  collectionBanner: { id: string; title: string; description: string; emoji: string; color: string } | null
 }
 
 export default function HomeSections({
   featured, popular, today, upcoming, endingSoon, monthly, categories, influencers, endedButBuyable,
-  collectionBanner,
 }: Props) {
   const [bookmarks, setBookmarks] = useState<Set<number>>(new Set())
   const [toast, setToast] = useState({ message: '', visible: false })
@@ -71,22 +67,6 @@ export default function HomeSections({
       <DealStrip icon={<Award size={17} strokeWidth={2.5} />} title="이번 주 우리가 고른 공구" posts={featured} highlight />
 
       <DealStrip icon={<CalendarDays size={17} strokeWidth={2.5} />} title="오늘 새로 올라온 공구" moreHref="/today"    posts={today} />
-
-      {/* 컬렉션 배너 — 섹션 사이에 한 장만 끼워 넣는다. 상품 카드를 여러 장 돌리던 예전
-          방식(CollectionRoller)보다 화면을 덜 차지하면서도 눈에 띈다 */}
-      {collectionBanner && (
-        <Link href={`/collection/${collectionBanner.id}`} className="collection-banner"
-          style={{ background: `linear-gradient(135deg, ${collectionBanner.color}, ${collectionBanner.color}CC)` }}
-          onClick={() => track('click', { clickType: 'other' })}>
-          <span className="collection-banner-emoji">{collectionBanner.emoji}</span>
-          <span className="collection-banner-text">
-            <span className="collection-banner-title">{collectionBanner.title}</span>
-            {collectionBanner.description && <span className="collection-banner-desc">{collectionBanner.description}</span>}
-          </span>
-          <span className="collection-banner-cta">보러가기 →</span>
-        </Link>
-      )}
-
       <DealStrip icon={<AlarmClock size={17} strokeWidth={2.5} />} title="마감 임박 공구" moreHref="/deadline" posts={endingSoon} />
       {/* 오픈 예정은 55건이 있는데도 홈에 자리가 없어 아무도 못 봤다. 마감 임박 바로 뒤에
           두는 이유는, 둘 다 "날짜를 챙겨야 하는 공구"라 같이 훑는 게 자연스럽기 때문이다 */}

@@ -40,7 +40,9 @@ const KAKAO_CHANNEL_URL = 'http://pf.kakao.com/_WVxgfX/friend'
 
 // 큐레이션 섹션은 서버에서 계산해 넘겨받는다 — 여기서 fetch하면 첫 HTML이 비어서
 // 검색엔진이 상품을 못 읽는다
-export default function HomeClient({ sections }: { sections?: React.ReactNode }) {
+interface CollectionBanner { id: string; title: string; description: string; emoji: string; color: string }
+
+export default function HomeClient({ sections, collectionBanner }: { sections?: React.ReactNode; collectionBanner: CollectionBanner | null }) {
   const [posts, setPosts] = useState<Post[]>([])
   const [bookmarks, setBookmarks] = useState<Set<number>>(new Set())
   const [currentCat, setCurrentCat] = useState<Category | 'all' | 'evergreen' | 'upcoming'>('all')
@@ -328,6 +330,22 @@ export default function HomeClient({ sections }: { sections?: React.ReactNode })
             />
           </div>
         </div>
+
+        {/* 검색 바로 아래, 카테고리 위 — 사장님이 준 참고 화면(쿠팡)과 같은 자리.
+            스크롤로 카테고리가 접힐 때 배너도 같이 접는다 — 배너만 계속 붙어 있으면
+            헤더가 다시 커져서 접은 의미가 없어진다. */}
+        {!categoryCollapsed && collectionBanner && (
+          <Link href={`/collection/${collectionBanner.id}`} className="collection-banner"
+            style={{ background: `linear-gradient(135deg, ${collectionBanner.color}, ${collectionBanner.color}CC)` }}
+            onClick={() => track('click', { clickType: 'other' })}>
+            <span className="collection-banner-emoji">{collectionBanner.emoji}</span>
+            <span className="collection-banner-text">
+              <span className="collection-banner-title">{collectionBanner.title}</span>
+              {collectionBanner.description && <span className="collection-banner-desc">{collectionBanner.description}</span>}
+            </span>
+            <span className="collection-banner-cta">보러가기 →</span>
+          </Link>
+        )}
 
         {/* 스크롤로 접히면 카테고리 자리를 아예 비운다 — 다시 펼치는 버튼은 헤더 왼쪽 위
             햄버거로 옮겼다(사장님 피드백: 메뉴 버튼은 보통 왼쪽 위에 있다) */}

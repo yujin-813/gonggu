@@ -33,6 +33,7 @@ export default function Home() {
         itemListSchema(posts, '진행 중인 공구', SITE_URL),
       ]} />
       <HomeClient
+        collectionBanner={featuredCollectionBanner()}
         sections={<HomeSections
           popular={popular}
           featured={featured}
@@ -43,7 +44,6 @@ export default function Home() {
           categories={categorySections(posts, STRIP_LIMIT)}
           influencers={influencerSummaries(posts)}
           endedButBuyable={endedButBuyablePosts()}
-          collectionBanner={featuredCollectionBanner()}
         />}
       />
     </>
