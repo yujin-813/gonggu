@@ -1227,7 +1227,10 @@ header {
 /* ── 홈 큐레이션 섹션 ────────────────────────────────────────────────────── */
 /* 단일 피드였던 홈을 "지금 많이 보는 / 이번 주 추천 / 곧 끝나는 / 카테고리별"로 나눈 영역.
    각 영역은 상품이 하나도 없으면 렌더 자체를 하지 않아 빈 제목만 남지 않는다. */
-.home-sections { max-width: 680px; margin: 0 auto; }
+/* 각 섹션(.strip)이 자체 padding 20px을 갖고 있긴 하지만, 컨테이너 자체는
+   패딩이 0이라 "여백이 없다"고 느껴질 수 있다 — 컨테이너에도 여백을 둬서
+   전체적으로 좀 더 넉넉해 보이게 한다 */
+.home-sections { max-width: 680px; margin: 0 auto; padding: 0 8px; }
 
 .home-section { padding: 22px 20px 4px; }
 .home-section + .home-section { border-top: 1px solid var(--gray-2); }
