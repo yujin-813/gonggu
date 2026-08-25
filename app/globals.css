@@ -1318,7 +1318,7 @@ header {
 /* 오늘의 공구 · 마감 임박 · 이달의 공구 · 카테고리별 · 인플루언서별이 쓴다.
    전체 크기 카드는 한 화면에 두세 개밖에 안 들어가서, 홈에서 "무엇이 있는지" 훑는 데는
    작은 카드가 맞다. 판단에 필요한 정보는 눌러서 들어간 상세에서 보여준다. */
-.strip { max-width: 680px; margin: 0 auto; padding: 20px 0 4px; }
+.strip { max-width: 680px; margin: 0 auto; padding: 28px 0 4px; }
 .strip + .strip { border-top: 1px solid var(--gray-2); }
 
 /* 모바일에서는 섹션 제목 앞 아이콘을 빼고(쿠팡처럼 텍스트 위주), 그 대신 섹션 사이
@@ -1326,14 +1326,14 @@ header {
    대신 맡는다 */
 @media (max-width: 640px) {
   .strip-title svg { display: none; }
-  .strip + .strip { border-top: 8px solid var(--gray-1); padding-top: 24px; }
+  .strip + .strip { border-top: 8px solid var(--gray-1); padding-top: 32px; }
 }
 
 .strip-head {
   display: flex; align-items: baseline; justify-content: space-between; gap: 12px;
-  padding: 0 20px 10px;
+  padding: 0 20px 12px;
 }
-.strip-title { font-size: 16px; font-weight: 800; letter-spacing: -0.3px; }
+.strip-title { font-size: 18px; font-weight: 800; letter-spacing: -0.3px; }
 .strip-more {
   flex: none;
   font-size: 12.5px; font-weight: 700;
