@@ -94,6 +94,7 @@ export default function PostDetailClient({ post, ended = false, upcoming = false
             if (result === 'clipboard') showToast('링크가 복사되었어요')
             track('share', { postId: id })
           }}
+          endedCompact={ended}
         />
       </div>
 

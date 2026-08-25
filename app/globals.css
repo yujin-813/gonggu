@@ -1031,8 +1031,13 @@ header {
 .ended-price-label { font-size: 12px; color: var(--gray-4); font-weight: 700; }
 .ended-price-value { font-size: 19px; font-weight: 900; }
 .ended-price-date { font-size: 12px; color: var(--gray-3); }
+/* 할인율 한 줄 — 정가 대비 % 저렴했던 꿀딜. 가격 옆이 아니라 다음 줄에 온전히 나오게
+   너비를 100%로 끊는다(마감 페이지는 판정 카드를 다시 안 그리므로 이 한 줄이 전부다) */
+.ended-price-rate { flex-basis: 100%; font-size: 13px; font-weight: 700; color: var(--brand); }
+.ended-checked-at { font-size: 11.5px; color: var(--gray-3); margin: 6px 0 0; }
 
 .ended-lead { font-size: 13.5px; color: var(--gray-4); line-height: 1.6; margin-bottom: 12px; }
+.ended-alt-title { font-size: 14.5px; font-weight: 800; margin: 0 0 6px; }
 
 .ended-links { display: flex; flex-direction: column; gap: 8px; }
 .ended-link-btn {
@@ -1060,6 +1065,11 @@ header {
 .ended-alt-row { display: flex; align-items: center; justify-content: space-between; margin-top: 4px; gap: 8px; }
 .ended-alt-price { font-size: 15px; font-weight: 800; color: var(--text); }
 .ended-alt-cta { display: inline-flex; align-items: center; gap: 4px; font-size: 12.5px; font-weight: 700; color: #0369a1; white-space: nowrap; }
+.ended-alt-tag {
+  display: inline-block; margin-top: 6px;
+  font-size: 10.5px; font-weight: 700; color: #64748b;
+  background: rgba(255,255,255,.7); border-radius: 999px; padding: 2px 8px;
+}
 
 .ended-notes { margin: 10px 0 0; padding-left: 16px; }
 .ended-notes li { font-size: 12px; color: var(--gray-4); line-height: 1.6; }
@@ -1360,6 +1370,13 @@ header {
   margin-bottom: 10px;
 }
 .verdict-label { font-size: 11.5px; font-weight: 800; color: var(--gray-3); letter-spacing: .04em; }
+/* 마감 카드의 판정 상세 접이 버튼 — PostCard의 endedCompact 전용 */
+.verdict-detail-toggle {
+  display: flex; align-items: center; justify-content: center; gap: 4px;
+  width: 100%; padding: 10px 0; margin-bottom: 8px;
+  background: var(--gray-1); border: 1px solid var(--gray-2); border-radius: 10px;
+  font-size: 12.5px; font-weight: 700; color: var(--gray-4); cursor: pointer;
+}
 .verdict-head { font-size: 13.5px; font-weight: 800; margin-bottom: 4px; }
 
 .verdict-table { width: 100%; border-collapse: collapse; }

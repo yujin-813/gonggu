@@ -1,9 +1,10 @@
 'use client'
 import Link from 'next/link'
 import { ExternalLink, ShoppingBag } from 'lucide-react'
-import type { Post, PurchaseLink } from '@/lib/types'
-import { PLATFORM_LABEL, PLATFORM_DISCLOSURE, isSameProduct, linkReason } from '@/lib/purchaseLinks'
+import type { Post, PurchaseLink, PurchaseLinkRelation } from '@/lib/types'
+import { PLATFORM_LABEL, PLATFORM_DISCLOSURE, isSameProduct, linkReason, linkRelation } from '@/lib/purchaseLinks'
 import { fmtDate, isExpired } from '@/lib/period'
+import { getDealVerdict, rateText } from '@/lib/dealGrade'
 import { track, type ClickType } from '@/lib/track'
 
 // 공구가 끝난 상세 페이지에 붙는 안내. 검색으로 들어온 사용자는 두 가지 중 하나를 원한다 —
@@ -43,6 +44,18 @@ function isDisclosureText(note: string, platform: PurchaseLink['platform']): boo
   return norm(note).includes(norm(PLATFORM_DISCLOSURE[platform]).slice(0, 25))
 }
 
+// \ub300\uccb4 \uc0c1\ud488 \uc601\uc5ed \uc81c\ubaa9\u00b7\ubc30\uc9c0 \u2014 "\uc774\ub7f0 \uac74 \uc5b4\ub54c\uc694?" \uac19\uc740 \ubb49\ub6b1\uadf8\ub9b0 \ub9d0 \ub300\uc2e0 \uad00\uacc4\ub97c \uadf8\ub300\ub85c \ubc1d\ud78c\ub2e4
+const ALT_SECTION_TITLE: Record<PurchaseLinkRelation, string> = {
+  same: '\uc9c0\uae08 \uc0b4 \uc218 \uc788\uc5b4\uc694',
+  same_brand: '\uac19\uc740 \ube0c\ub79c\ub4dc \uc0c1\ud488\ub3c4 \uc788\uc5b4\uc694',
+  similar: '\ube44\uc2b7\ud55c \uc0c1\ud488\ub3c4 \ucc3e\uc544\ubd24\uc5b4\uc694',
+}
+const ALT_TAG_LABEL: Record<PurchaseLinkRelation, string> = {
+  same: '\ub3d9\uc77c \uc0c1\ud488',
+  same_brand: '\uac19\uc740 \ube0c\ub79c\ub4dc \u00b7 \ub3d9\uc77c \uc0c1\ud488 \uc544\ub2d8',
+  similar: '\ube44\uc2b7\ud55c \uc0c1\ud488 \u00b7 \ub3d9\uc77c \uc0c1\ud488 \uc544\ub2d8',
+}
+
 export default function EndedDealNotice({ post, purchaseLinks, related, section, relatedKind = 'category', categoryLabel = '' }: Props) {
   const sameLinks = purchaseLinks.filter(isSameProduct)
   const altLinks = purchaseLinks.filter(l => !isSameProduct(l))
@@ -62,7 +75,7 @@ export default function EndedDealNotice({ post, purchaseLinks, related, section,
           <ShoppingBag size={15} />
           <span>
             {PLATFORM_LABEL[link.platform]}에서{' '}
-            {link.price ? `${link.price.toLocaleString()}원에 구매하기` : '가격 확인하기'}
+            {link.price ? `${link.price.toLocaleString()}원에 지금 보기` : '가격 확인하기'}
           </span>
           <ExternalLink size={13} />
         </a>
@@ -70,24 +83,42 @@ export default function EndedDealNotice({ post, purchaseLinks, related, section,
     </div>
   )
 
+  // 마감 페이지는 "판단"보다 "다음 행동"이 우선이다 — 판정 카드 전체를 다시 그리지 않고,
+  // 당시 가격 옆에 할인율 한 줄만 붙인다. 자세한 근거(옵션별 표 등)는 PostCard의 접이식
+  // 판정 카드가 아래에서 맡는다
+  const verdict = getDealVerdict(post)
+  const rateLine = verdict.rateRange
+    ? (verdict.rateRange.min === verdict.rateRange.max
+        ? `약 ${rateText(verdict.rateRange.max)}했던 꿀딜`
+        : `${Math.round(verdict.rateRange.min * 100)}~${Math.round(verdict.rateRange.max * 100)}% 저렴했던 꿀딜`)
+    : verdict.discountRate !== null
+    ? `${verdict.referenceLabel} 대비 약 ${rateText(verdict.discountRate)}했던 꿀딜`
+    : null
+
   return (
     <div className="ended-wrap">
       {section !== 'related' && (
       <section className="ended-box">
-        <h2 className="ended-title">이 공동구매는 종료되었습니다</h2>
+        <h2 className="ended-title">이 공동구매는 종료됐어요</h2>
 
         {post.price > 0 && (
           <div className="ended-price">
-            <span className="ended-price-label">당시 공동구매 가격</span>
+            <span className="ended-price-label">당시 공구가</span>
             <strong className="ended-price-value">{post.price.toLocaleString()}원</strong>
+            {rateLine && <span className="ended-price-rate">{rateLine}</span>}
             {post.deadline && <span className="ended-price-date">{fmtDate(post.deadline)} 마감</span>}
           </div>
         )}
 
         {sameLinks.length > 0 ? (
           <>
-            <p className="ended-lead">지금 바로 필요하다면 아래에서 구매할 수 있어요.</p>
+            <p className="ended-lead">지금 구매하려면</p>
             {renderLinks(sameLinks, l => l.platform as ClickType)}
+            {sameLinks.some(l => l.checked_at) && (
+              <p className="ended-checked-at">
+                {sameLinks.find(l => l.checked_at)!.checked_at!.slice(0, 10)} 확인 가격 · 현재 가격은 달라질 수 있어요
+              </p>
+            )}
 
             {notesOf(sameLinks).length > 0 && (
               <ul className="ended-notes">
@@ -97,12 +128,6 @@ export default function EndedDealNotice({ post, purchaseLinks, related, section,
               </ul>
             )}
 
-            <p className="ended-caution">
-              ※ 공동구매는 종료되었습니다. 현재 판매처의 가격은 당시 공동구매 가격과 다를 수 있습니다
-              {sameLinks.some(l => l.checked_at)
-                && ` (가격 확인: ${sameLinks.find(l => l.checked_at)!.checked_at!.slice(0, 10)})`}
-              .
-            </p>
             <p className="ended-disclosure">
               {[...new Set(sameLinks.map(l => PLATFORM_DISCLOSURE[l.platform]))].join(' ')}
             </p>
@@ -112,9 +137,10 @@ export default function EndedDealNotice({ post, purchaseLinks, related, section,
             {/* 똑같은 상품 링크를 못 찾았을 때만 여기로 온다. "구매하기"와 문구·톤을 분명히
                 갈라서, 다른 상품을 같은 상품인 것처럼 파는 일이 없게 한다. 단순 "구매하기"
                 버튼이 아니라 상품명·추천 이유를 먼저 보여줘 광고처럼 안 읽히게 한다 */}
+            <h3 className="ended-alt-title">{ALT_SECTION_TITLE[linkRelation(altLinks[0])]}</h3>
             <p className="ended-lead">
-              공구 상품은 {PLATFORM_LABEL[altLinks[0].platform]}에서 못 찾았어요.<br />
-              대신 비슷하게 비교해볼 만한 상품이에요.
+              같은 상품은 찾지 못했어요.<br />
+              대신 비슷한 조건의 상품을 찾아봤어요.
             </p>
             <div className="ended-alt-list">
               {altLinks.map(link => (
@@ -133,9 +159,10 @@ export default function EndedDealNotice({ post, purchaseLinks, related, section,
                       {link.price ? `${link.price.toLocaleString()}원` : '가격 확인하기'}
                     </span>
                     <span className="ended-alt-cta">
-                      {PLATFORM_LABEL[link.platform]}에서 비교해보기 <ExternalLink size={12} />
+                      비슷한 상품 보기 <ExternalLink size={12} />
                     </span>
                   </span>
+                  <span className="ended-alt-tag">{ALT_TAG_LABEL[linkRelation(link)]}</span>
                 </a>
               ))}
             </div>

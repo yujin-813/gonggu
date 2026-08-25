@@ -6,7 +6,7 @@ import { daysLeft, getPeriodState, badgeFromState, periodTextFromState, isExpire
 import { CATEGORY_LABEL, categoryIcon } from '@/lib/categoryIcons'
 import {
   Heart, Wallet, CheckCircle2, Calendar, CalendarClock, CalendarPlus,
-  Package, Flame, Lock, Timer, Zap, ExternalLink, Share2,
+  Package, Flame, Lock, Timer, Zap, ExternalLink, Share2, ChevronDown, ChevronUp,
 } from 'lucide-react'
 import PriceCompareModal from './PriceCompareModal'
 import { shareContent } from '@/lib/share'
@@ -30,13 +30,22 @@ interface PostCardProps {
   onShare?: (id: number, result: 'kakao' | 'native' | 'clipboard') => void
   siblings?: Post[]
   pastPrices?: { id: number; price: number; origPrice: number | null; date: string }[]
+  /**
+   * 마감 상세 페이지에서만 켠다. 당시 가격·판정 근거는 위쪽 EndedDealNotice가 이미
+   * "당시 공구가 · N% 저렴했던 꿀딜" 한 줄로 요약해 보여준다 — 여기서 가격·판정 카드를
+   * 또 그대로 그리면 같은 정보가 두 번 나온다. 판정 상세(옵션별 표 등)는 접어 두고
+   * 필요한 사람만 펼쳐 보게 한다.
+   */
+  endedCompact?: boolean
 }
 
 export default function PostCard({
   post, isBookmarked, onToggleBookmark, onJoin, onShare, siblings = [], pastPrices = [],
+  endedCompact = false,
 }: PostCardProps) {
   const [imgFailed, setImgFailed] = useState(false)
   const [showCompare, setShowCompare] = useState(false)
+  const [showVerdictDetail, setShowVerdictDetail] = useState(false)
   const compareCount = siblings.length
   const periodState = getPeriodState(post)
   // 저장된 status가 아니라 날짜로 계산한 상태를 본다 — 오픈일이 지났는데 status만
@@ -208,6 +217,8 @@ export default function PostCard({
         )}
         <div className="card-title">{post.title}</div>
 
+        {!endedCompact && (
+          <>
         {/* 가장 중요한 정보: 얼마인지 · 얼마나 싼지 — 카드에서 가장 크게 */}
         {/* 세트가 여러 개면 가격 하나만 보여주면 어느 구성인지 알 수 없다 — "N원부터"로 알린다 */}
         {/* 오픈 예정 공구는 가격이 아직 없다(인포크 예고 블록이라 상품 페이지가 없다).
@@ -250,6 +261,8 @@ export default function PostCard({
             📈 지난 공구가 {pastPrices[0].date && `${pastPrices[0].date.slice(5).replace('-', '.')} · `}{pastPrices[0].price.toLocaleString()}원
           </div>
         )}
+          </>
+        )}
 
         {/* 두 번째로 중요한 정보: 기간이 언제까지인지 — 독립된 줄로 항상 노출 */}
         {dt.txt && (
@@ -260,8 +273,19 @@ export default function PostCard({
         )}
 
         {/* 꿀공구 판정 — "이 공구 진짜 싼가"에 답하는 블록. 등급 계산은 lib/dealGrade.ts
-            한 곳에서만 하므로 카드·상세·공유 이미지가 항상 같은 등급을 보여준다. */}
-        <DealVerdictBox post={post} />
+            한 곳에서만 하므로 카드·상세·공유 이미지가 항상 같은 등급을 보여준다.
+            마감 페이지는 이 카드 위에서 이미 "당시 공구가 · N% 저렴했던 꿀딜"로 요약해
+            보여줬다 — 여기서는 접어 두고, 옵션별 표 등 근거가 궁금한 사람만 펼쳐 본다. */}
+        {endedCompact ? (
+          <>
+            <button type="button" onClick={() => setShowVerdictDetail(v => !v)} className="verdict-detail-toggle">
+              가격 비교 자세히 보기 {showVerdictDetail ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+            </button>
+            {showVerdictDetail && <DealVerdictBox post={post} />}
+          </>
+        ) : (
+          <DealVerdictBox post={post} />
+        )}
 
         {/* 대체 구매 링크 — 공구 가격 판단(dealJudgment)과는 완전히 별개인 참고 정보.
             여러 판매처를 가질 수 있어 배열로 읽는다. 공정위 지침상 경제적 대가 관계는
@@ -333,7 +357,7 @@ export default function PostCard({
           오픈 예정은 눌러도 살 곳이 없어 예전엔 비활성 버튼이었다 — 눌리는데 아무 반응이
           없어서 "고장났나" 싶었다. 상세 페이지(UpcomingNotice)와 같은 동작으로 바꿔서
           누르면 실제로 캘린더에 담기도록 한다. */}
-      {isUpcoming && post.start_date ? (
+      {endedCompact ? null : isUpcoming && post.start_date ? (
         <a
           href={`/api/calendar/${post.id}`}
           className="card-cta"

@@ -220,7 +220,14 @@ export function periodTextFromState(state: PeriodState): { cls: string; icon: Pe
     case 'upcoming':      return { cls: '', icon: 'calendar', txt: state.startDate ? `${fmtDate(state.startDate)} 오픈 예정` : '오픈일 미정' }
     case 'evergreen':     return { cls: '', icon: 'calendar', txt: state.startDate ? `${fmtDate(state.startDate)}부터 진행 중` : '상시딜' }
     case 'sold_out_only': return { cls: '', icon: 'calendar', txt: state.startDate ? `${fmtDate(state.startDate)}부터 · 한정수량 소진시 마감` : '한정수량 · 소진시 마감' }
-    case 'deadline_unknown': return { cls: '', icon: 'calendar', txt: state.startDate ? `${fmtDate(state.startDate)}부터 진행 중` : '진행 중' }
+    case 'deadline_unknown':
+      // isExpired()와 같은 기준(daysSince > DEADLINE_UNKNOWN_DAYS)을 여기서도 봐야 한다 —
+      // 안 보면 상세 페이지 맨 위는 "종료됐어요"인데 카드 안 기간 줄은 "진행 중"이라고
+      // 서로 다른 말을 하게 된다. 마감일 미확인 공구가 21일을 넘겨 자동으로 마감 처리된
+      // 뒤에도 이 줄만 옛 문구를 그대로 보여주고 있었다.
+      return state.daysSince !== null && state.daysSince > DEADLINE_UNKNOWN_DAYS
+        ? { cls: 'urgent', icon: 'calendar', txt: '마감됨' }
+        : { cls: '', icon: 'calendar', txt: state.startDate ? `${fmtDate(state.startDate)}부터 진행 중` : '진행 중' }
     case 'range':
       if (state.daysLeft < 0) return { cls: 'urgent', icon: 'calendar', txt: '마감됨' }
       if (state.daysLeft === 0) return { cls: 'urgent', icon: 'zap', txt: '오늘 마감!' }
