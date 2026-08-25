@@ -8,24 +8,22 @@ interface HeaderProps {
   viewingFollowed: boolean
   onPushToggle: () => void
   pushSubscribed: boolean
-  /** 스크롤로 카테고리가 접혔을 때만 로고 왼쪽에 햄버거를 보여준다 — 보통 메뉴 버튼이
-   * 있는 자리라 그쪽이 익숙하다는 피드백을 반영해 카테고리 자리(검색 아래)에서 옮겼다 */
-  categoryCollapsed?: boolean
+  /** 카테고리 드롭다운을 여는 버튼 — 항상 같은 자리에 고정해 둔다. 스크롤에 따라
+   * 나타났다 사라지면 로고가 밀리는 느낌이 들어서(사장님 피드백), 접혔을 때만 보이게
+   * 하는 대신 늘 자리를 차지하게 바꿨다. */
   onCategoryMenuToggle?: () => void
 }
 
 export default function Header({
   onBookmarkView, viewingBookmarks, onFollowView, viewingFollowed,
-  onPushToggle, pushSubscribed, categoryCollapsed = false, onCategoryMenuToggle,
+  onPushToggle, pushSubscribed, onCategoryMenuToggle,
 }: HeaderProps) {
   return (
     <header>
       <div className="header-inner">
-        {categoryCollapsed && (
-          <button className="btn-icon" onClick={onCategoryMenuToggle} title="카테고리" aria-label="카테고리">
-            <Menu size={18} />
-          </button>
-        )}
+        <button className="btn-icon" onClick={onCategoryMenuToggle} title="카테고리" aria-label="카테고리">
+          <Menu size={18} />
+        </button>
         <Link href="/" className="logo" aria-label="홈으로">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src="/logo-symbol.png" alt="" className="logo-symbol" width={20} height={20} />

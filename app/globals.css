@@ -1204,8 +1204,8 @@ header {
 /* 컬렉션 배너 — 상품 카드 여러 장 대신 한 장. color는 관리자가 컬렉션마다 고른 값 */
 .collection-banner {
   display: flex; align-items: center; gap: 12px;
-  margin: 4px 20px 20px; padding: 16px 18px;
-  border-radius: 14px;
+  width: calc(100% - 40px); max-width: 640px; margin: 16px auto 12px; padding: 16px 18px;
+  border-radius: 14px; box-sizing: border-box;
   color: #fff; text-decoration: none;
 }
 .collection-banner-emoji { font-size: 28px; flex-shrink: 0; }
@@ -1248,11 +1248,11 @@ header {
   position: static;
   box-shadow: none;
 }
-/* 묶인 상태에서는 세 줄이 붙으므로 위아래 여백을 줄여 헤더가 화면을 덜 먹게 한다 */
+/* nav는 로고·검색까지만 — 위아래 여백을 줄여 화면을 덜 먹게 한다. 검색이 nav의
+   마지막 줄이라 아래쪽 여백을 직접 갖는다(예전엔 뒤따라오던 category-wrap이 대신 줬다) */
 .app-header .header-inner { padding: 12px 20px 8px; }
-.app-header .hero-search-wrap { padding: 0 20px; }
+.app-header .hero-search-wrap { padding: 0 20px 12px; }
 .app-header .hero-search { padding: 10px 14px; }
-.app-header .category-wrap { padding: 10px 20px 12px; }
 
 /* ── 컬렉션 상품 롤링 ───────────────────────────────────────────────────── */
 /* 컬렉션에 담긴 상품 카드가 한 장씩 넘어간다. 가로 스크롤은 옆에 더 있다는 걸 모르면

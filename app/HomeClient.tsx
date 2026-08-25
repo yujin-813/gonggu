@@ -46,20 +46,10 @@ export default function HomeClient({ sections, collectionBanner }: { sections?: 
   const [posts, setPosts] = useState<Post[]>([])
   const [bookmarks, setBookmarks] = useState<Set<number>>(new Set())
   const [currentCat, setCurrentCat] = useState<Category | 'all' | 'evergreen' | 'upcoming'>('all')
-  // 카테고리를 아이콘 그리드(2줄)로 키우면서 스크롤할 때마다 헤더가 화면을 너무 많이
-  // 먹게 됐다 — 조금만 내려도 카테고리 칩 대신 햄버거 버튼만 남기고, 누르면 드롭다운으로
-  // 펼쳐 보여준다
-  const [categoryCollapsed, setCategoryCollapsed] = useState(false)
+  // 검색까지만 고정(nav)하고 배너·카테고리·아래 내용은 그냥 body로 스크롤되게 한다
+  // (사장님 피드백 — 예전엔 카테고리까지 sticky 헤더 안에 있었다). 카테고리는 스크롤하면
+  // 자연스럽게 같이 넘어가고, 대신 nav에 항상 있는 햄버거로 어디서든 드롭다운을 연다.
   const [categoryMenuOpen, setCategoryMenuOpen] = useState(false)
-
-  useEffect(() => {
-    function onScroll() { setCategoryCollapsed(window.scrollY > 80) }
-    window.addEventListener('scroll', onScroll, { passive: true })
-    return () => window.removeEventListener('scroll', onScroll)
-  }, [])
-  useEffect(() => {
-    if (!categoryCollapsed) setCategoryMenuOpen(false)
-  }, [categoryCollapsed])
 
   function handleCategorySelect(cat: Category | 'all' | 'evergreen' | 'upcoming') {
     setCurrentCat(cat)
@@ -305,8 +295,9 @@ export default function HomeClient({ sections, collectionBanner }: { sections?: 
     <>
       <h1 className="sr-only">꿀공구 — 인스타그램 공동구매(공구) 모아보기</h1>
 
-      {/* 로고 · 검색 · 카테고리를 하나의 헤더 면으로 묶는다 — 셋 다 "무엇을 볼지 고르는"
-          도구라 붙어 있어야 손이 덜 간다. 아래 콘텐츠와는 그림자 한 겹으로 구분한다. */}
+      {/* nav는 로고·검색까지만 — 카테고리·배너까지 묶으면 스크롤할 때마다 화면 위쪽을
+          너무 많이 먹는다(사장님 피드백). 카테고리 드롭다운을 여는 햄버거는 여기(Header)에
+          항상 고정으로 둔다 — 스크롤 여부로 나타났다 사라지면 로고가 밀리는 느낌이 든다. */}
       <div className="app-header">
         <Header
           onBookmarkView={() => { setViewingBookmarks(v => !v); setViewingFollowed(false) }}
@@ -315,7 +306,6 @@ export default function HomeClient({ sections, collectionBanner }: { sections?: 
           viewingFollowed={viewingFollowed}
           onPushToggle={togglePush}
           pushSubscribed={pushSubscribed}
-          categoryCollapsed={categoryCollapsed}
           onCategoryMenuToggle={() => setCategoryMenuOpen(v => !v)}
         />
 
@@ -331,30 +321,9 @@ export default function HomeClient({ sections, collectionBanner }: { sections?: 
           </div>
         </div>
 
-        {/* 검색 바로 아래, 카테고리 위 — 사장님이 준 참고 화면(쿠팡)과 같은 자리.
-            스크롤로 카테고리가 접힐 때 배너도 같이 접는다 — 배너만 계속 붙어 있으면
-            헤더가 다시 커져서 접은 의미가 없어진다. */}
-        {!categoryCollapsed && collectionBanner && (
-          <Link href={`/collection/${collectionBanner.id}`} className="collection-banner"
-            style={{ background: `linear-gradient(135deg, ${collectionBanner.color}, ${collectionBanner.color}CC)` }}
-            onClick={() => track('click', { clickType: 'other' })}>
-            <span className="collection-banner-emoji">{collectionBanner.emoji}</span>
-            <span className="collection-banner-text">
-              <span className="collection-banner-title">{collectionBanner.title}</span>
-              {collectionBanner.description && <span className="collection-banner-desc">{collectionBanner.description}</span>}
-            </span>
-            <span className="collection-banner-cta">보러가기 →</span>
-          </Link>
-        )}
-
-        {/* 스크롤로 접히면 카테고리 자리를 아예 비운다 — 다시 펼치는 버튼은 헤더 왼쪽 위
-            햄버거로 옮겼다(사장님 피드백: 메뉴 버튼은 보통 왼쪽 위에 있다) */}
-        {!categoryCollapsed && <CategoryFilter current={currentCat} onSelect={handleCategorySelect} />}
-
-        {/* 드롭다운은 app-header 안에 둔다 — app-header가 sticky라 위치 기준(containing
-            block)이 되므로, "헤더 바로 아래"가 저절로 맞춰진다. app-header 바깥에 두면
-            sticky 헤더(z-index 100)에 가려 안 보이는 문제가 있었다. */}
-        {categoryCollapsed && categoryMenuOpen && (
+        {/* 드롭다운은 nav(app-header, sticky) 안에 둔다 — sticky가 위치 기준(containing
+            block)이 되므로 "nav 바로 아래"가 스크롤 위치와 무관하게 저절로 맞춰진다. */}
+        {categoryMenuOpen && (
           <>
             <div className="category-dropdown-overlay" onClick={() => setCategoryMenuOpen(false)} />
             <div className="category-dropdown-panel" onClick={e => e.stopPropagation()}>
@@ -363,6 +332,22 @@ export default function HomeClient({ sections, collectionBanner }: { sections?: 
           </>
         )}
       </div>
+
+      {/* 여기서부터 body — 검색 아래, 카테고리 위라는 참고 화면(쿠팡)과 같은 순서로
+          배너를 먼저 두고 카테고리를 그 아래에 둔다. 둘 다 그냥 스크롤되어 넘어간다. */}
+      {collectionBanner && (
+        <Link href={`/collection/${collectionBanner.id}`} className="collection-banner"
+          style={{ background: `linear-gradient(135deg, ${collectionBanner.color}, ${collectionBanner.color}CC)` }}
+          onClick={() => track('click', { clickType: 'other' })}>
+          <span className="collection-banner-emoji">{collectionBanner.emoji}</span>
+          <span className="collection-banner-text">
+            <span className="collection-banner-title">{collectionBanner.title}</span>
+            {collectionBanner.description && <span className="collection-banner-desc">{collectionBanner.description}</span>}
+          </span>
+          <span className="collection-banner-cta">보러가기 →</span>
+        </Link>
+      )}
+      <CategoryFilter current={currentCat} onSelect={handleCategorySelect} />
 
       {showingMainFeed && !kakaoBannerDismissed && (
         <div className="notify-banner">
