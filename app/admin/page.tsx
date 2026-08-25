@@ -484,6 +484,9 @@ export default function AdminPage() {
     const matchQ = !q || p.title.toLowerCase().includes(q) || p.account.toLowerCase().includes(q)
     return matchFilter && matchQ
   })
+  // 오픈예정 탭은 원래 순서(수집 순)라 "내일 오픈"이 몇 십 건 사이에 묻혀 안 보였다 —
+  // 오픈일이 가까운 순으로 세워서 급한 것부터 눈에 띄게 한다
+  if (filter === 'upcoming') visible.sort((a, b) => daysLeft(a.start_date) - daysLeft(b.start_date))
 
   const countBy = (s: Post['status']) => posts.filter(p => effectiveStatus(p) === s).length
   const candidateCount   = countBy('candidate')
@@ -2241,7 +2244,7 @@ function TodayPriorities({ posts, detailViews, clickBreakdown, postSources, sour
     .sort((a, b) => searchIn(b.id) - searchIn(a.id))
 
   const bucketB = posts
-    .filter(p => isPagePublic(p) && !hasPurchaseLink(p) && views(p.id) > 0)
+    .filter(p => isPagePublic(p) && !hasPurchaseLink(p) && alternativeLinks(p).length === 0 && views(p.id) > 0)
     .sort((a, b) => views(b.id) - views(a.id))
 
   const bucketC = posts
@@ -2387,7 +2390,9 @@ function RevenueBoard({ posts, clicks, sources, onGoFill, onSaved }: {
   // 수익화가 필요한 것 — 사람이 보고 있는데 나갈 곳이 없는 상품.
   // 마감 공구가 먼저다. 진행 중 공구는 공구 자체가 출구라 급하지 않고, 꿀딜에 대체 구매처를
   // 붙이는 건 "제일 싸다"고 판정해 놓고 다른 데로 보내는 모양이라 따로 판단이 필요하다.
-  const need = rows.filter(r => !r.linked && r.detail > 0)
+  // 대체 상품만 있고 동일 상품은 없는 것도 "채웠다"로 친다 — hasAlt를 안 빼면 배지엔
+  // "대체 상품"이라고 뜨면서 정작 이 목록엔 계속 남아 "링크 없음"을 또 채우라고 조르게 된다
+  const need = rows.filter(r => !r.linked && !r.hasAlt && r.detail > 0)
   const list = needOnly ? need : rows
   const lost = need.filter(r => r.ended).reduce((s, r) => s + r.detail, 0)
 
@@ -2547,7 +2552,8 @@ function VerdictFiller({ posts, views, onSaved, initialMode }: {
   // 조회의 56%를 받으면서 190건이 살 곳을 못 알려주고 있어서(2026-08-23 실측), 어디부터
   // 채우냐가 그대로 손실 크기를 가른다.
   const ended = posts
-    .filter(p => isPagePublic(p) && isExpired(p) && !hasPurchaseLink(p))
+    // 대체 상품 링크라도 넣어뒀으면 이미 손본 것이다 — 안 빼면 채워도 계속 이 목록에 남는다
+    .filter(p => isPagePublic(p) && isExpired(p) && !hasPurchaseLink(p) && alternativeLinks(p).length === 0)
     .sort((a, b) => {
       const av = views[a.id] || 0
       const bv = views[b.id] || 0
