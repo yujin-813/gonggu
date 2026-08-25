@@ -1,7 +1,7 @@
 import type { Post, Category } from './types'
 import { getPeriodState, isCustomerVisible, isPagePublic, isExpired, isEvergreen, daysLeft } from './period'
 import { hasPurchaseLink } from './purchaseLinks'
-import { loadPosts } from './store'
+import { loadPosts, loadCollections } from './store'
 import { CATEGORY_LABEL } from './categoryIcons'
 import { SITE_URL } from './siteUrl'
 import { toPublicPosts } from './publicPost'
@@ -276,6 +276,18 @@ export function influencerSummaries(posts: Post[], limit = 12) {
  * 공구는 끝났지만 지금 살 수 있는 상품 — 홈 하단 영역.
  * 대체 구매처를 확인해 둔 것만 넣는다. 링크가 없으면 사용자가 할 수 있는 게 없다.
  */
+/**
+ * 홈 중간에 넣는 컬렉션 배너 — 여러 상품을 카드로 돌리던 것(CollectionRoller) 대신
+ * 컬렉션 하나를 배너 한 장으로 소개한다. 지금은 활성 컬렉션이 항상 1개뿐이라 첫 번째만
+ * 쓴다 — 여러 개를 동시에 밀어야 할 때가 오면 그때 다시 본다.
+ * /api/collections GET의 고객 노출 조건과 같은 기준(상품 있음 + 안 만료)을 쓴다.
+ */
+export function featuredCollectionBanner(): { id: string; title: string; description: string; emoji: string; color: string } | null {
+  const c = loadCollections().find(c => c.productIds.length > 0 && !(c.expiresAt && new Date(c.expiresAt) < new Date()))
+  if (!c) return null
+  return { id: c.id, title: c.title, description: c.description, emoji: c.emoji, color: c.color }
+}
+
 export function endedButBuyablePosts(limit = 12): Post[] {
   return toPublicPosts(
     routablePosts()

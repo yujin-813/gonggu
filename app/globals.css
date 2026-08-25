@@ -219,6 +219,28 @@ header {
 }
 
 /* ── Category ── */
+/* 스크롤로 카테고리가 접혔을 때 대신 보이는 버튼 + 눌렀을 때 펼쳐지는 드롭다운.
+   category-wrap이 2줄 그리드로 커지면서 계속 붙어 있으면 스크롤할 때 화면을 너무
+   많이 먹는다 */
+.category-hamburger {
+  display: flex; align-items: center; gap: 6px;
+  max-width: 680px; margin: 10px auto 12px; padding: 8px 16px;
+  background: var(--gray-1); border: 1px solid var(--gray-2); border-radius: 10px;
+  font-size: 13px; font-weight: 700; color: var(--gray-4); cursor: pointer;
+}
+.category-dropdown-overlay {
+  position: fixed; inset: 0; top: 0;
+  background: rgba(15, 23, 42, .35);
+  z-index: 99;
+}
+.category-dropdown-panel {
+  max-width: 680px; margin: 0 auto;
+  background: #fff;
+  border-radius: 0 0 16px 16px;
+  box-shadow: 0 12px 24px rgba(0, 0, 0, .12);
+  padding-bottom: 8px;
+}
+
 .category-wrap {
   max-width: 680px;
   margin: 0 auto;
@@ -250,6 +272,41 @@ header {
 /* 카테고리는 이동 수단이지 콘텐츠가 아니다. 브랜드색을 여기까지 쓰면 화면 위쪽이
    상품보다 먼저 눈에 들어온다. 선택 상태는 명도 대비로만 표시한다. */
 .cat-btn.active { background: var(--text); border-color: var(--text); color: white; }
+/* 데스크톱/좁은 가로 스크롤 형태에서는 원 배지가 그냥 통과되고 아이콘만 인라인으로 보인다 */
+.cat-icon-circle { display: contents; }
+.cat-label { display: inline; }
+
+/* 모바일: 쿠팡 홈처럼 아이콘 배지 + 아래 짧은 텍스트, 여러 줄 그리드로 촘촘히 배치 —
+   가로 스크롤 chip 대신 한눈에 카테고리를 다 보여준다 */
+@media (max-width: 640px) {
+  .category-wrap {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 14px 4px;
+    overflow-x: visible;
+    padding: 14px 10px 4px;
+  }
+  .cat-btn {
+    flex-direction: column;
+    align-items: center;
+    gap: 5px;
+    background: none;
+    border: none;
+    border-radius: 0;
+    padding: 0;
+    white-space: normal;
+  }
+  .cat-btn:hover { border-color: transparent; }
+  .cat-btn.active { background: none; border-color: transparent; color: var(--text); }
+  .cat-icon-circle {
+    display: flex; align-items: center; justify-content: center;
+    width: 46px; height: 46px; border-radius: 50%;
+    background: var(--gray-1); color: var(--gray-4);
+    transition: background .18s, color .18s;
+  }
+  .cat-btn.active .cat-icon-circle { background: var(--text); color: #fff; }
+  .cat-label { font-size: 11px; font-weight: 700; }
+}
 
 /* ── Topbar ── */
 .topbar {
@@ -1146,6 +1203,22 @@ header {
 .home-section { padding: 22px 20px 4px; }
 .home-section + .home-section { border-top: 1px solid var(--gray-2); }
 
+/* 컬렉션 배너 — 상품 카드 여러 장 대신 한 장. color는 관리자가 컬렉션마다 고른 값 */
+.collection-banner {
+  display: flex; align-items: center; gap: 12px;
+  margin: 4px 20px 20px; padding: 16px 18px;
+  border-radius: 14px;
+  color: #fff; text-decoration: none;
+}
+.collection-banner-emoji { font-size: 28px; flex-shrink: 0; }
+.collection-banner-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.collection-banner-title { font-size: 15px; font-weight: 800; }
+.collection-banner-desc {
+  font-size: 12.5px; opacity: .92;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.collection-banner-cta { flex-shrink: 0; font-size: 12.5px; font-weight: 700; white-space: nowrap; }
+
 .home-section-head { margin-bottom: 12px; }
 .home-section-title { font-size: 17px; font-weight: 800; letter-spacing: -0.3px; }
 .home-section-sub { font-size: 12.5px; color: var(--gray-3); margin-top: 4px; }
@@ -1249,6 +1322,14 @@ header {
    작은 카드가 맞다. 판단에 필요한 정보는 눌러서 들어간 상세에서 보여준다. */
 .strip { max-width: 680px; margin: 0 auto; padding: 20px 0 4px; }
 .strip + .strip { border-top: 1px solid var(--gray-2); }
+
+/* 모바일에서는 섹션 제목 앞 아이콘을 빼고(쿠팡처럼 텍스트 위주), 그 대신 섹션 사이
+   구분선을 더 또렷하게 준다 — 아이콘이 하던 "여기부터 다른 섹션" 신호를 선 하나가
+   대신 맡는다 */
+@media (max-width: 640px) {
+  .strip-title svg { display: none; }
+  .strip + .strip { border-top: 8px solid var(--gray-1); padding-top: 24px; }
+}
 
 .strip-head {
   display: flex; align-items: baseline; justify-content: space-between; gap: 12px;
