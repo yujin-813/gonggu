@@ -13,6 +13,7 @@
 사용법: python3 check_links.py
 """
 import os
+import re
 import time
 import warnings
 from datetime import date, datetime, timedelta, timezone
@@ -58,6 +59,15 @@ SOLD_OUT_TEXT_PATTERNS = (
     "재고가 없습니다",
     "재고 소진",
     "sold out",
+)
+
+# 카페24류 쇼핑몰은 구매 버튼 자체가 "품절" 두 글자만 라벨로 박혀 있다("<span
+# class="butn-soldout">품절</span>"). 이건 SOLD_OUT_TEXT_PATTERNS의 긴 문구엔 안 걸리는데,
+# 그렇다고 "품절" 두 글자를 문장 어디서나 매칭하면 "배송 지연 및 품절이 발생할 수
+# 있습니다" 같은 안내 문구에도 걸린다 — 태그 안에 "품절" 딱 두 글자만 있을 때만 잡는다
+SOLD_OUT_TAG_PATTERNS = (
+    re.compile(r">\s*품절\s*<"),
+    re.compile(r'alt=["\']품절["\']'),
 )
 
 BROKEN_REASON = "구매링크 만료됨 (자동 비공개)"
@@ -126,7 +136,9 @@ def check_link(url):
     if r.status_code >= 500 or r.status_code == 403:
         return "uncertain", f"HTTP {r.status_code}"
 
-    text = r.text[:20000]  # 페이지 전체를 다 볼 필요는 없음
+    # 앞 20000자만 보다가 실제 품절 배지를 놓친 적이 있다(카페24 옵션 목록이 길어
+    # 구매 버튼이 그 뒤에 나오는 몰) — 페이지 전체를 본다. 문자열 검색이라 비용은 작다
+    text = r.text
     for pat in DEAD_TEXT_PATTERNS:
         if pat in text:
             return "dead", f"문구 감지: {pat}"
@@ -135,6 +147,9 @@ def check_link(url):
     for pat in SOLD_OUT_TEXT_PATTERNS:
         if pat.lower() in text_lower:
             return "sold_out", f"품절 문구 감지: {pat}"
+    for pat in SOLD_OUT_TAG_PATTERNS:
+        if pat.search(text):
+            return "sold_out", "품절 문구 감지: 품절(버튼/배지)"
 
     return "alive", "정상"
 
