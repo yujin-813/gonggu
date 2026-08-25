@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import { Bell, BellOff, Star, House, Heart, Users, PackagePlus } from 'lucide-react'
+import { Bell, BellOff, Star, House, Heart, Users, PackagePlus, Menu } from 'lucide-react'
 
 interface HeaderProps {
   onBookmarkView: () => void
@@ -8,15 +8,24 @@ interface HeaderProps {
   viewingFollowed: boolean
   onPushToggle: () => void
   pushSubscribed: boolean
+  /** 스크롤로 카테고리가 접혔을 때만 로고 왼쪽에 햄버거를 보여준다 — 보통 메뉴 버튼이
+   * 있는 자리라 그쪽이 익숙하다는 피드백을 반영해 카테고리 자리(검색 아래)에서 옮겼다 */
+  categoryCollapsed?: boolean
+  onCategoryMenuToggle?: () => void
 }
 
 export default function Header({
   onBookmarkView, viewingBookmarks, onFollowView, viewingFollowed,
-  onPushToggle, pushSubscribed,
+  onPushToggle, pushSubscribed, categoryCollapsed = false, onCategoryMenuToggle,
 }: HeaderProps) {
   return (
     <header>
       <div className="header-inner">
+        {categoryCollapsed && (
+          <button className="btn-icon" onClick={onCategoryMenuToggle} title="카테고리" aria-label="카테고리">
+            <Menu size={18} />
+          </button>
+        )}
         <Link href="/" className="logo" aria-label="홈으로">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src="/logo-symbol.png" alt="" className="logo-symbol" width={20} height={20} />

@@ -219,21 +219,19 @@ header {
 }
 
 /* ── Category ── */
-/* 스크롤로 카테고리가 접혔을 때 대신 보이는 버튼 + 눌렀을 때 펼쳐지는 드롭다운.
-   category-wrap이 2줄 그리드로 커지면서 계속 붙어 있으면 스크롤할 때 화면을 너무
-   많이 먹는다 */
-.category-hamburger {
-  display: flex; align-items: center; gap: 6px;
-  max-width: 680px; margin: 10px auto 12px; padding: 8px 16px;
-  background: var(--gray-1); border: 1px solid var(--gray-2); border-radius: 10px;
-  font-size: 13px; font-weight: 700; color: var(--gray-4); cursor: pointer;
-}
+/* 스크롤로 카테고리가 접히면 헤더 왼쪽 위 햄버거(.btn-icon, Header.tsx)를 누른 뒤
+   펼쳐지는 드롭다운. category-wrap이 2줄 그리드로 커지면서 계속 붙어 있으면 스크롤할
+   때 화면을 너무 많이 먹는다 */
 .category-dropdown-overlay {
-  position: fixed; inset: 0; top: 0;
+  position: fixed; inset: 0;
   background: rgba(15, 23, 42, .35);
   z-index: 99;
 }
+/* app-header(sticky, z-index:100) 안에 두고 absolute + top:100%로 "헤더 바로 아래"에
+   붙인다 — app-header 바깥에서 fixed로 띄우면 sticky 헤더에 가려 안 보였다 */
 .category-dropdown-panel {
+  position: absolute; top: 100%; left: 0; right: 0;
+  z-index: 101;
   max-width: 680px; margin: 0 auto;
   background: #fff;
   border-radius: 0 0 16px 16px;

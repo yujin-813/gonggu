@@ -10,7 +10,7 @@ import type { Post, Category, SortOrder } from '@/lib/types'
 import { categoryIcon } from '@/lib/categoryIcons'
 import { isExpired } from '@/lib/period'
 import { getVisitorId, track } from '@/lib/track'
-import { Bell, ArrowLeft, Heart, Star, Clock, Loader2, Search, MessageCircle, X, Menu } from 'lucide-react'
+import { Bell, ArrowLeft, Heart, Star, Clock, Loader2, Search, MessageCircle, X } from 'lucide-react'
 
 function daysLeft(deadline?: string): number {
   if (!deadline) return 999
@@ -313,6 +313,8 @@ export default function HomeClient({ sections }: { sections?: React.ReactNode })
           viewingFollowed={viewingFollowed}
           onPushToggle={togglePush}
           pushSubscribed={pushSubscribed}
+          categoryCollapsed={categoryCollapsed}
+          onCategoryMenuToggle={() => setCategoryMenuOpen(v => !v)}
         />
 
         <div className="hero-search-wrap">
@@ -327,24 +329,22 @@ export default function HomeClient({ sections }: { sections?: React.ReactNode })
           </div>
         </div>
 
-        {categoryCollapsed ? (
-          <button className="category-hamburger" onClick={() => setCategoryMenuOpen(v => !v)}>
-            <Menu size={16} /> 카테고리
-          </button>
-        ) : (
-          <CategoryFilter current={currentCat} onSelect={handleCategorySelect} />
+        {/* 스크롤로 접히면 카테고리 자리를 아예 비운다 — 다시 펼치는 버튼은 헤더 왼쪽 위
+            햄버거로 옮겼다(사장님 피드백: 메뉴 버튼은 보통 왼쪽 위에 있다) */}
+        {!categoryCollapsed && <CategoryFilter current={currentCat} onSelect={handleCategorySelect} />}
+
+        {/* 드롭다운은 app-header 안에 둔다 — app-header가 sticky라 위치 기준(containing
+            block)이 되므로, "헤더 바로 아래"가 저절로 맞춰진다. app-header 바깥에 두면
+            sticky 헤더(z-index 100)에 가려 안 보이는 문제가 있었다. */}
+        {categoryCollapsed && categoryMenuOpen && (
+          <>
+            <div className="category-dropdown-overlay" onClick={() => setCategoryMenuOpen(false)} />
+            <div className="category-dropdown-panel" onClick={e => e.stopPropagation()}>
+              <CategoryFilter current={currentCat} onSelect={handleCategorySelect} />
+            </div>
+          </>
         )}
       </div>
-
-      {/* 스크롤해서 카테고리가 햄버거로 접힌 뒤에도 고를 수 있게 드롭다운으로 다시 펼친다.
-          바깥을 누르면 닫힌다 */}
-      {categoryCollapsed && categoryMenuOpen && (
-        <div className="category-dropdown-overlay" onClick={() => setCategoryMenuOpen(false)}>
-          <div className="category-dropdown-panel" onClick={e => e.stopPropagation()}>
-            <CategoryFilter current={currentCat} onSelect={handleCategorySelect} />
-          </div>
-        </div>
-      )}
 
       {showingMainFeed && !kakaoBannerDismissed && (
         <div className="notify-banner">
