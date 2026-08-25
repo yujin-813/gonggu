@@ -731,12 +731,13 @@ export default function AddPostModal({ onClose, onSubmit, editPost, existingGrou
           </p>
         )}
 
-        {/* 대체 구매 링크 — 공구가 끝난 뒤 "지금 바로 사고 싶은" 사용자를 보낼 곳.
-            여러 판매처를 가질 수 있어서 줄 단위로 추가·삭제한다. */}
+        {/* 구매 링크 — 공구가 끝난 뒤(또는 아쉽딜일 때) "지금 바로 사고 싶은" 사용자를 보낼
+            곳. 같은 상품을 못 찾으면 비슷한 대체 상품도 넣을 수 있다(D-031) — 이름을 "대체
+            구매 링크"라고만 하면 여기 넣는 건 전부 대체 상품인 줄 오해하기 쉬워서 바꿨다. */}
         <label>
-          대체 구매 링크
+          구매 링크
           <span style={{ fontSize: 12, color: '#94a3b8', fontWeight: 400, marginLeft: 6 }}>
-            (선택 — 공구 종료 후 이 링크로 안내합니다)
+            (선택 — 공구 종료 후 이 링크로 안내합니다. 같은 상품이 없으면 비슷한 대체 상품도 가능해요)
           </span>
         </label>
 
@@ -780,9 +781,34 @@ export default function AddPostModal({ onClose, onSubmit, editPost, existingGrou
                 type="text"
                 value={link.note ?? ''}
                 onChange={e => update({ note: e.target.value })}
-                placeholder="옵션/구성 참고사항 (선택 — 예: 2개입 기준)"
+                placeholder={link.kind === 'alternative' ? '차이점 한 줄 (선택 — 예: 용량이 달라요)' : '옵션/구성 참고사항 (선택 — 예: 2개입 기준)'}
                 style={{ marginTop: 6 }}
               />
+              {/* 같은 상품을 못 찾을 때가 있다(D-031) — 그렇다고 다른 상품을 같은 상품인 척
+                  넣으면 가격 비교·"지금 살 수 있어요" 문구가 둘 다 거짓이 된다. 어떤 링크인지
+                  여기서 명시적으로 갈라서, 대체 상품은 판정에 안 쓰이고 별도 문구로 안내되게 한다. */}
+              <div style={{ display: 'flex', gap: 6, marginTop: 6 }}>
+                <button type="button" onClick={() => update({ kind: 'same' })}
+                  style={{ flex: 1, padding: '6px 8px', borderRadius: 7, fontSize: 11.5, fontWeight: 700, cursor: 'pointer',
+                    border: `1.5px solid ${(link.kind ?? 'same') === 'same' ? '#6366f1' : '#e2e8f0'}`,
+                    background: (link.kind ?? 'same') === 'same' ? '#eef2ff' : '#fff',
+                    color: (link.kind ?? 'same') === 'same' ? '#4338ca' : '#94a3b8' }}>
+                  동일 상품
+                </button>
+                <button type="button" onClick={() => update({ kind: 'alternative' })}
+                  style={{ flex: 1, padding: '6px 8px', borderRadius: 7, fontSize: 11.5, fontWeight: 700, cursor: 'pointer',
+                    border: `1.5px solid ${link.kind === 'alternative' ? '#b45309' : '#e2e8f0'}`,
+                    background: link.kind === 'alternative' ? '#fffbeb' : '#fff',
+                    color: link.kind === 'alternative' ? '#b45309' : '#94a3b8' }}>
+                  다른 상품 (비슷한 대체)
+                </button>
+              </div>
+              {link.kind === 'alternative' && (
+                <p style={{ fontSize: 11, color: '#a8a29e', margin: '6px 0 0', lineHeight: 1.6 }}>
+                  고객 화면에 &quot;똑같은 상품은 못 찾았어요&quot;라고 먼저 밝히고 안내돼요. 가격
+                  비교(판정)에는 안 쓰여요 — 다른 상품을 같은 상품으로 속이지 않기 위해서예요.
+                </p>
+              )}
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 8 }}>
                 <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontWeight: 400, fontSize: 13 }}>
                   <input
@@ -812,7 +838,7 @@ export default function AddPostModal({ onClose, onSubmit, editPost, existingGrou
 
         <button
           type="button"
-          onClick={() => setPurchaseLinks(prev => [...prev, { platform: 'coupang', url: '', price: null, note: null, visible: true }])}
+          onClick={() => setPurchaseLinks(prev => [...prev, { platform: 'coupang', kind: 'same', url: '', price: null, note: null, visible: true }])}
           style={{ padding: '7px 12px', background: '#f1f5f9', color: '#475569', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 12, fontWeight: 600, marginBottom: 4 }}>
           + 구매 링크 추가
         </button>
