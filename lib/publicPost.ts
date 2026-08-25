@@ -1,9 +1,21 @@
 import type { Post, PurchaseLink } from './types'
 
-/** purchase_links 배열만 따로 다룰 때(예: /post/[id]가 visiblePurchaseLinks 결과를 그대로
- * 넘길 때) adminMemo만 떼어낸다 */
+/**
+ * purchase_links 배열만 따로 다룰 때(예: /post/[id]가 visiblePurchaseLinks 결과를 그대로
+ * 넘길 때) 관리자 전용 값을 떼어낸다.
+ *
+ * adminMemo는 항상 뗀다. note는 kind==='same'일 때만 남긴다 — 동일 상품 링크의 note는
+ * "2개입 기준" 같은 옵션 참고사항으로 원래도 고객 노출이 맞다. 하지만 D-043 이전에
+ * 만들어진 대체 상품 링크는 adminMemo가 따로 없어서 "브랜드가 달라요" 같은 내부 판단이
+ * note 자리에 그대로 들어있다 — kind==='alternative'인 링크는 note도 함께 뗀다
+ * (EndedDealNotice도 alt 링크는 이제 note를 안 읽고 reason만 읽으므로 기능은 그대로다).
+ */
 export function stripAdminMemo(links: PurchaseLink[]): PurchaseLink[] {
-  return links.map(l => { const { adminMemo, ...rest } = l; return rest })
+  return links.map(l => {
+    const { adminMemo, ...rest } = l
+    if ((l.kind ?? 'same') !== 'same') delete rest.note
+    return rest
+  })
 }
 
 // 고객 화면(클라이언트 컴포넌트)에 넘기는 Post에서 관리자 전용 필드를 걷어낸다.
@@ -35,12 +47,7 @@ export function toPublicPost(post: Post): Post {
   const confidence = (post.extraction_debug as Record<string, unknown> | null | undefined)?.extraction_confidence
   clone.extraction_debug = confidence ? { extraction_confidence: confidence } : null
 
-  if (clone.purchase_links) {
-    clone.purchase_links = clone.purchase_links.map(l => {
-      const { adminMemo, ...rest } = l
-      return rest
-    })
-  }
+  if (clone.purchase_links) clone.purchase_links = stripAdminMemo(clone.purchase_links)
 
   return clone
 }
