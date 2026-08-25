@@ -12,7 +12,7 @@
 | 단계 | 운영 중 · 실사용자 있음 (2026-08-19 기준 사람 방문 고유 IP 163명/2일) |
 | 스택 | Next.js 14 (App Router) · React 18 · TypeScript · 파이썬 수집기 |
 | 저장소 | **파일 기반** — `data/*.json`. DB 없음 |
-| 코드 규모 | `lib/` 3,166줄 · `app/admin` + `components/` 5,788줄 · 파이썬 3,004줄 |
+| 코드 규모 | `lib/` 3,166줄 · `app/admin` + `components/` 5,788줄 · 파이썬 3,019줄 |
 | 데이터 규모 | 게시물 2,448건 (공개 336건) · 인플루언서 소스 57개 · analytics 31일치 |
 | 배포 | EC2 `13.125.121.62`(t3.small) · PM2(fork) + nginx · `bash deploy.sh` — **무중단**(3002↔3003 슬롯 교대, `D-028`) |
 | 도메인 | https://gonggu.asknuggetdata.com |
@@ -127,11 +127,11 @@ extraction_debug, scraped_at, collection_status, collection_error
 **`Post.status`** — 관리 상태
 | 값 | 의미 | 현재 건수 |
 |---|---|---|
-| `needs_review` | 검수 필요 | 1,047 |
-| `excluded` | 제외됨 (비공구 등) | 899 |
-| `published` | 공개 중 | 261 |
-| `upcoming` | 오픈 예정 | 52 |
-| `ready` | 공개 가능 | 42 |
+| `needs_review` | 검수 필요 | 1,101 |
+| `excluded` | 제외됨 (비공구 등) | 955 |
+| `published` | 공개 중 | 259 |
+| `upcoming` | 오픈 예정 | 57 |
+| `ready` | 공개 가능 (품절 자동 숨김 포함, `D-042`) | 60 |
 | `candidate` | 공구 후보 | 0 |
 | (없음) | 옛 데이터 | 16 ⚠️ |
 
@@ -203,6 +203,7 @@ public/scraped/   수집 이미지 431MB
 | `lib/period.ts`의 `isCustomerVisible()` | 오픈 예정 자리표시자는 오픈일이 지나도 가격이 없으면 숨긴다(`D-037`). 이 검사를 지우면 마감일만 미리 채워진 빈 자리표시자가 "가격 미정" 카드로 일반 목록에 섞여 노출된다 |
 | 날짜 경계 계산 | **서버 타임존이 UTC다.** `new Date()`/`date.today()`를 그냥 쓰면 KST 새벽(UTC 15:00~23:59) 9시간 동안 하루가 밀린다. 반드시 `lib/kst.ts`(TS)·`kst_today()`(`check_links.py`)를 거칠 것 — `inpock.py`·`lib/analytics.ts`·`scripts/*-upcoming.js`는 아직 이 패턴을 안 따른다 (`D-034`) |
 | `DEADLINE_UNKNOWN_DAYS = 21` | **`lib/period.ts`와 `check_links.py` 양쪽에 있다.** 한쪽만 고치면 고객 화면과 링크 점검 대상이 갈라진다 (`D-024`) |
+| `check_links.py`의 `check_link()` | 몰 페이지 전체를 본다 — 앞부분만 잘라 보면 옵션 목록이 긴 몰(카페24 등)에서 7~8만자 지점에 있는 실제 품절 배지를 놓친다 (`D-042`) |
 | `app/api/posts/[id]/route.ts`의 필드 allowlist | 여기 없는 필드는 관리자가 저장해도 **조용히 무시된다.** 새 필드를 추가하면 PATCH·PUT 양쪽에 넣어야 한다 |
 | `middleware.ts`의 `config.matcher` | 새 관리자 API를 만들면 `isProtected()`와 `matcher` **양쪽**에 등록해야 한다. 한쪽만 하면 무방비 |
 | `data/posts.json` 직접 편집 | 서버에서 스크립트로 고칠 때는 반드시 백업부터. 저장은 스크립트 끝에서 한 번만 일어난다 |
