@@ -1,5 +1,5 @@
 import type { Post, Category } from './types'
-import { getPeriodState, isCustomerVisible, isPagePublic, isExpired, daysLeft } from './period'
+import { getPeriodState, isCustomerVisible, isPagePublic, isExpired, isEvergreen, daysLeft } from './period'
 import { hasPurchaseLink } from './purchaseLinks'
 import { loadPosts } from './store'
 import { CATEGORY_LABEL } from './categoryIcons'
@@ -13,7 +13,7 @@ export { SITE_URL }
 // 없어서 홈 하나로만 색인되고 있었다. 검색어별로 전용 페이지를 두고 제목·설명을 그 검색어에
 // 맞춰 붙인다 — 페이지마다 다루는 공구 목록이 실제로 다르므로 중복 콘텐츠도 아니다.
 
-export type LandingKey = 'today' | 'deadline' | 'monthly'
+export type LandingKey = 'today' | 'deadline' | 'monthly' | 'upcoming' | 'evergreen'
 
 export interface LandingCopy {
   path: string
@@ -107,6 +107,11 @@ export function upcomingPosts(posts: Post[]): Post[] {
     })
 }
 
+/** 사람이 "계속 판다"고 확인해 준 공구 — "상시딜" */
+export function evergreenPosts(posts: Post[]): Post[] {
+  return posts.filter(isEvergreen)
+}
+
 /** 3일 안에 끝나는 공구 — "마감 임박 공구" */
 export function deadlinePosts(posts: Post[]): Post[] {
   return posts
@@ -159,10 +164,26 @@ export function landingCopy(key: LandingKey, count: number): LandingCopy {
         description: `${kstMonthLabel()}에 진행되는 인스타그램 인플루언서 공동구매 ${count}건을 한곳에 모았어요. 이달의 공구를 카테고리별로 확인하세요.`,
         empty: '이번 달 공구가 아직 없어요',
       }
+    case 'upcoming':
+      return {
+        path: '/upcoming',
+        h1: '곧 열려요',
+        title: '오픈 예정 공구 — 곧 열리는 인스타 공동구매 모아보기',
+        description: `아직 열리지 않았지만 오픈이 예정된 인스타 인플루언서 공동구매 ${count}건을 모았어요. 캘린더에 담아두면 오픈일 아침에 알려드려요.`,
+        empty: '오픈 예정인 공구가 없어요',
+      }
+    case 'evergreen':
+      return {
+        path: '/evergreen',
+        h1: '상시딜',
+        title: '상시딜 — 언제든 살 수 있는 공구 모아보기',
+        description: `마감일 없이 계속 진행되는 인스타 인플루언서 공동구매(상시딜) ${count}건을 모았어요.`,
+        empty: '상시딜로 확인된 공구가 없어요',
+      }
   }
 }
 
-export const LANDING_KEYS: LandingKey[] = ['today', 'deadline', 'monthly']
+export const LANDING_KEYS: LandingKey[] = ['today', 'deadline', 'monthly', 'upcoming', 'evergreen']
 
 import { CATEGORY_KEYS } from './types'
 export { CATEGORY_KEYS }

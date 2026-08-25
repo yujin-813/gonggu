@@ -9,7 +9,7 @@ import PostCard from '@/components/PostCard'
 import Toast from '@/components/Toast'
 import type { Post, Category, SortOrder, Collection } from '@/lib/types'
 import { categoryIcon } from '@/lib/categoryIcons'
-import { isEvergreen, isExpired, getPeriodState } from '@/lib/period'
+import { isExpired } from '@/lib/period'
 import { getVisitorId, track } from '@/lib/track'
 import { Bell, ArrowLeft, Heart, Star, Clock, Loader2, Search, MessageCircle, X } from 'lucide-react'
 
@@ -235,13 +235,10 @@ export default function HomeClient({ sections }: { sections?: React.ReactNode })
     ? posts.filter(p => followedInfluencers.has(p.account))
     : posts
 
+  // 오픈예정·상시딜은 이제 /upcoming·/evergreen 전용 페이지로 이동하는 링크라 여기서
+  // 다시 거를 일이 없다 — 실제 카테고리(유아동 등)만 제자리에서 거른다
   const showingMainFeed = !viewingBookmarks && !viewingFollowed
-  if (showingMainFeed && currentCat === 'evergreen') {
-    filtered = filtered.filter(isEvergreen)
-  } else if (showingMainFeed && currentCat === 'upcoming') {
-    // 오픈 예정은 아직 못 사는 공구라 다른 카테고리와 섞이면 헷갈린다 — 따로 골라 본다
-    filtered = filtered.filter(p => getPeriodState(p).kind === 'upcoming')
-  } else if (showingMainFeed && currentCat !== 'all') {
+  if (showingMainFeed && currentCat !== 'all') {
     filtered = filtered.filter(p => p.cat === currentCat)
   }
   if (searchQuery) {

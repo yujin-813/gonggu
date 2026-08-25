@@ -783,6 +783,13 @@ header {
 
 @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
 
+/* 페이지 이동 시 흰 화면이 번쩍이지 않게 살짝 페이드인 — app/template.tsx 참고 */
+.page-transition { animation: page-fade-in .22s ease both; }
+@keyframes page-fade-in { from { opacity: 0; } to { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) {
+  .page-transition { animation: none; }
+}
+
 /* ══════════════════════════════════════
    반응형 — 모바일 (640px 이하)
 ══════════════════════════════════════ */

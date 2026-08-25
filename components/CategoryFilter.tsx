@@ -15,9 +15,10 @@ export default function CategoryFilter({ current, onSelect }: CategoryFilterProp
         const label = CATEGORY_LABEL[id]
         const className = `cat-btn ${current === id ? 'active' : ''}`
 
-        // 실제 카테고리는 전용 페이지(/category/kids 등)로 보낸다. 그 페이지에는 소개 문구와
-        // 구조화 데이터가 들어 있어 검색에도 잡히고, 주소가 남아 공유·뒤로가기가 된다.
-        // 제자리에서 목록만 갈아끼우면 그 셋이 다 사라진다.
+        // 실제 카테고리·오픈예정·상시딜은 전용 페이지(/category/kids, /upcoming, /evergreen)로
+        // 보낸다. 그 페이지에는 소개 문구와 구조화 데이터가 들어 있어 검색에도 잡히고, 주소가
+        // 남아 공유·뒤로가기가 된다. 제자리에서 목록만 갈아끼우면 그게 다 사라지고, 눌러도
+        // 페이지 이동이 없어 "반응이 없다"고 느껴졌다.
         if (CATEGORY_KEYS.includes(id as Category)) {
           return (
             <Link key={id} href={`/category/${id}`} className={className} onClick={() => onSelect(id)}>
@@ -26,8 +27,16 @@ export default function CategoryFilter({ current, onSelect }: CategoryFilterProp
             </Link>
           )
         }
+        if (id === 'upcoming' || id === 'evergreen') {
+          return (
+            <Link key={id} href={`/${id}`} className={className} onClick={() => onSelect(id)}>
+              <Icon size={14} strokeWidth={2.25} />
+              {label}
+            </Link>
+          )
+        }
 
-        // 전체·오픈예정·상시딜은 대응하는 페이지가 없어 홈에서 거르는 방식을 유지한다
+        // "전체"만 대응하는 페이지가 없다 — 홈 자체가 전체 목록이므로 홈에서 거르는 방식을 유지한다
         return (
           <button key={id} className={className} onClick={() => onSelect(id)}>
             <Icon size={14} strokeWidth={2.25} />
