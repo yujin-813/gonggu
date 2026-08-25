@@ -535,13 +535,17 @@ export default function AdminPage() {
             setAdminTab(tab)
             if (mode) setVerdictMode(mode)
             if (tab === 'posts') setFilter('upcoming')
+            // "목록으로 →"는 TodayPriorities(맨 위)에서 누르는데, 탭 내용은 방문자 분석
+            // (거의 750줄, 화면 여러 개 분량) 아래에 있다. 상태만 바꾸고 안 내려주면
+            // 스크롤이 안 된 사람 눈엔 아무 일도 안 일어난 것처럼 보였다.
+            document.getElementById('admin-tabs')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
           }} />
 
         {/* 방문자 분석 */}
         <AnalyticsSection data={analytics} topPosts={topPosts} topSharedPosts={topSharedPosts} sources={sources} />
 
         {/* 탭 메뉴 */}
-        <div style={{ display: 'flex', gap: 4, marginBottom: 20, borderBottom: '2px solid #e2e8f0', paddingBottom: 0 }}>
+        <div id="admin-tabs" style={{ display: 'flex', gap: 4, marginBottom: 20, borderBottom: '2px solid #e2e8f0', paddingBottom: 0 }}>
           {([
             { key: 'posts',       label: '공구 관리' },
             { key: 'influencers', label: '인플루언서 관리' },
