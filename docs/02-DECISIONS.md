@@ -9,6 +9,27 @@
 
 ---
 
+## D-044 · 관리자 전용 필드를 고객 화면 페이지 소스에서도 지운다 · 2026-08-25
+
+**상태:** 유효
+
+**상황** — D-043에서 대체 상품의 관리자 메모(`adminMemo`)가 화면엔 안 보이는데 페이지 소스(뷰소스/RSC payload)엔 그대로 남아있는 걸 발견했다. Next.js는 서버 컴포넌트가 클라이언트 컴포넌트에 넘기는 props를 페이지 소스에 그대로 직렬화한다 — 화면에 안 그려도 "보기 소스"로 다 보인다. 확인해보니 `adminMemo` 하나만의 문제가 아니었다: `review_reason`(검수 사유)·`compare_none_reason`/`compare_none_note`(비교불가 판단)·`extraction_debug`(원문 스크래핑 조각 전체)·`market_price_note`·옛 `partners_*` 필드까지 전부 같은 경로로 새고 있었다. 코드 주석에 "고객 화면은 이 값을 쓰지 않는다. 검수 상태는 우리 사정이다(원칙 3)"라고 이미 적혀 있던 필드들인데, 화면에 안 그린다는 것과 소스에서 지운다는 것을 같은 걸로 착각하고 있었다.
+
+**결정** — `lib/publicPost.ts`에 `toPublicPost()`(denylist 방식)를 만들어 고객 화면으로 가는 모든 경로의 끝(`lib/landing.ts`의 `visiblePosts()`/`endedButBuyablePosts()`, `/api/posts`·`/api/collections/[id]` GET의 비관리자 응답, `/post/[id]`·`/collection/[id]` 페이지)에 적용한다. `extraction_debug`는 통째로 지우지 않는다 — `PostCard`의 "가격·마감일 확인된 정보예요" 배지가 `extraction_confidence` 하나만 읽어서, 그 값만 남기고 나머지(원문 후보값 전체)는 지운다.
+
+**검토한 대안과 버린 이유**
+
+| 대안 | 버린 이유 |
+|---|---|
+| allowlist(필요한 필드만 명시)로 짬 | `Post` 필드가 50개 가까이 되고 대부분 `getDealVerdict`·`getPeriodState`가 클라이언트 컴포넌트 안에서도 계산에 쓴다. 하나라도 빠뜨리면 화면이 조용히 깨진다 — 뺄 것만 정하는 denylist가 더 안전했다 |
+| `adminMemo`만 딱 고침 | 사장님이 "화면 노출만 막으면 뭐해"라고 직접 지적 — 같은 구조의 문제가 다른 필드에도 이미 있었고(주석에 "고객 화면은 안 쓴다"고 적힌 필드들), 하나만 고치면 곧 또 재발한다 |
+
+**받아들인 대가** — 새 관리자 전용 필드를 추가할 때마다 `lib/publicPost.ts`의 목록에도 같이 넣어야 한다 — 안 넣으면 다시 샌다. `app/api/posts/[id]/route.ts`의 allowlist(저장용)와는 반대 방향(노출용)이라 헷갈리지 않게 문서화해 둔다.
+
+**당시 확신도** — 높음. 로컬에서 `/api/posts`·`/post/[id]` 응답을 직접 떠서 `adminMemo`·`review_reason`·`compare_none_*`·`partners_*`가 전부 사라진 것과 `extraction_debug`가 `extraction_confidence`만 남긴 것 확인.
+
+---
+
 ## D-043 · 대체 상품 링크에 "관계 3단계"와 관리자 전용 메모를 추가한다 · 2026-08-25
 
 **상태:** 유효

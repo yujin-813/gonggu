@@ -4,6 +4,7 @@ import { hasPurchaseLink } from './purchaseLinks'
 import { loadPosts } from './store'
 import { CATEGORY_LABEL } from './categoryIcons'
 import { SITE_URL } from './siteUrl'
+import { toPublicPosts } from './publicPost'
 
 // 클라이언트에서도 쓰려고 상수만 따로 뺐다 — 여기서 다시 내보내 기존 import를 유지한다
 export { SITE_URL }
@@ -41,7 +42,9 @@ export function kstMonthLabel(): string {
 }
 
 export function visiblePosts(): Post[] {
-  return loadPosts().filter(isCustomerVisible)
+  // 여기서 걸러진 배열이 그대로 클라이언트 컴포넌트로 넘어간다(홈 큐레이션·랜딩 페이지
+  // 전부) — 관리자 전용 필드가 페이지 소스에 실리지 않도록 여기서 한 번에 지운다
+  return toPublicPosts(loadPosts().filter(isCustomerVisible))
 }
 
 /**
@@ -274,8 +277,10 @@ export function influencerSummaries(posts: Post[], limit = 12) {
  * 대체 구매처를 확인해 둔 것만 넣는다. 링크가 없으면 사용자가 할 수 있는 게 없다.
  */
 export function endedButBuyablePosts(limit = 12): Post[] {
-  return routablePosts()
-    .filter(p => isExpired(p) && hasPurchaseLink(p))
-    .sort((a, b) => (b.deadline || '').localeCompare(a.deadline || ''))
-    .slice(0, limit)
+  return toPublicPosts(
+    routablePosts()
+      .filter(p => isExpired(p) && hasPurchaseLink(p))
+      .sort((a, b) => (b.deadline || '').localeCompare(a.deadline || ''))
+      .slice(0, limit)
+  )
 }

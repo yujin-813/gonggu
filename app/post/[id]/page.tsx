@@ -9,6 +9,7 @@ import { getDealVerdict } from '@/lib/dealGrade'
 import { relatedPosts, type RelatedKind } from '@/lib/relatedPosts'
 import JsonLd, { productSchema, breadcrumbSchema } from '@/components/JsonLd'
 import type { Post } from '@/lib/types'
+import { toPublicPost, toPublicPosts, stripAdminMemo } from '@/lib/publicPost'
 import PostDetailClient from './PostDetailClient'
 
 const RELATED_LIMIT = 6
@@ -117,16 +118,16 @@ export default function PostPage({ params }: { params: { id: string } }) {
         ]),
       ]} />
       <PostDetailClient
-        post={post}
+        post={toPublicPost(post)}
         ended={ended}
-        purchaseLinks={
+        purchaseLinks={stripAdminMemo(
           ended ? visiblePurchaseLinks(post)         // 마감: 같은 상품·대체 상품 다 넘기고 컴포넌트가 나눠 그린다
           : betterPrice ? sameProductLinks(post)      // 아쉽딜: "더 싸다"는 같은 상품일 때만 말할 수 있다
           : []
-        }
+        )}
         upcoming={upcoming}
         betterPrice={betterPrice}
-        related={related.posts}
+        related={toPublicPosts(related.posts)}
         relatedKind={related.kind}
         categoryLabel={CATEGORY_LABEL[post.cat]}
       />

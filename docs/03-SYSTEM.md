@@ -12,7 +12,7 @@
 | 단계 | 운영 중 · 실사용자 있음 (2026-08-19 기준 사람 방문 고유 IP 163명/2일) |
 | 스택 | Next.js 14 (App Router) · React 18 · TypeScript · 파이썬 수집기 |
 | 저장소 | **파일 기반** — `data/*.json`. DB 없음 |
-| 코드 규모 | `lib/` 3,166줄 · `app/admin` + `components/` 5,820줄 · 파이썬 3,019줄 |
+| 코드 규모 | `lib/` 3,260줄 · `app/admin` + `components/` 5,936줄 · 파이썬 3,019줄 |
 | 데이터 규모 | 게시물 2,448건 (공개 336건) · 인플루언서 소스 57개 · analytics 31일치 |
 | 배포 | EC2 `13.125.121.62`(t3.small) · PM2(fork) + nginx · `bash deploy.sh` — **무중단**(3002↔3003 슬롯 교대, `D-028`) |
 | 도메인 | https://gonggu.asknuggetdata.com |
@@ -205,6 +205,7 @@ public/scraped/   수집 이미지 431MB
 | `DEADLINE_UNKNOWN_DAYS = 21` | **`lib/period.ts`와 `check_links.py` 양쪽에 있다.** 한쪽만 고치면 고객 화면과 링크 점검 대상이 갈라진다 (`D-024`) |
 | `check_links.py`의 `check_link()` | 몰 페이지 전체를 본다 — 앞부분만 잘라 보면 옵션 목록이 긴 몰(카페24 등)에서 7~8만자 지점에 있는 실제 품절 배지를 놓친다 (`D-042`) |
 | `app/api/posts/[id]/route.ts`의 필드 allowlist | 여기 없는 필드는 관리자가 저장해도 **조용히 무시된다.** 새 필드를 추가하면 PATCH·PUT 양쪽에 넣어야 한다 |
+| `lib/publicPost.ts`의 필드 denylist | 위와 반대 방향 — Post에 관리자 전용 필드를 새로 추가하면 여기 목록에도 넣을 것. 안 넣으면 고객 화면 페이지 소스(뷰소스/RSC payload)에 그대로 샌다 (`D-044`) |
 | `middleware.ts`의 `config.matcher` | 새 관리자 API를 만들면 `isProtected()`와 `matcher` **양쪽**에 등록해야 한다. 한쪽만 하면 무방비 |
 | `data/posts.json` 직접 편집 | 서버에서 스크립트로 고칠 때는 반드시 백업부터. 저장은 스크립트 끝에서 한 번만 일어난다 |
 | 마감일 형식 | `YYYY-MM-DD` 문자열 비교로 판단한다. 시각이 섞이면 표시와 비교가 동시에 깨진다. `lib/period.ts`의 `dateOnly()`, `inpock.py`의 `_date_only()`가 방어한다 |

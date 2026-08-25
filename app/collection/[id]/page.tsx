@@ -2,6 +2,7 @@ import type { Metadata } from 'next'
 import { notFound } from 'next/navigation'
 import { loadCollections, loadPosts } from '@/lib/store'
 import { isCustomerVisible } from '@/lib/period'
+import { toPublicPosts } from '@/lib/publicPost'
 import CollectionDetailClient from './CollectionDetailClient'
 
 const SITE_URL = 'https://gonggu.asknuggetdata.com'
@@ -55,5 +56,5 @@ export async function generateMetadata({ params }: { params: { id: string } }): 
 export default function CollectionPage({ params }: { params: { id: string } }) {
   const data = getCollectionAndPosts(params.id)
   if (!data) notFound()
-  return <CollectionDetailClient collection={data.collection} posts={data.posts} />
+  return <CollectionDetailClient collection={data.collection} posts={toPublicPosts(data.posts)} />
 }

@@ -3,6 +3,7 @@ import { loadPosts, savePosts } from '@/lib/store'
 import type { Post } from '@/lib/types'
 import { daysLeft, isCustomerVisible, isPagePublic } from '@/lib/period'
 import { enforcePurchaseLinkRequirement, syncPriceWithOptions } from '@/lib/postGuards'
+import { toPublicPosts } from '@/lib/publicPost'
 
 const CAT_EMOJI: Record<string, string> = {
   kids: '👶', life: '🏠', food: '🍽️', health: '💊', beauty: '💄',
@@ -60,7 +61,12 @@ export async function GET(request: NextRequest) {
   const start  = (page - 1) * perPage
   const paged  = posts.slice(start, start + perPage)
 
-  return NextResponse.json({ posts: paged, total, page, per_page: perPage, pages: Math.ceil(total / perPage) })
+  // 고객 요청(비관리자)은 관리자 전용 필드를 뺀 채로 응답한다 — 이 API를 브라우저가 직접
+  // 호출하므로(HomeClient) 응답 그대로가 곧 페이지 소스에 남는다
+  return NextResponse.json({
+    posts: adminMode ? paged : toPublicPosts(paged),
+    total, page, per_page: perPage, pages: Math.ceil(total / perPage),
+  })
 }
 
 export async function POST(request: NextRequest) {

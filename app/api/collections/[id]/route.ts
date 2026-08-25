@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { loadCollections, saveCollections, loadPosts } from '@/lib/store'
 import type { Collection } from '@/lib/types'
 import { isCustomerVisible } from '@/lib/period'
+import { toPublicPosts } from '@/lib/publicPost'
 
 type Ctx = { params: { id: string } }
 
@@ -16,7 +17,7 @@ export async function GET(request: NextRequest, { params }: Ctx) {
   let posts = collection.productIds.map(id => postMap.get(id)).filter((p): p is NonNullable<typeof p> => !!p)
   if (!adminMode) posts = posts.filter(isCustomerVisible)
 
-  return NextResponse.json({ collection, posts })
+  return NextResponse.json({ collection, posts: adminMode ? posts : toPublicPosts(posts) })
 }
 
 export async function PATCH(request: NextRequest, { params }: Ctx) {
