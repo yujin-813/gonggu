@@ -134,9 +134,19 @@ export default function RequestPage() {
         <input type="text" value={title} onChange={e => setTitle(e.target.value)} placeholder="예: 리넨 반팔 원피스" style={{ width: '100%', marginBottom: 12 }} />
 
         <label>카테고리</label>
-        <select value={cat} onChange={e => setCat(e.target.value as Category)} style={{ width: '100%', marginBottom: 12 }}>
-          {CATS.map(c => <option key={c} value={c}>{CATEGORY_LABEL[c]}</option>)}
-        </select>
+        <div className="modal-row" style={{ marginBottom: 12, flexWrap: 'wrap' }}>
+          {CATS.map(c => (
+            <button
+              key={c}
+              type="button"
+              onClick={() => setCat(c)}
+              className={`cat-btn ${cat === c ? 'active' : ''}`}
+              style={{ flex: '1 1 auto' }}
+            >
+              {CATEGORY_LABEL[c]}
+            </button>
+          ))}
+        </div>
 
         <label>판매가 (원) *</label>
         <input type="number" value={price} onChange={e => setPrice(e.target.value)} placeholder="45000" style={{ width: '100%', marginBottom: 12 }} />
