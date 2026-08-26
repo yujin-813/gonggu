@@ -555,9 +555,6 @@ export default function AdminPage() {
             document.getElementById('admin-tabs')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
           }} />
 
-        {/* 성장 목표 — 일 방문자 기준 단계별 목표 대비 지금 어디쯤인지 */}
-        <GrowthGoalsBoard stages={growthGoals} analytics={analytics} moneyClicks7={moneyClicks7} onSaved={fetchGrowthGoals} />
-
         {/* 방문자 분석 */}
         <AnalyticsSection data={analytics} topPosts={topPosts} topSharedPosts={topSharedPosts} sources={sources} />
 
@@ -710,7 +707,12 @@ export default function AdminPage() {
         {/* 통계 설정 탭 — 관리자 방문이 고객 통계에 섞이지 않게 관리 */}
         {adminTab === 'verdict' && <VerdictFiller posts={posts} views={detailViews} onSaved={fetchPosts} initialMode={verdictMode} />}
 
-        {adminTab === 'data' && <VisitorFlow sessions={recentSessions} posts={posts} clickBreakdown={clickBreakdown} postSources={postSources} sources={sources} onRefresh={fetchAnalytics} />}
+        {adminTab === 'data' && (
+          <>
+            <GrowthGoalsBoard stages={growthGoals} analytics={analytics} moneyClicks7={moneyClicks7} onSaved={fetchGrowthGoals} />
+            <VisitorFlow sessions={recentSessions} posts={posts} clickBreakdown={clickBreakdown} postSources={postSources} sources={sources} onRefresh={fetchAnalytics} />
+          </>
+        )}
 
         {adminTab === 'inquiries' && <InquiryList inquiries={inquiries} onRefresh={fetchInquiries} />}
 
