@@ -2352,7 +2352,7 @@ function GrowthGoalsBoard({ stages, analytics, moneyClicks7, onSaved }: {
             <div style={{ background: '#f8fafc', borderRadius: 10, padding: '12px 14px' }}>
               <div style={{ fontSize: 11, color: '#64748b', marginBottom: 4 }}>현재 단계</div>
               <div style={{ fontSize: 16, fontWeight: 800, color: '#0f172a' }}>
-                {currentIdx < 0 ? '시작 전' : `${currentIdx + 1}단계 · 일 ${stages[currentIdx].toLocaleString()}명`}
+                {nextStage === null ? `${stages.length}단계 달성 🎉` : `${nextIdx + 1}단계 도전 중 · 목표 일 ${nextStage.toLocaleString()}명`}
               </div>
             </div>
             <div style={{ background: '#f8fafc', borderRadius: 10, padding: '12px 14px' }}>
