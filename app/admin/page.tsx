@@ -12,6 +12,7 @@ import { needsKoreanName } from '@/lib/influencerItems'
 import { findCompareCandidates, type CompareCandidate } from '@/lib/compareCandidates'
 import { COMPARE_NONE_REASON_LABEL, type CompareNoneReason } from '@/lib/types'
 import { GradeBadge } from '@/components/DealVerdictBox'
+import { SITE_URL } from '@/lib/siteUrl'
 import { CheckCircle2, TriangleAlert, Search, Flame, ImageOff, Eye, EyeOff, Package, Copy } from 'lucide-react'
 import AddPostModal from '@/components/AddPostModal'
 
@@ -144,7 +145,7 @@ export default function AdminPage() {
   const [instPostUrl, setInstPostUrl] = useState('')
   const [instPostBusy, setInstPostBusy] = useState(false)
   const [instPostMsg, setInstPostMsg] = useState('')
-  const [adminTab, setAdminTab] = useState<'posts' | 'influencers' | 'collections' | 'verdict' | 'revenue' | 'data' | 'inquiries' | 'settings'>('posts')
+  const [adminTab, setAdminTab] = useState<'posts' | 'influencers' | 'collections' | 'verdict' | 'revenue' | 'outreach' | 'data' | 'inquiries' | 'settings'>('posts')
   const [collections, setCollections] = useState<Collection[]>([])
   const [editingInfluencer, setEditingInfluencer] = useState<string | null>(null)
   const [editInfluencerDraft, setEditInfluencerDraft] = useState<Partial<InfluencerSource>>({})
@@ -566,6 +567,7 @@ export default function AdminPage() {
             { key: 'collections', label: '컬렉션 관리' },
             { key: 'verdict',     label: '채우기' },
             { key: 'revenue',     label: '수익화 현황' },
+            { key: 'outreach',    label: '인플루언서 확산' },
             { key: 'data',        label: '데이터' },
             { key: 'inquiries',   label: `제휴 문의${inquiries.filter(i => !i.handled).length ? ` ${inquiries.filter(i => !i.handled).length}` : ''}` },
             { key: 'settings',    label: '통계 설정' },
@@ -717,6 +719,8 @@ export default function AdminPage() {
         {adminTab === 'inquiries' && <InquiryList inquiries={inquiries} onRefresh={fetchInquiries} />}
 
         {adminTab === 'revenue' && <RevenueBoard posts={posts} clicks={clickBreakdown} sources={postSources} onGoFill={() => setAdminTab('verdict')} onSaved={fetchPosts} />}
+
+        {adminTab === 'outreach' && <OutreachBoard posts={posts} detailViews={detailViews} clickBreakdown={clickBreakdown} onSaved={fetchPosts} />}
 
         {adminTab === 'settings' && <AdminIpManager />}
 
@@ -2762,6 +2766,194 @@ function RevenueBoard({ posts, clicks, sources, onGoFill, onSaved }: {
         {list.length === 0 && (
           <p style={{ textAlign: 'center', padding: '24px 0', fontSize: 14, fontWeight: 700, color: '#64748b' }}>
             해당하는 상품이 없어요
+          </p>
+        )}
+      </div>
+    </div>
+  )
+}
+
+/**
+ * 인플루언서 확산 후보 — "오늘 누구에게 연락하지?"를 매번 다시 고민하지 않게, 조건에
+ * 맞는 상품을 자동으로 추려서 하루 5~10건만 보여준다.
+ *
+ * 조건: 진행 중(마감 아님) + 가격비교 완료(등급이 매겨졌다는 뜻) + 꿀딜/괜찮딜만.
+ * 아쉬운딜·판정 대기는 절대 넣지 않는다 — "홍보해 주세요"가 아니라 "가격을 확인해봤는데
+ * 정말 좋은 딜이라 알려드립니다"로 접근해야, 인플루언서·판매자에게도 꿀공구가
+ * 광고 매체가 아니라 객관적인 가격 검증 서비스로 보인다(사장님 기준).
+ *
+ * 정렬: ① 할인폭 큼 ② 상세조회+공구클릭 많음 ③ 아직 연락 안 한 것 우선.
+ *
+ * 이미지·DM 문구를 새로 만들지 않는다 — 공유 이미지는 이미 있는 /api/og/deal/[id]를
+ * 열기만 하고, DM 문구는 클립보드에 복사할 템플릿 하나만 준비한다.
+ */
+const OUTREACH_LABEL: Record<string, string> = {
+  none: '미전달', sent: '전달완료', confirmed: '공유확인', converted: '유입발생',
+}
+const OUTREACH_ORDER = ['none', 'sent', 'confirmed', 'converted'] as const
+
+function OutreachBoard({ posts, detailViews, clickBreakdown, onSaved }: {
+  posts: Post[]
+  detailViews: Record<string, number>
+  clickBreakdown: Record<string, Record<string, number>>
+  onSaved: () => void
+}) {
+  const [showAll, setShowAll] = useState(false)
+  const [copiedId, setCopiedId] = useState<string | null>(null)
+  const [savingId, setSavingId] = useState<number | null>(null)
+
+  const views = (id: number) => detailViews[id] || 0
+  const clicks = (id: number) => (clickBreakdown[id] || {}).groupbuy || 0
+
+  const rows = useMemo(() => {
+    return posts
+      .filter(p => isCustomerVisible(p) && !isExpired(p) && p.influencer_name)
+      .map(p => {
+        const v = getDealVerdict(p)
+        return { post: p, verdict: v, discountRate: v.discountRate ?? 0, engagement: views(p.id) + clicks(p.id) }
+      })
+      .filter(r => r.verdict.display.key === 'honey' || r.verdict.display.key === 'good')
+      .sort((a, b) => {
+        if (b.discountRate !== a.discountRate) return b.discountRate - a.discountRate
+        if (b.engagement !== a.engagement) return b.engagement - a.engagement
+        const sa = a.post.outreach_status || 'none'
+        const sb = b.post.outreach_status || 'none'
+        if (sa === 'none' && sb !== 'none') return -1
+        if (sb === 'none' && sa !== 'none') return 1
+        return 0
+      })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [posts, detailViews, clickBreakdown])
+
+  const pending = rows.filter(r => (r.post.outreach_status || 'none') === 'none')
+  const list = showAll ? rows : pending.slice(0, 10)
+
+  async function setStatus(post: Post, status: string) {
+    setSavingId(post.id)
+    try {
+      await fetch(`/api/posts/${post.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ outreach_status: status, outreach_updated_at: new Date().toISOString() }),
+      })
+      onSaved()
+    } finally {
+      setSavingId(null)
+    }
+  }
+
+  function trackingUrl(post: Post) {
+    const campaign = encodeURIComponent((post.account || '').replace('@', ''))
+    return `${SITE_URL}/post/${post.id}?utm_source=influencer_dm&utm_medium=referral&utm_campaign=${campaign}`
+  }
+
+  function dmText(post: Post, rate: number) {
+    const pct = Math.round(Math.abs(rate) * 100)
+    const name = post.influencer_name || (post.account || '').replace('@', '')
+    return `안녕하세요 ${name}님! 꿀공구에서 가격을 확인해봤는데, 지금 진행 중이신 '${post.title}' 공구가 다른 곳보다 ${pct}% 더 저렴한 진짜 좋은 딜이더라고요 🍯\n저희가 가격 검증한 자료 공유드려요: ${trackingUrl(post)}`
+  }
+
+  function copy(text: string, key: string) {
+    navigator.clipboard.writeText(text).then(() => {
+      setCopiedId(key)
+      setTimeout(() => setCopiedId(c => (c === key ? null : c)), 1500)
+    }).catch(() => {})
+  }
+
+  const th: React.CSSProperties = { padding: '8px 10px', fontSize: 11.5, fontWeight: 700, color: '#64748b', textAlign: 'right', whiteSpace: 'nowrap' }
+  const td: React.CSSProperties = { padding: '9px 10px', fontSize: 13, textAlign: 'right', whiteSpace: 'nowrap', borderTop: '1px solid #f1f5f9' }
+
+  return (
+    <div style={{ background: '#fff', borderRadius: 12, padding: 20, border: '1px solid #e2e8f0' }}>
+      <h2 style={{ fontSize: 17, fontWeight: 800, marginBottom: 6 }}>인플루언서 확산 후보</h2>
+      <p style={{ fontSize: 13, color: '#64748b', lineHeight: 1.7, marginBottom: 14 }}>
+        진행 중 · 가격비교 완료 · <strong>꿀딜/괜찮딜</strong>만 골랐어요(아쉬운딜은 안 보내는 게 원칙이에요).
+        할인폭 → 반응(조회+클릭) → 아직 연락 안 한 것 순으로 정렬돼요.
+      </p>
+
+      <div style={{ display: 'flex', gap: 6, marginBottom: 14, flexWrap: 'wrap' }}>
+        <button onClick={() => setShowAll(false)}
+          style={{ padding: '7px 14px', borderRadius: 20, border: 'none', cursor: 'pointer', fontSize: 13, fontWeight: 700,
+            background: !showAll ? '#dc2626' : '#e2e8f0', color: !showAll ? '#fff' : '#475569' }}>
+          오늘 후보 {Math.min(10, pending.length)}
+        </button>
+        <button onClick={() => setShowAll(true)}
+          style={{ padding: '7px 14px', borderRadius: 20, border: 'none', cursor: 'pointer', fontSize: 13, fontWeight: 700,
+            background: showAll ? '#475569' : '#e2e8f0', color: showAll ? '#fff' : '#475569' }}>
+          전체 {rows.length}
+        </button>
+      </div>
+
+      <div style={{ overflowX: 'auto' }}>
+        <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 820 }}>
+          <thead>
+            <tr>
+              <th style={{ ...th, textAlign: 'left' }}>상품</th>
+              <th style={{ ...th, textAlign: 'left' }}>인플루언서</th>
+              <th style={th}>판정</th>
+              <th style={th}>가격차</th>
+              <th style={th}>조회/클릭</th>
+              <th style={{ ...th, textAlign: 'center' }}>액션</th>
+              <th style={{ ...th, textAlign: 'center' }}>상태</th>
+            </tr>
+          </thead>
+          <tbody>
+            {list.map(r => {
+              const p = r.post
+              return (
+                <tr key={p.id}>
+                  <td style={{ ...td, textAlign: 'left', maxWidth: 260 }}>
+                    <a href={`/post/${p.id}`} target="_blank" rel="noreferrer"
+                      style={{ color: '#1e293b', fontWeight: 600, textDecoration: 'none' }}>
+                      {p.title}
+                    </a>
+                  </td>
+                  <td style={{ ...td, textAlign: 'left' }}>{p.influencer_name}</td>
+                  <td style={td}><GradeBadge display={r.verdict.display} size="sm" /></td>
+                  <td style={{ ...td, fontWeight: 700, color: '#dc2626' }}>{Math.round(Math.abs(r.discountRate) * 100)}%↓</td>
+                  <td style={td}>{views(p.id)} / {clicks(p.id)}</td>
+                  <td style={{ ...td, textAlign: 'center' }}>
+                    <div style={{ display: 'flex', gap: 4, justifyContent: 'center' }}>
+                      <a href={`/api/og/deal/${p.id}`} target="_blank" rel="noreferrer"
+                        title="공유 이미지 만들기"
+                        style={{ padding: '4px 8px', borderRadius: 6, border: '1px solid #cbd5e1', background: '#fff',
+                          fontSize: 11, fontWeight: 600, color: '#475569', textDecoration: 'none' }}>
+                        이미지
+                      </a>
+                      <button onClick={() => copy(dmText(p, r.discountRate), `dm-${p.id}`)}
+                        title="DM 문구 복사"
+                        style={{ padding: '4px 8px', borderRadius: 6, border: '1px solid #cbd5e1',
+                          background: copiedId === `dm-${p.id}` ? '#dcfce7' : '#fff',
+                          cursor: 'pointer', fontSize: 11, fontWeight: 600, color: '#475569' }}>
+                        {copiedId === `dm-${p.id}` ? '복사됨' : 'DM 복사'}
+                      </button>
+                      <button onClick={() => copy(trackingUrl(p), `link-${p.id}`)}
+                        title="추적링크 복사"
+                        style={{ padding: '4px 8px', borderRadius: 6, border: '1px solid #cbd5e1',
+                          background: copiedId === `link-${p.id}` ? '#dcfce7' : '#fff',
+                          cursor: 'pointer', fontSize: 11, fontWeight: 600, color: '#475569' }}>
+                        {copiedId === `link-${p.id}` ? '복사됨' : '링크 복사'}
+                      </button>
+                    </div>
+                  </td>
+                  <td style={{ ...td, textAlign: 'center' }}>
+                    <select
+                      value={p.outreach_status || 'none'}
+                      disabled={savingId === p.id}
+                      onChange={e => setStatus(p, e.target.value)}
+                      style={{ fontSize: 12, fontWeight: 700, padding: '4px 6px', borderRadius: 6, border: '1px solid #cbd5e1',
+                        color: (p.outreach_status || 'none') === 'none' ? '#dc2626' : '#15803d' }}>
+                      {OUTREACH_ORDER.map(s => <option key={s} value={s}>{OUTREACH_LABEL[s]}</option>)}
+                    </select>
+                  </td>
+                </tr>
+              )
+            })}
+          </tbody>
+        </table>
+        {list.length === 0 && (
+          <p style={{ textAlign: 'center', padding: '24px 0', fontSize: 14, fontWeight: 700, color: '#64748b' }}>
+            지금 조건에 맞는 후보가 없어요
           </p>
         )}
       </div>

@@ -89,6 +89,9 @@ export interface Post {
   // 마감일이 없어도 정상으로 뜨므로(EndedDealNotice가 deadline이 있을 때만 날짜를 쓴다),
   // 날짜를 지어내지 않고 "확인했다"는 사실만 남긴다.
   ended_at?: string | null
+  // 인플루언서 확산 후보 관리 — 관리자가 직접 연락하고 상태만 기록한다(자동 발송 아님)
+  outreach_status?: 'none' | 'sent' | 'confirmed' | 'converted'
+  outreach_updated_at?: string | null
   compare_none_at?: string | null
   compare_none_reason?: CompareNoneReason | null
   compare_none_note?: string | null

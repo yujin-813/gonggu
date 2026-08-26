@@ -36,6 +36,7 @@ const INTERNAL_FIELDS = [
   'partners_checked_at', 'partners_platform', 'partners_price', 'partners_url', 'partners_option_note', 'partners_visible',
   'market_price_note',
   'collectionIds',
+  'outreach_status', 'outreach_updated_at',
 ] as const satisfies readonly (keyof Post)[]
 
 export function toPublicPost(post: Post): Post {
