@@ -8,6 +8,10 @@ const POSTS_FILE  = path.join(DATA_DIR, 'posts.json')
 const STATUS_FILE = path.join(DATA_DIR, 'scraper_status.json')
 const PROFILES_FILE = path.join(DATA_DIR, 'tracked_profiles.json')
 const COLLECTIONS_FILE = path.join(DATA_DIR, 'collections.json')
+const GROWTH_GOALS_FILE = path.join(DATA_DIR, 'growth_goals.json')
+
+// 일 방문자 기준 성장 단계. 사장님이 관리자 화면에서 나중에 바꿀 수 있다 — 이건 그때까지의 기본값.
+const DEFAULT_GROWTH_STAGES = [150, 300, 500, 1000, 3000, 10000]
 
 function ensureDir() {
   if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true })
@@ -143,4 +147,19 @@ export function loadCollections(): Collection[] {
 export function saveCollections(collections: Collection[]): void {
   ensureDir()
   atomicWrite(COLLECTIONS_FILE, JSON.stringify(collections, null, 2))
+}
+
+export function loadGrowthGoals(): { stages: number[] } {
+  ensureDir()
+  if (!fs.existsSync(GROWTH_GOALS_FILE)) return { stages: DEFAULT_GROWTH_STAGES }
+  try {
+    const d = JSON.parse(fs.readFileSync(GROWTH_GOALS_FILE, 'utf-8'))
+    if (!Array.isArray(d.stages) || d.stages.length === 0) return { stages: DEFAULT_GROWTH_STAGES }
+    return { stages: d.stages }
+  } catch { return { stages: DEFAULT_GROWTH_STAGES } }
+}
+
+export function saveGrowthGoals(goals: { stages: number[] }): void {
+  ensureDir()
+  atomicWrite(GROWTH_GOALS_FILE, JSON.stringify(goals, null, 2))
 }

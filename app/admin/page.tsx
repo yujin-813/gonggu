@@ -128,6 +128,9 @@ export default function AdminPage() {
   const [postSources, setPostSources] = useState<Record<string, Record<string, number>>>({})
   // 최근 방문의 개별 동작 — 세션 단위로 묶어 흐름을 본다
   const [recentSessions, setRecentSessions] = useState<RecentSession[]>([])
+  // 최근 7일 구매처(쿠팡·네이버·기타) 클릭 합계 — 성장 목표 카드
+  const [moneyClicks7, setMoneyClicks7] = useState(0)
+  const [growthGoals, setGrowthGoals] = useState<number[]>([])
   const [inquiries, setInquiries] = useState<Inquiry[]>([])
   // 「오늘 손보면 돈 되는 일」에서 '목록으로 →'를 누르면 채우기 탭의 어느 세부 탭으로
   // 갈지 함께 정한다 — 탭만 바꾸면 항상 '미확인'으로 열려서, ⚠️ 종료+대체상품없음 항목을
@@ -179,7 +182,13 @@ export default function AdminPage() {
       setClickBreakdown(d.clickBreakdown || {})
       setPostSources(d.postSources || {})
       setRecentSessions(d.recentSessions || [])
+      setMoneyClicks7(d.moneyClicks7 || 0)
     }
+  }, [])
+
+  const fetchGrowthGoals = useCallback(async () => {
+    const r = await fetch('/api/growth-goals')
+    if (r.ok) { const d = await r.json(); setGrowthGoals(d.stages || []) }
   }, [])
 
   const fetchInquiries = useCallback(async () => {
@@ -311,13 +320,14 @@ export default function AdminPage() {
   useEffect(() => {
     fetchPosts()
     fetchAnalytics()
+    fetchGrowthGoals()
     fetchInquiries()
     fetchInfluencerSources()
     fetchInpockStatus()
     fetchCollections()
     const iv = setInterval(() => { fetchInpockStatus() }, 5000)
     return () => clearInterval(iv)
-  }, [fetchPosts, fetchAnalytics, fetchInquiries, fetchInfluencerSources, fetchInpockStatus, fetchCollections])
+  }, [fetchPosts, fetchAnalytics, fetchGrowthGoals, fetchInquiries, fetchInfluencerSources, fetchInpockStatus, fetchCollections])
 
   async function togglePublished(p: Post) {
     const isPublished = p.status === 'published' || (!p.status && p.published !== false)
@@ -544,6 +554,9 @@ export default function AdminPage() {
             // 스크롤이 안 된 사람 눈엔 아무 일도 안 일어난 것처럼 보였다.
             document.getElementById('admin-tabs')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
           }} />
+
+        {/* 성장 목표 — 일 방문자 기준 단계별 목표 대비 지금 어디쯤인지 */}
+        <GrowthGoalsBoard stages={growthGoals} analytics={analytics} moneyClicks7={moneyClicks7} onSaved={fetchGrowthGoals} />
 
         {/* 방문자 분석 */}
         <AnalyticsSection data={analytics} topPosts={topPosts} topSharedPosts={topSharedPosts} sources={sources} />
@@ -2224,6 +2237,178 @@ function PurchaseLinkModal({ post, onClose, onSaved }: { post: Post; onClose: ()
  * 된다. 데이터가 없는데 "+82%"를 보여주면 그게 바로 틀린 숫자를 내보내는 것이다(원칙 1).
  * 자리는 비워 두고 며칠 뒤 데이터가 차면 그때 만든다.
  */
+/**
+ * 성장 목표 — 일 방문자 기준 단계(기본 150→300→500→1,000→3,000→10,000)로 지금 어디까지
+ * 왔는지 보여준다. 단계는 사장님이 나중에 고칠 수 있다(/api/growth-goals).
+ *
+ * "지금 단계"는 오늘 하루 값이 아니라 최근 7일 평균으로 정한다 — 하루 방문자는 요일
+ * 편차가 커서(주말 vs 평일), 좋은 날 하루로 다음 단계를 넘긴 것처럼 보이거나 나쁜 날
+ * 하루로 이미 넘은 단계 아래로 떨어져 보이면 판정이 널뛴다.
+ */
+function GrowthGoalsBoard({ stages, analytics, moneyClicks7, onSaved }: {
+  stages: number[]
+  analytics: DayStat[]
+  moneyClicks7: number
+  onSaved: () => void
+}) {
+  const [editing, setEditing] = useState(false)
+  const [draft, setDraft] = useState<string[]>([])
+  const [saving, setSaving] = useState(false)
+  const [err, setErr] = useState('')
+
+  const last7 = analytics.slice(-7)
+  const week7 = last7.reduce((s, d) => s + d.visitors, 0)
+  const avg7 = last7.length > 0 ? week7 / last7.length : 0
+  const maxVisitors = Math.max(...last7.map(d => d.visitors), 1)
+
+  if (stages.length === 0) return null // 아직 못 불러왔음
+
+  // 현재 단계 = 7일 평균이 넘은 마지막 단계. 하나도 못 넘었으면 -1
+  let currentIdx = -1
+  for (let i = 0; i < stages.length; i++) {
+    if (avg7 >= stages[i]) currentIdx = i
+  }
+  const nextIdx = currentIdx + 1
+  const nextStage = nextIdx < stages.length ? stages[nextIdx] : null
+  const remaining = nextStage !== null ? Math.max(0, Math.ceil(nextStage - avg7)) : 0
+
+  function startEdit() {
+    setDraft(stages.map(String))
+    setErr('')
+    setEditing(true)
+  }
+
+  async function save() {
+    setErr('')
+    const nums = draft.map(s => Number(s.trim()))
+    if (nums.some(n => !Number.isFinite(n) || n <= 0)) { setErr('모든 단계는 0보다 큰 숫자여야 해요'); return }
+    for (let i = 1; i < nums.length; i++) {
+      if (nums[i] <= nums[i - 1]) { setErr('단계는 앞 단계보다 커야 해요'); return }
+    }
+    setSaving(true)
+    try {
+      const res = await fetch('/api/growth-goals', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ stages: nums }),
+      })
+      if (!res.ok) { const d = await res.json().catch(() => ({})); setErr(d.error || '저장 실패'); return }
+      setEditing(false)
+      onSaved()
+    } catch {
+      setErr('저장 실패')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  function fmtDate(dateStr: string) {
+    const [, m, d] = dateStr.split('-')
+    return `${parseInt(m)}/${parseInt(d)}`
+  }
+
+  return (
+    <div style={{ background: '#fff', borderRadius: 12, padding: 20, marginBottom: 24, border: '1px solid #e2e8f0' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+        <h3 style={{ margin: 0, fontSize: 15, fontWeight: 700, color: '#1e293b' }}>성장 목표</h3>
+        {!editing && (
+          <button onClick={startEdit}
+            style={{ marginLeft: 'auto', padding: '4px 10px', borderRadius: 7, border: '1px solid #cbd5e1',
+              background: '#fff', cursor: 'pointer', fontSize: 11.5, fontWeight: 600, color: '#475569' }}>
+            단계 수정
+          </button>
+        )}
+      </div>
+      <p style={{ fontSize: 11.5, color: '#94a3b8', margin: '0 0 16px' }}>
+        일 방문자 기준(최근 7일 평균)이에요. 요일 편차가 커서 하루 값 대신 평균으로 단계를 매겨요.
+      </p>
+
+      {editing ? (
+        <div>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 10 }}>
+            {draft.map((v, i) => (
+              <input key={i} type="number" value={v}
+                onChange={e => setDraft(d => d.map((x, xi) => xi === i ? e.target.value : x))}
+                style={{ width: 90 }} />
+            ))}
+          </div>
+          {err && <p style={{ color: '#ef4444', fontSize: 12.5, margin: '0 0 8px', fontWeight: 600 }}>❌ {err}</p>}
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button className="btn-submit" onClick={save} disabled={saving} style={{ width: 'auto', padding: '8px 16px' }}>
+              {saving ? '저장 중...' : '저장'}
+            </button>
+            <button onClick={() => setEditing(false)}
+              style={{ padding: '8px 16px', borderRadius: 12, border: '1px solid #cbd5e1', background: '#fff',
+                cursor: 'pointer', fontSize: 14, fontWeight: 600, color: '#475569' }}>
+              취소
+            </button>
+          </div>
+        </div>
+      ) : (
+        <>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 10, marginBottom: 18 }}>
+            <div style={{ background: '#f8fafc', borderRadius: 10, padding: '12px 14px' }}>
+              <div style={{ fontSize: 11, color: '#64748b', marginBottom: 4 }}>현재 단계</div>
+              <div style={{ fontSize: 16, fontWeight: 800, color: '#0f172a' }}>
+                {currentIdx < 0 ? '시작 전' : `${currentIdx + 1}단계 · 일 ${stages[currentIdx].toLocaleString()}명`}
+              </div>
+            </div>
+            <div style={{ background: '#f8fafc', borderRadius: 10, padding: '12px 14px' }}>
+              <div style={{ fontSize: 11, color: '#64748b', marginBottom: 4 }}>다음 단계까지</div>
+              <div style={{ fontSize: 16, fontWeight: 800, color: '#d97706' }}>
+                {nextStage === null ? '모든 단계 달성 🎉' : `${remaining.toLocaleString()}명`}
+              </div>
+            </div>
+            <div style={{ background: '#f8fafc', borderRadius: 10, padding: '12px 14px' }}>
+              <div style={{ fontSize: 11, color: '#64748b', marginBottom: 4 }}>7일 평균 · 7일 합계 · 구매처 클릭(7일)</div>
+              <div style={{ fontSize: 14, fontWeight: 800, color: '#0f172a' }}>
+                {Math.round(avg7).toLocaleString()}명 · {week7.toLocaleString()}명 · {moneyClicks7.toLocaleString()}회
+              </div>
+            </div>
+          </div>
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 20 }}>
+            {stages.map((stage, i) => {
+              const pct = Math.min(100, Math.round((avg7 / stage) * 100))
+              const done = avg7 >= stage
+              return (
+                <div key={stage}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, marginBottom: 4 }}>
+                    <span style={{ fontWeight: 700, color: done ? '#15803d' : '#475569' }}>
+                      {i + 1}단계 · 일 {stage.toLocaleString()}명 {done && '✓'}
+                    </span>
+                    <span style={{ color: '#94a3b8' }}>{pct}%</span>
+                  </div>
+                  <div style={{ height: 8, borderRadius: 4, background: '#e2e8f0', overflow: 'hidden' }}>
+                    <div style={{ width: `${pct}%`, height: '100%', borderRadius: 4,
+                      background: done ? '#22c55e' : '#f59e0b', transition: 'width .3s' }} />
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+
+          <div>
+            <div style={{ fontSize: 11.5, color: '#64748b', fontWeight: 600, marginBottom: 8 }}>최근 7일 방문자 추이</div>
+            <div style={{ display: 'flex', alignItems: 'flex-end', gap: 6, height: 60 }}>
+              {last7.map((d, i) => (
+                <div key={d.date} style={{ flex: 1, textAlign: 'center' }}>
+                  <div style={{
+                    height: `${Math.max(4, (d.visitors / maxVisitors) * 48)}px`,
+                    background: i === last7.length - 1 ? '#6366f1' : '#c7d2fe',
+                    borderRadius: 3, marginBottom: 4,
+                  }} />
+                  <span style={{ fontSize: 9.5, color: '#94a3b8' }}>{fmtDate(d.date)}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </>
+      )}
+    </div>
+  )
+}
+
 function TodayPriorities({ posts, detailViews, clickBreakdown, postSources, sources, onGoTo }: {
   posts: Post[]
   detailViews: Record<string, number>
