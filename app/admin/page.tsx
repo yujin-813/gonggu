@@ -2262,8 +2262,23 @@ function GrowthGoalsBoard({ stages, analytics, moneyClicks7, onSaved }: {
   const week7 = last7.reduce((s, d) => s + d.visitors, 0)
   const avg7 = last7.length > 0 ? week7 / last7.length : 0
   const maxVisitors = Math.max(...last7.map(d => d.visitors), 1)
+  // 그 전 7일 대비 증감 — "42%"라는 정적인 숫자만으론 지금 오르는 중인지 멎어 있는지
+  // 안 보인다는 사장님 피드백. getSummary(14)라 그 전 7일이 딱 앞쪽에 남아 있다.
+  const prev7 = analytics.slice(-14, -7)
+  const prevAvg7 = prev7.length > 0 ? prev7.reduce((s, d) => s + d.visitors, 0) / prev7.length : 0
+  const trendDiff = Math.round(avg7 - prevAvg7)
+  const hasTrend = prev7.length > 0
 
   if (stages.length === 0) return null // 아직 못 불러왔음
+
+  // 단계와 별개로 이미 정해둔 잠금 해제 기준(CLAUDE.md "하지 않기로 한 것") — 일 방문자가
+  // 여기 넘으면 그 기능을 다시 검토한다는 뜻. 단계 사다리(150→...→10,000)와 숫자가 딱
+  // 안 맞아도(100은 150보다 작다) 사장님이 "다음에 뭘 할지 안 보인다"고 한 부분이라
+  // 따로 보여준다 — 없는 계획을 지어내는 대신 이미 있는 결정을 연결한다.
+  const UNLOCKS = [
+    { threshold: 100, label: '키워드 알림', note: '현재 푸시 구독자 2명' },
+    { threshold: 300, label: '댓글 기능', note: null as string | null },
+  ]
 
   // 현재 단계 = 7일 평균이 넘은 마지막 단계. 하나도 못 넘었으면 -1
   let currentIdx = -1
@@ -2356,7 +2371,15 @@ function GrowthGoalsBoard({ stages, analytics, moneyClicks7, onSaved }: {
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: 10, marginBottom: 18 }}>
             <div style={{ background: '#f8fafc', borderRadius: 10, padding: '12px 14px' }}>
               <div style={{ fontSize: 11, color: '#64748b', marginBottom: 4 }}>7일 평균</div>
-              <div style={{ fontSize: 16, fontWeight: 800, color: '#0f172a' }}>{Math.round(avg7).toLocaleString()}명</div>
+              <div style={{ fontSize: 16, fontWeight: 800, color: '#0f172a' }}>
+                {Math.round(avg7).toLocaleString()}명
+                {hasTrend && trendDiff !== 0 && (
+                  <span style={{ fontSize: 12, fontWeight: 700, marginLeft: 6, color: trendDiff > 0 ? '#15803d' : '#dc2626' }}>
+                    {trendDiff > 0 ? '▲' : '▼'}{Math.abs(trendDiff)}
+                  </span>
+                )}
+              </div>
+              {hasTrend && <div style={{ fontSize: 10.5, color: '#94a3b8', marginTop: 2 }}>지난 7일 대비</div>}
             </div>
             <div style={{ background: '#f8fafc', borderRadius: 10, padding: '12px 14px' }}>
               <div style={{ fontSize: 11, color: '#64748b', marginBottom: 4 }}>7일 합계</div>
@@ -2404,6 +2427,31 @@ function GrowthGoalsBoard({ stages, analytics, moneyClicks7, onSaved }: {
                 다음: {laterStages.map(s => `${s.toLocaleString()}명`).join(' → ')}
               </p>
             )}
+
+            {/* 방문자가 늘면 뭐가 달라지는지 — 진행률만 있고 다음 액션이 안 보인다는
+                피드백. 새로 정하지 않고 CLAUDE.md에 이미 있는 보류 조건을 그대로 연결한다 */}
+            <div style={{ marginTop: 14, paddingTop: 14, borderTop: '1px dashed #e2e8f0' }}>
+              <div style={{ fontSize: 11.5, color: '#64748b', fontWeight: 600, marginBottom: 8 }}>
+                🔓 방문자가 늘면 열리는 기능
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                {UNLOCKS.map(u => {
+                  const done = avg7 >= u.threshold
+                  return (
+                    <div key={u.label} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12.5 }}>
+                      <span style={{ fontWeight: 700, color: done ? '#15803d' : '#475569' }}>
+                        {done ? '✓' : '○'} {u.label}
+                      </span>
+                      <span style={{ color: '#94a3b8' }}>
+                        {done
+                          ? '조건 충족'
+                          : `일 ${u.threshold.toLocaleString()}명부터 (${Math.round(avg7).toLocaleString()}/${u.threshold.toLocaleString()})${u.note ? ` · ${u.note}` : ''}`}
+                      </span>
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
           </div>
 
           <div>
