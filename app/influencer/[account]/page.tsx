@@ -31,7 +31,7 @@ export function generateMetadata({ params }: { params: { account: string } }): M
   }
   const { name, items } = data
   const count = items.length
-  const pageTitle = `${name} 공구`
+  const pageTitle = `${name} 공동구매 일정·진행중 공구 모아보기`
   const shareTitle = `${pageTitle} | 꿀공구`
   const description = `${name}님의 공동구매 ${count}건을 모았어요. 상품별 가격과 마감일, 최저가 비교까지 한눈에 확인하세요.`
   const url = `${SITE_URL}/influencer/${encodeURIComponent(params.account)}`

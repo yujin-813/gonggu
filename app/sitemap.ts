@@ -55,9 +55,11 @@ export default function sitemap(): MetadataRoute.Sitemap {
     // (이전에는 "공구는 상세 페이지가 없다"는 낡은 전제로 통째로 빠져 있었다)
     // 마감된 공구도 넣는다 — 페이지가 종료 안내와 대체 구매처로 계속 쓰이므로, 사이트맵에서
     // 빼면 검색엔진이 사라진 페이지로 보고 색인을 내린다.
+    // updated_at은 가격·마감상태·공개 여부가 실제로 바뀐 시각(관리자 수정 포함),
+    // scraped_at은 수집기가 마지막으로 훑은 시각 — updated_at이 있으면 그게 더 정확하다
     ...routablePosts().map(p => ({
       url: `${SITE_URL}/post/${p.id}`,
-      lastModified: p.scraped_at ? new Date(p.scraped_at) : new Date(),
+      lastModified: new Date(p.updated_at || p.scraped_at || Date.now()),
       changeFrequency: 'daily' as const,
       priority: 0.7,
     })),

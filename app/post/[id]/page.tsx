@@ -65,11 +65,13 @@ export async function generateMetadata({ params }: { params: { id: string } }): 
   // 페이지 <title>은 루트 레이아웃의 template("%s | 꿀공구")을 타므로 접미사를 붙이지 않는다.
   // OG/Twitter 태그는 템플릿을 타지 않으므로 완결된 문자열을 직접 넣어야 한다.
   const ended = isExpired(post)
-  // 종료돼도 title을 없애지 않는다. "OO 공동구매 가격" 형태로 유지해야 이미 색인된
-  // 검색어("상품명 공동구매", "상품명 가격")와 계속 맞물린다.
+  // 가격을 제목에 그대로 넣어 "상품명 가격" 검색과 맞물리게 한다. "가격비교"는 실제로
+  // 비교가가 있을 때만 붙인다 — 판정 대기인데 비교했다고 써 붙이면 틀린 말이 된다(원칙 1).
+  const hasComparison = getDealVerdict(post).display.key !== 'pending'
+  const priceLabel = post.price ? ` ${post.price.toLocaleString()}원` : ''
   const pageTitle = ended
-    ? `${post.title} 공동구매 가격 및 구매처`
-    : `${post.title} 공동구매 가격 및 기간`
+    ? `${post.title} 공구${priceLabel} | 마감 후 구매처`
+    : `${post.title} 공구${priceLabel}${hasComparison ? ' | 가격비교' : ''}`
   const shareTitle = `${pageTitle} | 꿀공구`
   const description = buildDescription(post, ended)
   const url = `${SITE_URL}/post/${post.id}`

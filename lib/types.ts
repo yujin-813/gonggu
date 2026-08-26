@@ -41,6 +41,9 @@ export interface Post {
   avatar?: string
   caption?: string
   scraped_at?: string
+  /** 가격·마감상태·공개 여부가 실제로 바뀐 시각. scraped_at은 수집기가 훑은 시각이라
+   * 관리자가 직접 고친 건 안 잡힌다 — sitemap lastmod·IndexNow 통보에 이 값을 쓴다 */
+  updated_at?: string
   brand?: string | null
   group_key?: string | null
   market_url?: string | null

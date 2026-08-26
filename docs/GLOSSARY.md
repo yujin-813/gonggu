@@ -93,6 +93,17 @@
 
 목록용을 상세에 쓰면 마감 공구가 404난다 (`D-002`).
 
+### `scraped_at` vs `updated_at`
+
+| | `scraped_at` | `updated_at` |
+|---|---|---|
+| 뜻 | 수집기가 마지막으로 훑은 시각 | 가격·마감상태·공개 여부가 **실제로** 바뀐 시각 |
+| 관리자가 직접 고치면 | 안 바뀜 | 바뀜 |
+| 쓰는 곳 | 최신순 정렬 | sitemap `lastmod`, IndexNow 통보 (`D-054`) |
+
+`scraped_at`으로 sitemap `lastmod`를 매기면, 관리자가 어제 가격을 고친 공구도 오늘 수집기가
+훑기 전까진 "안 바뀐 것"으로 보인다.
+
 ### 등급 vs 상태
 
 `honey`/`good`/`hmm`/`meh`는 **등급**이고 `pending`/`exclusive`/`multi`는 **상태**다.

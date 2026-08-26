@@ -147,7 +147,9 @@ export function landingCopy(key: LandingKey, count: number): LandingCopy {
       return {
         path: '/today',
         h1: `오늘의 공구 (${kstTodayLabel()})`,
-        title: `오늘의 공구 — ${kstTodayLabel()} 새로 올라온 공구 모아보기`,
+        // 사람이 실제로 치는 검색어("오늘 공동구매", "오늘 공구")에 맞춰 부제 없이 간결하게 —
+        // 긴 대시(—) 부제는 검색 결과에서 잘려 보이는 경우가 많다
+        title: `오늘 새로 올라온 공동구매 모아보기 (${kstTodayLabel()})`,
         description: `${kstTodayLabel()}에 새로 오픈했거나 새로 올라온 인스타 공동구매 ${count}건을 모았어요. 오늘 나온 인플루언서 공구를 가장 먼저 확인하세요.`,
         empty: '오늘 새로 올라온 공구가 아직 없어요',
       }
@@ -155,7 +157,9 @@ export function landingCopy(key: LandingKey, count: number): LandingCopy {
       return {
         path: '/deadline',
         h1: '마감 임박 공구',
-        title: '마감 임박 공구 — 3일 안에 끝나는 공구 모아보기',
+        // "오늘 마감"이라고 쓰면 실제로는 1~3일 뒤 마감인 공구까지 오늘 마감인 것처럼
+        // 읽혀서 틀린 말이 된다(원칙 1) — 페이지 실제 조건(3일 이내)에 맞춘 문구를 쓴다
+        title: '마감 임박 공동구매 모아보기 — 3일 안에 끝나는 공구',
         description: `3일 안에 마감되는 인스타 인플루언서 공동구매 ${count}건을 모았어요. 마감 순으로 정렬해 급한 공구부터 보여드려요.`,
         empty: '3일 안에 마감되는 공구가 없어요',
       }
@@ -191,12 +195,23 @@ export const LANDING_KEYS: LandingKey[] = ['today', 'deadline', 'monthly', 'upco
 import { CATEGORY_KEYS } from './types'
 export { CATEGORY_KEYS }
 
+// 카테고리 라벨과 뜻이 겹치는 실제 검색어 하나씩만 — 관련 없는 인기 키워드를
+// 끼워넣지 않는다(네이버 서치어드바이저가 안내하는 대로, 억지로 넣으면 오히려 불리하다)
+const CATEGORY_SYNONYM: Record<Category, string> = {
+  kids: '육아',
+  life: '생활용품',
+  food: '먹거리',
+  health: '헬스케어',
+  beauty: '화장품',
+}
+
 export function categoryCopy(cat: Category, count: number): LandingCopy {
   const label = CATEGORY_LABEL[cat]
+  const synonym = CATEGORY_SYNONYM[cat]
   return {
     path: `/category/${cat}`,
     h1: `${label} 공구`,
-    title: `${label} 공구 — ${label} 인스타 공동구매 모아보기`,
+    title: `${label} 공동구매 · ${synonym} 공구 모아보기`,
     description: `${label} 카테고리 인스타그램 인플루언서 공동구매 ${count}건을 모았어요. ${label} 공구를 마감일·최저가와 함께 한눈에 비교하세요.`,
     empty: `진행 중인 ${label} 공구가 없어요`,
   }

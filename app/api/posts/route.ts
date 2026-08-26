@@ -4,6 +4,7 @@ import type { Post } from '@/lib/types'
 import { daysLeft, isCustomerVisible, isPagePublic } from '@/lib/period'
 import { enforcePurchaseLinkRequirement, syncPriceWithOptions } from '@/lib/postGuards'
 import { toPublicPosts } from '@/lib/publicPost'
+import { pingIndexNow, postUrl } from '@/lib/indexnow'
 
 const CAT_EMOJI: Record<string, string> = {
   kids: '👶', life: '🏠', food: '🍽️', health: '💊', beauty: '💄',
@@ -109,6 +110,7 @@ export async function POST(request: NextRequest) {
     avatar:     CAT_EMOJI[data.cat] || '🛍️',
     caption:    data.caption || '',
     scraped_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
     source:     'manual',
     published:  true,  // 관리자가 직접 등록한 것은 바로 공개
     custom_verdict:        data.custom_verdict?.trim() || null,
@@ -125,6 +127,7 @@ export async function POST(request: NextRequest) {
   const guarded = syncPriceWithOptions(enforcePurchaseLinkRequirement(newPost))
   posts.unshift(guarded)
   savePosts(posts)
+  if (guarded.published) pingIndexNow([postUrl(guarded.id)])
 
   return NextResponse.json({ success: true, post: guarded }, { status: 201 })
 }
