@@ -13,7 +13,7 @@
 | 스택 | Next.js 14 (App Router) · React 18 · TypeScript · 파이썬 수집기 |
 | 저장소 | **파일 기반** — `data/*.json`. DB 없음 |
 | 코드 규모 | `lib/` 3,286줄 · `app/admin` + `components/` 5,959줄 · 파이썬 3,019줄 |
-| 데이터 규모 | 게시물 2,448건 (공개 336건) · 인플루언서 소스 57개 · analytics 31일치 |
+| 데이터 규모 | 게시물 2,448건 (공개 336건) · 인플루언서 소스 59개 · analytics 31일치 |
 | 배포 | EC2 `13.125.121.62`(t3.small) · PM2(fork) + nginx · `bash deploy.sh` — **무중단**(3002↔3003 슬롯 교대, `D-028`) |
 | 도메인 | https://gonggu.asknuggetdata.com |
 
@@ -40,7 +40,7 @@
   고객 폰 캘린더가 한다. 웹 푸시는 iOS·인앱 브라우저에서 도달이 안 된다 (`D-029`)
 - 상세 하단 **공유 권유** — 판정에 맞춘 문구(`shareLabel`)를 눈에 보이게 꺼냈다. 31일간 공유 0회였다
 - 공유 카드 이미지 `/api/og/deal/[id]` — 판정 결과를 그린 800×400 PNG
-- SEO — JSON-LD(WebSite/ItemList/Product·Offer/BreadcrumbList), sitemap.xml(356 URL), robots.txt, 네이버·구글 소유확인
+- SEO — JSON-LD(WebSite/ItemList/Product·Offer/BreadcrumbList), sitemap.xml(429 URL), robots.txt, 네이버·구글 소유확인
 
 **관리자 `/admin`**
 - **첫 화면 = 「오늘 손보면 돈 되는 일」** — 상태 개수 카드 대신 우선순위를 먼저 보여준다(`D-032`).
