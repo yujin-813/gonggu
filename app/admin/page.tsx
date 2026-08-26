@@ -2385,19 +2385,28 @@ function RevenueBoard({ posts, clicks, sources, onGoFill, onSaved }: {
   const rows = useMemo(() => {
     return posts
       .filter(isPagePublic)
-      .map(p => ({
-        post: p,
-        detail: n(p.id, 'detail'),
-        groupbuy: n(p.id, 'groupbuy'),
-        coupang: n(p.id, 'coupang'),
-        naver: n(p.id, 'naver'),
-        search: searchIn(p.id),
-        linked: hasPurchaseLink(p),
-        broken: brokenPurchaseLinks(p).length > 0,
-        // 대체 상품만 있고 동일 상품은 없는 상태 — "없음"이라고 하면 이미 채운 걸 또 채우려 든다
-        hasAlt: alternativeLinks(p).length > 0,
-        ended: isExpired(p),
-      }))
+      .map(p => {
+        const detail = n(p.id, 'detail')
+        const groupbuy = n(p.id, 'groupbuy')
+        const coupang = n(p.id, 'coupang')
+        const naver = n(p.id, 'naver')
+        return {
+          post: p,
+          detail,
+          groupbuy,
+          coupang,
+          naver,
+          search: searchIn(p.id),
+          // 상세조회 대비 "어디로든 나간" 클릭(공구·쿠팡·네이버 전부) 비율 — 이 상품이
+          // 보기만 하고 마는지, 실제로 눌러서 나가는지를 한눈에 본다
+          ctr: detail > 0 ? (groupbuy + coupang + naver) / detail * 100 : null,
+          linked: hasPurchaseLink(p),
+          broken: brokenPurchaseLinks(p).length > 0,
+          // 대체 상품만 있고 동일 상품은 없는 상태 — "없음"이라고 하면 이미 채운 걸 또 채우려 든다
+          hasAlt: alternativeLinks(p).length > 0,
+          ended: isExpired(p),
+        }
+      })
       .filter(r => r.detail > 0 || r.groupbuy > 0)
       .sort((a, b) => b.detail - a.detail)
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -2426,7 +2435,8 @@ function RevenueBoard({ posts, clicks, sources, onGoFill, onSaved }: {
           주소 자리에 상품명이 들어간 것들이라 고객에게 안 보입니다.</>
         )}
         <br />
-        <span style={{ color: '#94a3b8' }}>검색유입 열은 오늘부터 쌓입니다 — 지난 기록은 상품과 안 묶여 있어서 소급이 안 돼요.</span>
+        <span style={{ color: '#94a3b8' }}>검색유입 열은 오늘부터 쌓입니다 — 지난 기록은 상품과 안 묶여 있어서 소급이 안 돼요.
+        클릭률은 상세조회 대비 (공구·쿠팡·네이버 클릭 합) 비율이에요 — 어디로든 나갔는지만 보고, 실제 구매 여부는 몰라요.</span>
       </p>
 
       <div style={{ display: 'flex', gap: 6, marginBottom: 14, flexWrap: 'wrap' }}>
@@ -2457,6 +2467,7 @@ function RevenueBoard({ posts, clicks, sources, onGoFill, onSaved }: {
               <th style={th}>공구 클릭</th>
               <th style={th}>쿠팡</th>
               <th style={th}>네이버</th>
+              <th style={th}>클릭률</th>
               <th style={{ ...th, textAlign: 'center' }}>제휴링크</th>
             </tr>
           </thead>
@@ -2477,6 +2488,9 @@ function RevenueBoard({ posts, clicks, sources, onGoFill, onSaved }: {
                 <td style={td}>{r.groupbuy || '–'}</td>
                 <td style={{ ...td, color: r.coupang ? '#0f172a' : '#cbd5e1' }}>{r.coupang || '–'}</td>
                 <td style={{ ...td, color: r.naver ? '#0f172a' : '#cbd5e1' }}>{r.naver || '–'}</td>
+                <td style={{ ...td, fontWeight: 700, color: r.ctr === null ? '#cbd5e1' : r.ctr >= 20 ? '#15803d' : '#0f172a' }}>
+                  {r.ctr === null ? '–' : `${r.ctr.toFixed(1)}%`}
+                </td>
                 <td style={{ ...td, textAlign: 'center' }}>
                   <button onClick={() => setLinking(r.post)}
                     title={r.linked ? '링크를 고칩니다' : '여기서 바로 넣습니다'}
