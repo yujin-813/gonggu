@@ -567,7 +567,7 @@ export default function AdminPage() {
             { key: 'collections', label: '컬렉션 관리' },
             { key: 'verdict',     label: '채우기' },
             { key: 'revenue',     label: '수익화 현황' },
-            { key: 'outreach',    label: '인플루언서 확산' },
+            { key: 'outreach',    label: '꿀딜 확산' },
             { key: 'data',        label: '데이터' },
             { key: 'inquiries',   label: `제휴 문의${inquiries.filter(i => !i.handled).length ? ` ${inquiries.filter(i => !i.handled).length}` : ''}` },
             { key: 'settings',    label: '통계 설정' },
@@ -2774,21 +2774,24 @@ function RevenueBoard({ posts, clicks, sources, onGoFill, onSaved }: {
 }
 
 /**
- * 인플루언서 확산 후보 — "오늘 누구에게 연락하지?"를 매번 다시 고민하지 않게, 조건에
- * 맞는 상품을 자동으로 추려서 하루 5~10건만 보여준다.
+ * 꿀딜 확산 후보 — "오늘 뭘 알릴까?"를 매번 다시 고민하지 않게, 조건에 맞는 상품을
+ * 자동으로 추려서 하루 5~10건만 보여준다.
  *
  * 조건: 진행 중(마감 아님) + 가격비교 완료(등급이 매겨졌다는 뜻) + 꿀딜/괜찮딜만.
  * 아쉬운딜·판정 대기는 절대 넣지 않는다 — "홍보해 주세요"가 아니라 "가격을 확인해봤는데
  * 정말 좋은 딜이라 알려드립니다"로 접근해야, 인플루언서·판매자에게도 꿀공구가
  * 광고 매체가 아니라 객관적인 가격 검증 서비스로 보인다(사장님 기준).
  *
- * 정렬: ① 할인폭 큼 ② 상세조회+공구클릭 많음 ③ 아직 연락 안 한 것 우선.
+ * 정렬: ① 할인폭 큼 ② 상세조회+공구클릭 많음 ③ 아직 안 올린 것 우선.
  *
- * 이미지·DM 문구를 새로 만들지 않는다 — 공유 이미지는 이미 있는 /api/og/deal/[id]를
- * 열기만 하고, DM 문구는 클립보드에 복사할 템플릿 하나만 준비한다.
+ * 인플루언서 개개인에게 먼저 말 거는 건(DM) 사장님께 심리적 부담이 크다고 확인됐다 —
+ * 낯선 사람에게 먼저 다가가는 게 무섭다고 하셨다. 그래서 "1:1로 찾아가서 알린다" 대신
+ * "우리 채널(카카오톡 채널 등)에 그냥 올려둔다"로 방향을 바꿨다. 아무도 콕 집지 않고
+ * 그냥 게시물 하나 올리는 것뿐이라 부담이 훨씬 적고, 그걸 본 인플루언서 본인이나
+ * 팬이 알아서 반응할 수도 있다 — 먼저 다가오면 반갑게 응대하면 된다는 게 사장님 기준.
  */
 const OUTREACH_LABEL: Record<string, string> = {
-  none: '미전달', sent: '전달완료', confirmed: '공유확인', converted: '유입발생',
+  none: '미게시', sent: '게시완료', confirmed: '반응확인', converted: '유입발생',
 }
 const OUTREACH_ORDER = ['none', 'sent', 'confirmed', 'converted'] as const
 
@@ -2844,13 +2847,17 @@ function OutreachBoard({ posts, detailViews, clickBreakdown, onSaved }: {
 
   function trackingUrl(post: Post) {
     const campaign = encodeURIComponent((post.account || '').replace('@', ''))
-    return `${SITE_URL}/post/${post.id}?utm_source=influencer_dm&utm_medium=referral&utm_campaign=${campaign}`
+    return `${SITE_URL}/post/${post.id}?utm_source=kakao_channel&utm_medium=broadcast&utm_campaign=${campaign}`
   }
 
-  function dmText(post: Post, rate: number) {
-    const pct = Math.round(Math.abs(rate) * 100)
-    const name = post.influencer_name || (post.account || '').replace('@', '')
-    return `안녕하세요 ${name}님! 꿀공구에서 가격을 확인해봤는데, 지금 진행 중이신 '${post.title}' 공구가 다른 곳보다 ${pct}% 더 저렴한 진짜 좋은 딜이더라고요 🍯\n저희가 가격 검증한 자료 공유드려요: ${trackingUrl(post)}`
+  // 카카오톡 채널 등 우리 채널에 그냥 올려두는 문구 — 누구를 콕 집어 부르지 않는다.
+  // "저희가 확인해보니 좋은 딜이라 소개해요" 톤으로, 오늘 후보 상위 몇 개를 한 번에 묶는다
+  function kakaoBatchText(items: typeof list) {
+    const lines = items.slice(0, 5).map(r => {
+      const pct = Math.round(Math.abs(r.discountRate) * 100)
+      return `🍯 ${r.post.title} — ${pct}% 저렴 (${r.post.influencer_name})\n${trackingUrl(r.post)}`
+    })
+    return `[오늘의 꿀딜] 꿀공구가 가격을 확인해본 결과, 진짜 좋은 딜이라 소개해요!\n\n${lines.join('\n\n')}`
   }
 
   function copy(text: string, key: string) {
@@ -2865,13 +2872,14 @@ function OutreachBoard({ posts, detailViews, clickBreakdown, onSaved }: {
 
   return (
     <div style={{ background: '#fff', borderRadius: 12, padding: 20, border: '1px solid #e2e8f0' }}>
-      <h2 style={{ fontSize: 17, fontWeight: 800, marginBottom: 6 }}>인플루언서 확산 후보</h2>
+      <h2 style={{ fontSize: 17, fontWeight: 800, marginBottom: 6 }}>꿀딜 확산 후보</h2>
       <p style={{ fontSize: 13, color: '#64748b', lineHeight: 1.7, marginBottom: 14 }}>
-        진행 중 · 가격비교 완료 · <strong>꿀딜/괜찮딜</strong>만 골랐어요(아쉬운딜은 안 보내는 게 원칙이에요).
-        할인폭 → 반응(조회+클릭) → 아직 연락 안 한 것 순으로 정렬돼요.
+        진행 중 · 가격비교 완료 · <strong>꿀딜/괜찮딜</strong>만 골랐어요(아쉬운딜은 안 올리는 게 원칙이에요).
+        할인폭 → 반응(조회+클릭) → 아직 안 올린 것 순으로 정렬돼요. 누군가에게 먼저 연락하는 대신,
+        우리 채널(카카오톡 채널 등)에 그냥 올려두는 용도예요.
       </p>
 
-      <div style={{ display: 'flex', gap: 6, marginBottom: 14, flexWrap: 'wrap' }}>
+      <div style={{ display: 'flex', gap: 6, marginBottom: 14, flexWrap: 'wrap', alignItems: 'center' }}>
         <button onClick={() => setShowAll(false)}
           style={{ padding: '7px 14px', borderRadius: 20, border: 'none', cursor: 'pointer', fontSize: 13, fontWeight: 700,
             background: !showAll ? '#dc2626' : '#e2e8f0', color: !showAll ? '#fff' : '#475569' }}>
@@ -2882,6 +2890,14 @@ function OutreachBoard({ posts, detailViews, clickBreakdown, onSaved }: {
             background: showAll ? '#475569' : '#e2e8f0', color: showAll ? '#fff' : '#475569' }}>
           전체 {rows.length}
         </button>
+        {pending.length > 0 && (
+          <button onClick={() => copy(kakaoBatchText(pending), 'kakao-batch')}
+            style={{ marginLeft: 'auto', padding: '7px 14px', borderRadius: 8, border: '1px solid #cbd5e1',
+              background: copiedId === 'kakao-batch' ? '#dcfce7' : '#fff', cursor: 'pointer', fontSize: 12.5,
+              fontWeight: 700, color: '#475569' }}>
+            {copiedId === 'kakao-batch' ? '복사됨' : `이번 주 꿀딜 문구 복사 (상위 ${Math.min(5, pending.length)}개)`}
+          </button>
+        )}
       </div>
 
       <div style={{ overflowX: 'auto' }}>
@@ -2920,13 +2936,6 @@ function OutreachBoard({ posts, detailViews, clickBreakdown, onSaved }: {
                           fontSize: 11, fontWeight: 600, color: '#475569', textDecoration: 'none' }}>
                         이미지
                       </a>
-                      <button onClick={() => copy(dmText(p, r.discountRate), `dm-${p.id}`)}
-                        title="DM 문구 복사"
-                        style={{ padding: '4px 8px', borderRadius: 6, border: '1px solid #cbd5e1',
-                          background: copiedId === `dm-${p.id}` ? '#dcfce7' : '#fff',
-                          cursor: 'pointer', fontSize: 11, fontWeight: 600, color: '#475569' }}>
-                        {copiedId === `dm-${p.id}` ? '복사됨' : 'DM 복사'}
-                      </button>
                       <button onClick={() => copy(trackingUrl(p), `link-${p.id}`)}
                         title="추적링크 복사"
                         style={{ padding: '4px 8px', borderRadius: 6, border: '1px solid #cbd5e1',
