@@ -2273,6 +2273,11 @@ function GrowthGoalsBoard({ stages, analytics, moneyClicks7, onSaved }: {
   const nextIdx = currentIdx + 1
   const nextStage = nextIdx < stages.length ? stages[nextIdx] : null
   const remaining = nextStage !== null ? Math.max(0, Math.ceil(nextStage - avg7)) : 0
+  const stagePct = nextStage !== null ? Math.min(100, Math.round((avg7 / nextStage) * 100)) : 100
+  const laterStages = nextStage !== null ? stages.slice(nextIdx + 1) : []
+  // 방문자가 늘어도 구매 행동이 같이 늘고 있는지 — "사람이 늘었나 · 구매도 늘었나"를
+  // 한 화면에서 같이 보려고 붙였다(사장님 피드백)
+  const clickRate7 = week7 > 0 ? (moneyClicks7 / week7) * 100 : null
 
   function startEdit() {
     setDraft(stages.map(String))
@@ -2348,46 +2353,57 @@ function GrowthGoalsBoard({ stages, analytics, moneyClicks7, onSaved }: {
         </div>
       ) : (
         <>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 10, marginBottom: 18 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: 10, marginBottom: 18 }}>
             <div style={{ background: '#f8fafc', borderRadius: 10, padding: '12px 14px' }}>
-              <div style={{ fontSize: 11, color: '#64748b', marginBottom: 4 }}>현재 단계</div>
+              <div style={{ fontSize: 11, color: '#64748b', marginBottom: 4 }}>7일 평균</div>
+              <div style={{ fontSize: 16, fontWeight: 800, color: '#0f172a' }}>{Math.round(avg7).toLocaleString()}명</div>
+            </div>
+            <div style={{ background: '#f8fafc', borderRadius: 10, padding: '12px 14px' }}>
+              <div style={{ fontSize: 11, color: '#64748b', marginBottom: 4 }}>7일 합계</div>
+              <div style={{ fontSize: 16, fontWeight: 800, color: '#0f172a' }}>{week7.toLocaleString()}명</div>
+            </div>
+            <div style={{ background: '#f8fafc', borderRadius: 10, padding: '12px 14px' }}>
+              <div style={{ fontSize: 11, color: '#64748b', marginBottom: 4 }}>구매처 클릭(7일)</div>
+              <div style={{ fontSize: 16, fontWeight: 800, color: '#0f172a' }}>{moneyClicks7.toLocaleString()}회</div>
+            </div>
+            <div style={{ background: '#f8fafc', borderRadius: 10, padding: '12px 14px' }}>
+              <div style={{ fontSize: 11, color: '#64748b', marginBottom: 4 }}>구매처 클릭률(7일)</div>
               <div style={{ fontSize: 16, fontWeight: 800, color: '#0f172a' }}>
-                {nextStage === null ? `${stages.length}단계 달성 🎉` : `${nextIdx + 1}단계 도전 중 · 목표 일 ${nextStage.toLocaleString()}명`}
-              </div>
-            </div>
-            <div style={{ background: '#f8fafc', borderRadius: 10, padding: '12px 14px' }}>
-              <div style={{ fontSize: 11, color: '#64748b', marginBottom: 4 }}>다음 단계까지</div>
-              <div style={{ fontSize: 16, fontWeight: 800, color: '#d97706' }}>
-                {nextStage === null ? '모든 단계 달성 🎉' : `${remaining.toLocaleString()}명`}
-              </div>
-            </div>
-            <div style={{ background: '#f8fafc', borderRadius: 10, padding: '12px 14px' }}>
-              <div style={{ fontSize: 11, color: '#64748b', marginBottom: 4 }}>7일 평균 · 7일 합계 · 구매처 클릭(7일)</div>
-              <div style={{ fontSize: 14, fontWeight: 800, color: '#0f172a' }}>
-                {Math.round(avg7).toLocaleString()}명 · {week7.toLocaleString()}명 · {moneyClicks7.toLocaleString()}회
+                {clickRate7 === null ? '–' : `${clickRate7.toFixed(1)}%`}
               </div>
             </div>
           </div>
 
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 20 }}>
-            {stages.map((stage, i) => {
-              const pct = Math.min(100, Math.round((avg7 / stage) * 100))
-              const done = avg7 >= stage
-              return (
-                <div key={stage}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, marginBottom: 4 }}>
-                    <span style={{ fontWeight: 700, color: done ? '#15803d' : '#475569' }}>
-                      {i + 1}단계 · 일 {stage.toLocaleString()}명 {done && '✓'}
-                    </span>
-                    <span style={{ color: '#94a3b8' }}>{pct}%</span>
-                  </div>
-                  <div style={{ height: 8, borderRadius: 4, background: '#e2e8f0', overflow: 'hidden' }}>
-                    <div style={{ width: `${pct}%`, height: '100%', borderRadius: 4,
-                      background: done ? '#22c55e' : '#f59e0b', transition: 'width .3s' }} />
-                  </div>
+          {/* 지금 도전 중인 단계 하나만 크게 — 6단계를 한 화면에 다 펼치면 63명이 10,000명
+              옆에서 너무 작아 보인다(사장님 피드백). "10,000명까지 1% 왔다"가 아니라
+              "1단계의 42%까지 왔다"가 지금 필요한 정보다. */}
+          <div style={{ marginBottom: 20 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 6 }}>
+              <span style={{ fontSize: 14, fontWeight: 800, color: '#0f172a' }}>
+                {nextStage === null ? `${stages.length}단계 달성 🎉` : `${nextIdx + 1}단계 · 일평균 ${nextStage.toLocaleString()}명`}
+              </span>
+              {nextStage !== null && (
+                <span style={{ fontSize: 12.5, color: '#64748b' }}>
+                  {Math.round(avg7).toLocaleString()}명 / {nextStage.toLocaleString()}명 · {stagePct}%
+                </span>
+              )}
+            </div>
+            {nextStage !== null && (
+              <>
+                <div style={{ height: 12, borderRadius: 6, background: '#e2e8f0', overflow: 'hidden' }}>
+                  <div style={{ width: `${stagePct}%`, height: '100%', borderRadius: 6,
+                    background: '#f59e0b', transition: 'width .3s' }} />
                 </div>
-              )
-            })}
+                <p style={{ fontSize: 12, color: '#d97706', fontWeight: 700, margin: '6px 0 0' }}>
+                  {nextIdx + 1}단계 달성까지 평균 +{remaining.toLocaleString()}명
+                </p>
+              </>
+            )}
+            {laterStages.length > 0 && (
+              <p style={{ fontSize: 11.5, color: '#94a3b8', margin: '10px 0 0' }}>
+                다음: {laterStages.map(s => `${s.toLocaleString()}명`).join(' → ')}
+              </p>
+            )}
           </div>
 
           <div>
