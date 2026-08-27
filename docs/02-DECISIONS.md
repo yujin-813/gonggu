@@ -9,6 +9,32 @@
 
 ---
 
+## D-058 · 제휴 없는 판매처 링크 — commission:false + 제휴 재확인 목록 · 2026-08-27
+
+**상태:** 유효
+
+**상황** — 사장님이 "쿠팡 파트너스도 네이버 제휴도 없으면 어떻게 하냐"고 물었다. 조사해보니 **진짜 위험한 문제**가 있었다: 지금 시스템은 `platform`이 coupang이 아니면 링크 도메인을 검증하지 않고, 화면에 뜨는 모든 `purchase_links`에 무조건 "일정액의 수수료를 제공받을 수 있습니다" 공정위 고지를 붙인다(`isAffiliateLink()`가 naver·other는 유효한 URL이면 전부 통과시킴). 실제 제휴가 없는 판매처 링크를 그냥 추가하면 안 받는 수수료를 받는다고 거짓 고지하는 셈이었다.
+
+**결정**
+- `PurchaseLink`에 `commission?: boolean`(기본 true, 명시적 false만 "수수료 없음") · `commission_checked_at?: string | null` 추가.
+- 새 헬퍼 `disclosureText(links)`(`lib/purchaseLinks.ts`) — `commission !== false`인 링크만 모아 고지 문구를 만든다. 전부 commission:false면 빈 문자열. `BetterPriceNotice`·`EndedDealNotice`(2곳)·`PostCard`의 고지 렌더링 4곳을 전부 이걸로 바꾸고, 고지가 없을 땐 `<p>` 자체를 안 그린다(빈 문구가 렌더링되던 걸 함께 고쳤다).
+- `PurchaseLinkModal`에 세 번째 접이식 섹션 "쿠팡 파트너스도, 대체 상품도 없어요 — 판매처 링크만" 추가. 저장 시 `platform:'other', kind:'same', commission:false, commission_checked_at:now`로 넣는다.
+- `RevenueBoard`(수익화 현황)에 세 번째 탭 "제휴 재확인" 추가 — `commission:false` 링크가 붙은 상품을 마지막 확인일이 오래된 순으로 보여준다. 트래픽(조회수) 유무와 무관하게 전부 대상이다(재확인이 목적이라 조회수로 거를 이유가 없다). 행마다 "재확인함"(그대로 없으면 확인일만 갱신)·"제휴 찾았어요"(`PurchaseLinkModal`을 열어 진짜 링크로 교체) 버튼.
+- `stripAdminMemo`에 `commission_checked_at` 제거 추가 — 고객 화면엔 쓸모없는 내부 추적용 날짜라서.
+
+**검토한 대안과 버린 이유**
+
+| 대안 | 버린 이유 |
+|---|---|
+| `isAffiliateLink()`가 naver/other 도메인도 실제로 검증하게 고침 | 검증할 실제 제휴 도메인 목록이 없다(네이버 제휴 자체가 아직 없다, D-019). 도메인 화이트리스트가 아니라 관리자가 명시적으로 표시하는 쪽이 지금 가진 정보에 맞다 |
+| 제휴 재확인을 새 화면(탭)으로 따로 뺌 | 이미 "수익화 현황"이 같은 성격(제휴 링크 상태를 관리)의 화면이라, 탭 안의 세 번째 필터로 두는 게 자연스럽고 데이터(`posts`)도 그대로 재사용된다 |
+
+**받아들인 대가** — 없음. 기존 `purchase_links` 배열 안에 필드 두 개만 추가한 거라 스키마 변경 폭이 작고, 고지 로직도 함수 하나로 모았다.
+
+**당시 확신도** — 높음. tsc·build 클린, 로컬에서 실제 저장→고객 페이지 렌더링까지 확인(판매처 링크는 보이고 고지 문구는 안 붙는 것, `commission_checked_at`이 고객 페이지 소스에 안 새는 것 둘 다 직접 확인).
+
+---
+
 ## D-057 · 확산 후보 — DM 대신 "우리 채널에 올려두기"로 방향 전환 · 2026-08-26
 
 **상태:** 유효 (D-056의 "1:1 DM 문구" 부분을 뒤집음)

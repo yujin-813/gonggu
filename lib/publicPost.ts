@@ -12,7 +12,7 @@ import type { Post, PurchaseLink } from './types'
  */
 export function stripAdminMemo(links: PurchaseLink[]): PurchaseLink[] {
   return links.map(l => {
-    const { adminMemo, ...rest } = l
+    const { adminMemo, commission_checked_at, ...rest } = l
     if ((l.kind ?? 'same') !== 'same') delete rest.note
     return rest
   })

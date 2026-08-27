@@ -3,7 +3,7 @@ import { useState, useEffect, useMemo, useCallback } from 'react'
 import type { Post, ScraperStatus, InfluencerSource, Collection, PurchaseLink, PurchaseLinkRelation } from '@/lib/types'
 import { RELATION_DEFAULT_REASON } from '@/lib/types'
 import { daysLeft, periodLabel, isExpired, isCustomerVisible, isPagePublic, fmtDate, getPeriodState, DEADLINE_UNKNOWN_DAYS } from '@/lib/period'
-import { hasPurchaseLink, normalizePurchaseLinks, brokenPurchaseLinks, isAffiliateLink, isSameProduct, alternativeLinks, PLATFORM_LABEL } from '@/lib/purchaseLinks'
+import { hasPurchaseLink, normalizePurchaseLinks, brokenPurchaseLinks, isAffiliateLink, isSameProduct, alternativeLinks, sameProductLinks, PLATFORM_LABEL } from '@/lib/purchaseLinks'
 import { getDealVerdict, isMultiOption } from '@/lib/dealGrade'
 import { partnerSearchQuery } from '@/lib/searchQuery'
 import { getCompareState, COMPARE_STATE_LABEL, CLEAR_COMPARE_NONE, type CompareState } from '@/lib/compareState'
@@ -2091,19 +2091,28 @@ function PurchaseLinkModal({ post, onClose, onSaved }: { post: Post; onClose: ()
   const [altReason, setAltReason] = useState(altExisting?.reason ?? RELATION_DEFAULT_REASON[altExisting?.relation ?? 'similar'])
   const [altMemo, setAltMemo] = useState(altExisting?.adminMemo ?? '')
 
+  // 쿠팡 파트너스도, 대체 상품도 못 찾았을 때 — 수수료 없이 그냥 판매처 링크만 안내한다.
+  // "가격을 검증해주는 서비스"라는 약속은 지키되, 안 받는 수수료를 받는다고 고지하면 안
+  // 되므로(공정위 지침) 이 링크는 disclosureText()에서 항상 제외된다(commission:false).
+  const plainExisting = existing.find(l => l.commission === false)
+  const [showPlain, setShowPlain] = useState(!!plainExisting)
+  const [plainUrl, setPlainUrl] = useState(plainExisting?.url ?? '')
+  const [plainPrice, setPlainPrice] = useState(String(plainExisting?.price ?? ''))
+
   const [saving, setSaving] = useState(false)
 
   const trimmed = url.trim()
   const looksOk = !trimmed || isAffiliateLink({ platform: 'coupang', url: trimmed })
   const altTrimmed = altUrl.trim()
   const altLooksOk = !altTrimmed || isAffiliateLink({ platform: 'coupang', url: altTrimmed })
-  const canSave = (!!trimmed || !!altTrimmed) && looksOk && altLooksOk
+  const plainTrimmed = plainUrl.trim()
+  const canSave = (!!trimmed || !!altTrimmed || !!plainTrimmed) && looksOk && altLooksOk
 
   async function save() {
     setSaving(true)
-    // 이 창이 다루는 건 coupang 동일상품 + coupang 대체상품 둘뿐이다. 그 외 플랫폼(네이버 등)
-    // 은 건드리지 않고 그대로 남긴다
-    const untouched = existing.filter(l => l.platform !== 'coupang')
+    // 이 창이 다루는 건 coupang 동일상품 + coupang 대체상품 + 제휴 없는 판매처 링크
+    // 셋뿐이다. 그 외 플랫폼(네이버 등)은 건드리지 않고 그대로 남긴다
+    const untouched = existing.filter(l => l.platform !== 'coupang' && l.commission !== false)
     const now = new Date().toISOString()
     const links = [...untouched]
     if (trimmed) links.push({ platform: 'coupang' as const, kind: 'same' as const, relation: 'same' as const, url: trimmed, price: parseInt(price) || null, visible: true, checked_at: now })
@@ -2112,6 +2121,11 @@ function PurchaseLinkModal({ post, onClose, onSaved }: { post: Post; onClose: ()
       url: altTrimmed, price: parseInt(altPrice) || null,
       productName: altProductName.trim() || null, reason: altReason.trim() || null, adminMemo: altMemo.trim() || null,
       visible: true, checked_at: now,
+    })
+    if (plainTrimmed) links.push({
+      platform: 'other' as const, kind: 'same' as const, relation: 'same' as const,
+      url: plainTrimmed, price: parseInt(plainPrice) || null,
+      commission: false, commission_checked_at: now, visible: true, checked_at: now,
     })
     await fetch(`/api/posts/${post.id}`, {
       method: 'PATCH', headers: { 'Content-Type': 'application/json' },
@@ -2193,6 +2207,35 @@ function PurchaseLinkModal({ post, onClose, onSaved }: { post: Post; onClose: ()
             style={{ marginTop: 10, padding: 0, border: 'none', background: 'none', cursor: 'pointer',
               fontSize: 11.5, color: '#94a3b8', fontWeight: 600 }}>
             + 똑같은 상품을 못 찾았어요 — 비슷한 상품으로 안내
+          </button>
+        )}
+
+        {showPlain ? (
+          <div style={{ marginTop: 12, padding: 10, borderRadius: 8, background: '#f8fafc', border: '1px solid #e2e8f0' }}>
+            <div style={{ fontSize: 12.5, fontWeight: 700, color: '#44403c', marginBottom: 7 }}>
+              쿠팡 파트너스도, 대체 상품도 없어요 — 판매처 링크만
+            </div>
+            <input type="url" value={plainUrl} onChange={e => setPlainUrl(e.target.value)}
+              placeholder="자사몰·스마트스토어 등 실제 구매 페이지" style={{ ...fillInput, fontSize: 13 }} />
+            <input type="number" value={plainPrice} onChange={e => setPlainPrice(e.target.value)}
+              placeholder="가격 (선택)" style={{ ...fillInput, fontSize: 13, marginTop: 6 }} />
+            <p style={{ fontSize: 11, color: '#94a3b8', margin: '8px 0 0', lineHeight: 1.6 }}>
+              수수료를 안 받는 링크라 공정위 고지 문구가 안 붙어요. 나중에 이 상품이 쿠팡·네이버에
+              올라오면 「수익화 현황 → 제휴 재확인」에서 다시 채워주세요.
+            </p>
+            {!plainExisting && (
+              <button onClick={() => { setShowPlain(false); setPlainUrl(''); setPlainPrice('') }}
+                style={{ marginTop: 8, padding: 0, border: 'none', background: 'none', cursor: 'pointer',
+                  fontSize: 11.5, color: '#94a3b8', fontWeight: 600 }}>
+                접기
+              </button>
+            )}
+          </div>
+        ) : (
+          <button type="button" onClick={() => setShowPlain(true)}
+            style={{ marginTop: 10, padding: 0, border: 'none', background: 'none', cursor: 'pointer',
+              fontSize: 11.5, color: '#94a3b8', fontWeight: 600 }}>
+            + 쿠팡 파트너스도, 대체 상품도 없어요 — 판매처 링크만
           </button>
         )}
 
@@ -2628,7 +2671,7 @@ function RevenueBoard({ posts, clicks, sources, onGoFill, onSaved }: {
   onGoFill: () => void
   onSaved: () => void
 }) {
-  const [needOnly, setNeedOnly] = useState(true)
+  const [tab, setTab] = useState<'need' | 'all' | 'recheck'>('need')
   const [linking, setLinking] = useState<Post | null>(null)
 
   const n = (id: number, k: string) => (clicks[id] || {})[k] || 0
@@ -2673,8 +2716,35 @@ function RevenueBoard({ posts, clicks, sources, onGoFill, onSaved }: {
   // 대체 상품만 있고 동일 상품은 없는 것도 "채웠다"로 친다 — hasAlt를 안 빼면 배지엔
   // "대체 상품"이라고 뜨면서 정작 이 목록엔 계속 남아 "링크 없음"을 또 채우라고 조르게 된다
   const need = rows.filter(r => !r.linked && !r.hasAlt && r.detail > 0)
-  const list = needOnly ? need : rows
   const lost = need.filter(r => r.ended).reduce((s, r) => s + r.detail, 0)
+
+  // 제휴 재확인 — 쿠팡·네이버 제휴가 없어 판매처 링크만(commission:false) 붙여둔 상품.
+  // 트래픽 유무와 무관하게 전부 대상이다(re-check가 목적이라 조회수로 거를 이유가 없다).
+  // 마지막으로 "아직도 제휴 없다"고 확인한 시각이 오래된(또는 아예 없는) 순으로 정렬한다
+  const recheckRows = useMemo(() => {
+    return posts
+      .filter(isPagePublic)
+      .map(p => {
+        const link = sameProductLinks(p).find(l => l.commission === false)
+        return link ? { post: p, link } : null
+      })
+      .filter((r): r is { post: Post; link: PurchaseLink } => !!r)
+      .sort((a, b) => (a.link.commission_checked_at || '').localeCompare(b.link.commission_checked_at || ''))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [posts])
+
+  const list = tab === 'need' ? need : tab === 'recheck' ? [] : rows
+
+  async function markRechecked(post: Post, link: PurchaseLink) {
+    const now = new Date().toISOString()
+    const links = normalizePurchaseLinks(post).map(l =>
+      (l.platform === link.platform && l.url === link.url) ? { ...l, commission_checked_at: now } : l)
+    await fetch(`/api/posts/${post.id}`, {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ purchase_links: links }),
+    })
+    onSaved()
+  }
 
   const th: React.CSSProperties = { padding: '8px 10px', fontSize: 11.5, fontWeight: 700, color: '#64748b', textAlign: 'right', whiteSpace: 'nowrap' }
   const td: React.CSSProperties = { padding: '9px 10px', fontSize: 13, textAlign: 'right', whiteSpace: 'nowrap', borderTop: '1px solid #f1f5f9' }
@@ -2695,15 +2765,20 @@ function RevenueBoard({ posts, clicks, sources, onGoFill, onSaved }: {
       </p>
 
       <div style={{ display: 'flex', gap: 6, marginBottom: 14, flexWrap: 'wrap' }}>
-        <button onClick={() => setNeedOnly(true)}
+        <button onClick={() => setTab('need')}
           style={{ padding: '7px 14px', borderRadius: 20, border: 'none', cursor: 'pointer', fontSize: 13, fontWeight: 700,
-            background: needOnly ? '#dc2626' : '#e2e8f0', color: needOnly ? '#fff' : '#475569' }}>
+            background: tab === 'need' ? '#dc2626' : '#e2e8f0', color: tab === 'need' ? '#fff' : '#475569' }}>
           수익화 필요 {need.length}
         </button>
-        <button onClick={() => setNeedOnly(false)}
+        <button onClick={() => setTab('all')}
           style={{ padding: '7px 14px', borderRadius: 20, border: 'none', cursor: 'pointer', fontSize: 13, fontWeight: 700,
-            background: !needOnly ? '#475569' : '#e2e8f0', color: !needOnly ? '#fff' : '#475569' }}>
+            background: tab === 'all' ? '#475569' : '#e2e8f0', color: tab === 'all' ? '#fff' : '#475569' }}>
           전체 {rows.length}
+        </button>
+        <button onClick={() => setTab('recheck')}
+          style={{ padding: '7px 14px', borderRadius: 20, border: 'none', cursor: 'pointer', fontSize: 13, fontWeight: 700,
+            background: tab === 'recheck' ? '#d97706' : '#e2e8f0', color: tab === 'recheck' ? '#fff' : '#475569' }}>
+          제휴 재확인 {recheckRows.length}
         </button>
         <button onClick={onGoFill}
           style={{ marginLeft: 'auto', padding: '7px 14px', borderRadius: 8, border: '1px solid #cbd5e1',
@@ -2712,6 +2787,61 @@ function RevenueBoard({ posts, clicks, sources, onGoFill, onSaved }: {
         </button>
       </div>
 
+      {tab === 'recheck' ? (
+        <div style={{ overflowX: 'auto' }}>
+          <p style={{ fontSize: 12.5, color: '#94a3b8', marginBottom: 10, lineHeight: 1.6 }}>
+            쿠팡·네이버 제휴가 없어 판매처 링크만(수수료 없음) 붙여둔 상품이에요. 오래 확인 안 한
+            순으로 정렬돼요 — 다시 찾아봐도 없으면 &quot;재확인함&quot;만 눌러두세요.
+          </p>
+          <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 560 }}>
+            <thead>
+              <tr>
+                <th style={{ ...th, textAlign: 'left' }}>상품</th>
+                <th style={{ ...th, textAlign: 'left' }}>판매처 링크</th>
+                <th style={th}>마지막 확인</th>
+                <th style={{ ...th, textAlign: 'center' }}>액션</th>
+              </tr>
+            </thead>
+            <tbody>
+              {recheckRows.map(({ post, link }) => (
+                <tr key={post.id}>
+                  <td style={{ ...td, textAlign: 'left', maxWidth: 280 }}>
+                    <a href={`/post/${post.id}`} target="_blank" rel="noreferrer"
+                      style={{ color: '#1e293b', fontWeight: 600, textDecoration: 'none' }}>
+                      {post.title}
+                    </a>
+                  </td>
+                  <td style={{ ...td, textAlign: 'left' }}>
+                    <a href={link.url} target="_blank" rel="noreferrer" style={{ color: '#0369a1', fontSize: 12 }}>
+                      {PLATFORM_LABEL[link.platform]} 링크
+                    </a>
+                  </td>
+                  <td style={td}>{link.commission_checked_at ? link.commission_checked_at.slice(0, 10) : '확인 안 함'}</td>
+                  <td style={{ ...td, textAlign: 'center' }}>
+                    <div style={{ display: 'flex', gap: 4, justifyContent: 'center' }}>
+                      <button onClick={() => markRechecked(post, link)}
+                        style={{ padding: '4px 8px', borderRadius: 6, border: '1px solid #cbd5e1', background: '#fff',
+                          cursor: 'pointer', fontSize: 11, fontWeight: 600, color: '#475569' }}>
+                        재확인함
+                      </button>
+                      <button onClick={() => setLinking(post)}
+                        style={{ padding: '4px 8px', borderRadius: 6, border: '1px solid #cbd5e1', background: '#fff',
+                          cursor: 'pointer', fontSize: 11, fontWeight: 600, color: '#15803d' }}>
+                        제휴 찾았어요
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          {recheckRows.length === 0 && (
+            <p style={{ textAlign: 'center', padding: '24px 0', fontSize: 14, fontWeight: 700, color: '#64748b' }}>
+              제휴 재확인이 필요한 상품이 없어요
+            </p>
+          )}
+        </div>
+      ) : (
       <div style={{ overflowX: 'auto' }}>
         <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 720 }}>
           <thead>
@@ -2760,15 +2890,16 @@ function RevenueBoard({ posts, clicks, sources, onGoFill, onSaved }: {
             ))}
           </tbody>
         </table>
-        {linking && (
-          <PurchaseLinkModal post={linking} onClose={() => setLinking(null)} onSaved={onSaved} />
-        )}
         {list.length === 0 && (
           <p style={{ textAlign: 'center', padding: '24px 0', fontSize: 14, fontWeight: 700, color: '#64748b' }}>
             해당하는 상품이 없어요
           </p>
         )}
       </div>
+      )}
+      {linking && (
+        <PurchaseLinkModal post={linking} onClose={() => setLinking(null)} onSaved={onSaved} />
+      )}
     </div>
   )
 }

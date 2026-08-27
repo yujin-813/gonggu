@@ -11,7 +11,7 @@ import {
 import PriceCompareModal from './PriceCompareModal'
 import { shareContent } from '@/lib/share'
 import { track } from '@/lib/track'
-import { visiblePurchaseLinks, PLATFORM_LABEL, PLATFORM_DISCLOSURE } from '@/lib/purchaseLinks'
+import { visiblePurchaseLinks, PLATFORM_LABEL, disclosureText } from '@/lib/purchaseLinks'
 import DealVerdictBox from './DealVerdictBox'
 import GradeIcon from './GradeIcon'
 import { getDealVerdict, shareLabel } from '@/lib/dealGrade'
@@ -290,7 +290,9 @@ export default function PostCard({
         {/* 대체 구매 링크 — 공구 가격 판단(dealJudgment)과는 완전히 별개인 참고 정보.
             여러 판매처를 가질 수 있어 배열로 읽는다. 공정위 지침상 경제적 대가 관계는
             반드시 고지해야 하므로 플랫폼별 지정 문구를 함께 노출한다. */}
-        {altLinks.length > 0 && (
+        {altLinks.length > 0 && (() => {
+          const disclosure = disclosureText(altLinks)
+          return (
           <div style={{ marginBottom: 8 }}>
             {altLinks.map((link, i) => (
               <a
@@ -303,7 +305,7 @@ export default function PostCard({
                   display: 'flex', alignItems: 'center', gap: 4,
                   fontSize: 11, color: '#0369a1', background: '#f0f9ff',
                   border: '1px solid #bae6fd',
-                  borderRadius: i === 0 ? '8px 8px 0 0' : 0,
+                  borderRadius: i === 0 ? '8px 8px 0 0' : (!disclosure && i === altLinks.length - 1) ? '0 0 8px 8px' : 0,
                   borderTop: i === 0 ? undefined : 'none',
                   padding: '5px 8px', textDecoration: 'none',
                 }}
@@ -314,15 +316,18 @@ export default function PostCard({
                 {link.note && <span style={{ color: '#64748b' }}>· {link.note}</span>}
               </a>
             ))}
-            <div style={{
-              fontSize: 10, color: '#64748b', background: '#f8fafc',
-              border: '1px solid #e2e8f0', borderTop: 'none', borderRadius: '0 0 8px 8px',
-              padding: '4px 8px',
-            }}>
-              {[...new Set(altLinks.map(l => PLATFORM_DISCLOSURE[l.platform]))].join(' ')}
-            </div>
+            {disclosure && (
+              <div style={{
+                fontSize: 10, color: '#64748b', background: '#f8fafc',
+                border: '1px solid #e2e8f0', borderTop: 'none', borderRadius: '0 0 8px 8px',
+                padding: '4px 8px',
+              }}>
+                {disclosure}
+              </div>
+            )}
           </div>
-        )}
+          )
+        })()}
 
         {isVerified && (
           <div style={{ fontSize: 11, color: '#16a34a', marginBottom: 6, display: 'flex', alignItems: 'center', gap: 4 }}>

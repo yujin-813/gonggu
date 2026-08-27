@@ -19,6 +19,17 @@ export const PLATFORM_DISCLOSURE: Record<PurchasePlatform, string> = {
   other: '이 링크를 통한 구매 시 일정액의 수수료를 제공받을 수 있습니다.',
 }
 
+/** 링크에 실제로 고지가 필요한지 — commission:false(제휴 없는 판매처 링크)면 고지하지 않는다.
+ * 안 받는 수수료를 받는다고 쓰면 그 자체가 거짓 고지다 */
+export function needsDisclosure(link: Pick<PurchaseLink, 'commission'>): boolean {
+  return link.commission !== false
+}
+
+/** 링크 목록에서 실제로 고지가 필요한 것만 골라 문구를 합친다 — 전부 commission:false면 빈 문자열 */
+export function disclosureText(links: Pick<PurchaseLink, 'platform' | 'commission'>[]): string {
+  return [...new Set(links.filter(needsDisclosure).map(l => PLATFORM_DISCLOSURE[l.platform]))].join(' ')
+}
+
 /**
  * 상품의 대체 구매 링크를 배열 하나로 정리한다.
  * 예전 partners_* 단일 필드도 함께 읽어 넣되, 같은 플랫폼이 purchase_links에 이미 있으면

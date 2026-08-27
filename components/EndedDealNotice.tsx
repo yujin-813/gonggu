@@ -2,7 +2,7 @@
 import Link from 'next/link'
 import { ExternalLink, ShoppingBag } from 'lucide-react'
 import type { Post, PurchaseLink, PurchaseLinkRelation } from '@/lib/types'
-import { PLATFORM_LABEL, PLATFORM_DISCLOSURE, isSameProduct, linkReason, linkRelation } from '@/lib/purchaseLinks'
+import { PLATFORM_LABEL, PLATFORM_DISCLOSURE, disclosureText, isSameProduct, linkReason, linkRelation } from '@/lib/purchaseLinks'
 import { fmtDate, isExpired } from '@/lib/period'
 import { getDealVerdict, rateText } from '@/lib/dealGrade'
 import { track, type ClickType } from '@/lib/track'
@@ -128,9 +128,9 @@ export default function EndedDealNotice({ post, purchaseLinks, related, section,
               </ul>
             )}
 
-            <p className="ended-disclosure">
-              {[...new Set(sameLinks.map(l => PLATFORM_DISCLOSURE[l.platform]))].join(' ')}
-            </p>
+            {disclosureText(sameLinks) && (
+              <p className="ended-disclosure">{disclosureText(sameLinks)}</p>
+            )}
           </>
         ) : altLinks.length > 0 ? (
           <>
@@ -171,9 +171,9 @@ export default function EndedDealNotice({ post, purchaseLinks, related, section,
               ※ 이 공구와 같은 상품이 아니라서 저희가 가격을 비교하지 않았어요. 구성·품질을
               직접 확인하고 골라주세요.
             </p>
-            <p className="ended-disclosure">
-              {[...new Set(altLinks.map(l => PLATFORM_DISCLOSURE[l.platform]))].join(' ')}
-            </p>
+            {disclosureText(altLinks) && (
+              <p className="ended-disclosure">{disclosureText(altLinks)}</p>
+            )}
           </>
         ) : (
           <p className="ended-lead">

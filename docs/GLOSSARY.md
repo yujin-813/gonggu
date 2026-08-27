@@ -71,9 +71,22 @@
 | | `purchase_links[]` | `market_url` |
 |---|---|---|
 | 목적 | 대체 **구매** (제휴) | 가격 **비교** |
-| 공정위 고지 | **항상 붙는다** | 안 붙는다 |
+| 공정위 고지 | 붙는다(`commission:false`면 예외) | 안 붙는다 |
 
 섞으면 제휴가 아닌 링크에 "수수료를 제공받습니다"가 붙어 거짓 고지가 된다 (`D-003`).
+
+### `purchase_links[].commission` vs `.visible` vs `.checked_at`
+
+셋 다 링크 하나에 붙는 별개의 값이다 — 헷갈리지 말 것.
+
+| 필드 | 뜻 |
+|---|---|
+| `visible` | 고객 화면에 뜨는지(관리자가 확인 끝냈는지) |
+| `checked_at` | **가격**을 마지막으로 확인한 시각 — 고객 화면에 "N일 확인 가격"으로 노출 |
+| `commission` | 이 링크가 수수료를 받는 제휴 링크인지. `false`면 공정위 고지가 안 붙는다(`disclosureText()`가 걸러냄) |
+| `commission_checked_at` | **제휴가 아직도 없는지**를 마지막으로 확인한 시각 — 관리자 전용, 고객 화면엔 절대 안 나간다(`D-058`) |
+
+`checked_at`과 `commission_checked_at`을 섞어 쓰면 안 된다 — 하나는 가격 확인 시각(고객 노출), 하나는 제휴 재확인 시각(관리자 전용)이다.
 
 ### `purchase_url` vs `url` vs `store_url`
 

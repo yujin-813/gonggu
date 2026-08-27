@@ -220,6 +220,12 @@ export interface PurchaseLink {
   checked_at?: string | null
   /** 고객 화면 노출 여부 — 확인이 끝난 링크만 켠다 */
   visible?: boolean
+  /** false면 수수료를 안 받는 링크(쿠팡 파트너스·네이버 제휴가 없어 그냥 판매처만 안내).
+   * 없으면(undefined) 기존 동작대로 수수료를 받는 링크로 본다 — 공정위 고지 문구가
+   * 이 값에 따라 붙거나 빠진다. 실제로 안 받는 수수료를 받는다고 고지하면 거짓 고지가 된다 */
+  commission?: boolean
+  /** 제휴가 아직도 없는지 마지막으로 확인한 시각 — checked_at(가격 확인)과는 다른 값이다 */
+  commission_checked_at?: string | null
 }
 
 export interface Collection {

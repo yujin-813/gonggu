@@ -1,7 +1,7 @@
 'use client'
 import { ExternalLink, ShoppingBag } from 'lucide-react'
 import type { Post, PurchaseLink } from '@/lib/types'
-import { PLATFORM_LABEL, PLATFORM_DISCLOSURE } from '@/lib/purchaseLinks'
+import { PLATFORM_LABEL, disclosureText } from '@/lib/purchaseLinks'
 import { track } from '@/lib/track'
 
 /**
@@ -77,9 +77,9 @@ export default function BetterPriceNotice({ post, purchaseLinks }: { post: Post;
             && ` (가격 확인: ${purchaseLinks.find(l => l.checked_at)!.checked_at!.slice(0, 10)})`}
           .
         </p>
-        <p className="ended-disclosure">
-          {[...new Set(purchaseLinks.map(l => PLATFORM_DISCLOSURE[l.platform]))].join(' ')}
-        </p>
+        {disclosureText(purchaseLinks) && (
+          <p className="ended-disclosure">{disclosureText(purchaseLinks)}</p>
+        )}
       </section>
     </div>
   )
