@@ -2952,6 +2952,7 @@ function RevenueBoard({ posts, clicks, sources, onGoFill, onSaved }: {
         const groupbuy = n(p.id, 'groupbuy')
         const coupang = n(p.id, 'coupang')
         const naver = n(p.id, 'naver')
+        const other = n(p.id, 'other')
         return {
           post: p,
           detail,
@@ -2959,9 +2960,11 @@ function RevenueBoard({ posts, clicks, sources, onGoFill, onSaved }: {
           coupang,
           naver,
           search: searchIn(p.id),
-          // 상세조회 대비 "어디로든 나간" 클릭(공구·쿠팡·네이버 전부) 비율 — 이 상품이
-          // 보기만 하고 마는지, 실제로 눌러서 나가는지를 한눈에 본다
-          ctr: detail > 0 ? (groupbuy + coupang + naver) / detail * 100 : null,
+          // 공구 클릭률 — 판매자 링크라 수수료가 없다. 구매처 클릭률(쿠팡·네이버·기타) —
+          // 이게 돈이 되는 쪽이다. 사장님이 두 개를 나눠 보고 싶어 해서 합친 클릭률 대신
+          // 이 둘로 바꿨다(입력이 번거로운 구매 기록 대신, 이미 자동으로 쌓이는 값)
+          groupbuyRate: detail > 0 ? groupbuy / detail * 100 : null,
+          buyerRate: detail > 0 ? (coupang + naver + other) / detail * 100 : null,
           linked: hasPurchaseLink(p),
           broken: brokenPurchaseLinks(p).length > 0,
           // 대체 상품만 있고 동일 상품은 없는 상태 — "없음"이라고 하면 이미 채운 걸 또 채우려 든다
@@ -3025,7 +3028,8 @@ function RevenueBoard({ posts, clicks, sources, onGoFill, onSaved }: {
         )}
         <br />
         <span style={{ color: '#94a3b8' }}>검색유입 열은 오늘부터 쌓입니다 — 지난 기록은 상품과 안 묶여 있어서 소급이 안 돼요.
-        클릭률은 상세조회 대비 (공구·쿠팡·네이버 클릭 합) 비율이에요 — 어디로든 나갔는지만 보고, 실제 구매 여부는 몰라요.</span>
+        공구 클릭률은 상세조회 대비 공구 링크(판매자, 수수료 없음) 클릭 비율, 구매처 클릭률은
+        상세조회 대비 쿠팡·네이버·기타 클릭(돈이 되는 쪽) 비율이에요 — 실제 구매 여부는 몰라요.</span>
       </p>
 
       <div style={{ display: 'flex', gap: 6, marginBottom: 14, flexWrap: 'wrap' }}>
@@ -3107,7 +3111,7 @@ function RevenueBoard({ posts, clicks, sources, onGoFill, onSaved }: {
         </div>
       ) : (
       <div style={{ overflowX: 'auto' }}>
-        <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 720 }}>
+        <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 800 }}>
           <thead>
             <tr>
               <th style={{ ...th, textAlign: 'left' }}>상품</th>
@@ -3116,7 +3120,8 @@ function RevenueBoard({ posts, clicks, sources, onGoFill, onSaved }: {
               <th style={th}>공구 클릭</th>
               <th style={th}>쿠팡</th>
               <th style={th}>네이버</th>
-              <th style={th}>클릭률</th>
+              <th style={th}>공구 클릭률</th>
+              <th style={th}>구매처 클릭률</th>
               <th style={{ ...th, textAlign: 'center' }}>제휴링크</th>
             </tr>
           </thead>
@@ -3137,8 +3142,11 @@ function RevenueBoard({ posts, clicks, sources, onGoFill, onSaved }: {
                 <td style={td}>{r.groupbuy || '–'}</td>
                 <td style={{ ...td, color: r.coupang ? '#0f172a' : '#cbd5e1' }}>{r.coupang || '–'}</td>
                 <td style={{ ...td, color: r.naver ? '#0f172a' : '#cbd5e1' }}>{r.naver || '–'}</td>
-                <td style={{ ...td, fontWeight: 700, color: r.ctr === null ? '#cbd5e1' : r.ctr >= 20 ? '#15803d' : '#0f172a' }}>
-                  {r.ctr === null ? '–' : `${r.ctr.toFixed(1)}%`}
+                <td style={{ ...td, color: r.groupbuyRate === null ? '#cbd5e1' : '#0f172a' }}>
+                  {r.groupbuyRate === null ? '–' : `${r.groupbuyRate.toFixed(1)}%`}
+                </td>
+                <td style={{ ...td, fontWeight: 700, color: r.buyerRate === null ? '#cbd5e1' : r.buyerRate >= 20 ? '#15803d' : '#0f172a' }}>
+                  {r.buyerRate === null ? '–' : `${r.buyerRate.toFixed(1)}%`}
                 </td>
                 <td style={{ ...td, textAlign: 'center' }}>
                   <button onClick={() => setLinking(r.post)}
