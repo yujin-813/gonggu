@@ -131,8 +131,10 @@ export default function AdminPage() {
   const [recentSessions, setRecentSessions] = useState<RecentSession[]>([])
   // 최근 7일 공구/구매처(쿠팡·네이버) 클릭 합계 — 성장 목표 카드. 지금 공개 중인 상품만
   // 센다(isPagePublic) — 「수익화 현황 → 상품별로 보기」와 같은 기준으로 맞춰야 합계가 안 어긋난다
+  const [detailViews7, setDetailViews7] = useState(0)
   const [groupbuyClicks7, setGroupbuyClicks7] = useState(0)
   const [moneyClicks7, setMoneyClicks7] = useState(0)
+  const [affiliateDetailViews7, setAffiliateDetailViews7] = useState(0)
   const [growthGoals, setGrowthGoals] = useState<number[]>([])
   const [purchaseLog, setPurchaseLog] = useState<PurchaseRecord[]>([])
   const [inquiries, setInquiries] = useState<Inquiry[]>([])
@@ -186,8 +188,10 @@ export default function AdminPage() {
       setClickBreakdown(d.clickBreakdown || {})
       setPostSources(d.postSources || {})
       setRecentSessions(d.recentSessions || [])
+      setDetailViews7(d.detailViews7 || 0)
       setGroupbuyClicks7(d.groupbuyClicks7 || 0)
       setMoneyClicks7(d.moneyClicks7 || 0)
+      setAffiliateDetailViews7(d.affiliateDetailViews7 || 0)
     }
   }, [])
 
@@ -721,8 +725,9 @@ export default function AdminPage() {
 
         {adminTab === 'data' && (
           <>
-            <PurchaseLogBoard posts={posts} records={purchaseLog} onSaved={fetchPurchaseLog} />
-            <GrowthGoalsBoard stages={growthGoals} analytics={analytics} groupbuyClicks7={groupbuyClicks7} moneyClicks7={moneyClicks7} onSaved={fetchGrowthGoals}
+            <GrowthGoalsBoard stages={growthGoals} analytics={analytics}
+              detailViews7={detailViews7} groupbuyClicks7={groupbuyClicks7} moneyClicks7={moneyClicks7} affiliateDetailViews7={affiliateDetailViews7}
+              onSaved={fetchGrowthGoals}
               onGoRevenue={() => { setAdminTab('revenue'); document.getElementById('admin-tabs')?.scrollIntoView({ behavior: 'smooth', block: 'start' }) }} />
             <VisitorFlow sessions={recentSessions} posts={posts} clickBreakdown={clickBreakdown} postSources={postSources} sources={sources} onRefresh={fetchAnalytics} />
           </>
@@ -2571,11 +2576,13 @@ function PurchaseLogBoard({ posts, records, onSaved }: {
  * 편차가 커서(주말 vs 평일), 좋은 날 하루로 다음 단계를 넘긴 것처럼 보이거나 나쁜 날
  * 하루로 이미 넘은 단계 아래로 떨어져 보이면 판정이 널뛴다.
  */
-function GrowthGoalsBoard({ stages, analytics, groupbuyClicks7, moneyClicks7, onSaved, onGoRevenue }: {
+function GrowthGoalsBoard({ stages, analytics, detailViews7, groupbuyClicks7, moneyClicks7, affiliateDetailViews7, onSaved, onGoRevenue }: {
   stages: number[]
   analytics: DayStat[]
+  detailViews7: number
   groupbuyClicks7: number
   moneyClicks7: number
+  affiliateDetailViews7: number
   onSaved: () => void
   onGoRevenue: () => void
 }) {
@@ -2616,9 +2623,15 @@ function GrowthGoalsBoard({ stages, analytics, groupbuyClicks7, moneyClicks7, on
   const remaining = nextStage !== null ? Math.max(0, Math.ceil(nextStage - avg7)) : 0
   const stagePct = nextStage !== null ? Math.min(100, Math.round((avg7 / nextStage) * 100)) : 100
   const laterStages = nextStage !== null ? stages.slice(nextIdx + 1) : []
-  // 방문자가 늘어도 구매 행동이 같이 늘고 있는지 — "사람이 늘었나 · 구매도 늘었나"를
-  // 한 화면에서 같이 보려고 붙였다(사장님 피드백)
-  const clickRate7 = week7 > 0 ? (moneyClicks7 / week7) * 100 : null
+  // 클릭률 두 개를 분모부터 다르게 본다 — "사람이 늘었나 · 구매 행동도 같이 늘고 있나"를
+  // 한 화면에서 보려는 목적은 같지만, 방문자(week7)를 분모로 쓰면 제휴 링크가 아예 없는
+  // 상품을 본 사람까지 섞여서 "4/515=0.8%"처럼 숫자는 맞아도 쓸모가 없어진다(사장님 지적).
+  // 공구 클릭률은 상세조회 전체가 분모(공구 구매처는 어느 상세페이지에나 있다),
+  // 제휴 클릭률은 제휴 링크가 실제로 노출된 상세조회만 분모(affiliateDetailViews7,
+  // /api/analytics에서 계산).
+  const totalMoneyClicks7 = groupbuyClicks7 + moneyClicks7
+  const groupbuyRate7 = detailViews7 > 0 ? (groupbuyClicks7 / detailViews7) * 100 : null
+  const affiliateRate7 = affiliateDetailViews7 > 0 ? (moneyClicks7 / affiliateDetailViews7) * 100 : null
 
   function startEdit() {
     setDraft(stages.map(String))
@@ -2696,7 +2709,7 @@ function GrowthGoalsBoard({ stages, analytics, groupbuyClicks7, moneyClicks7, on
         <>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: 10, marginBottom: 18 }}>
             <div style={{ background: '#f8fafc', borderRadius: 10, padding: '12px 14px' }}>
-              <div style={{ fontSize: 11, color: '#64748b', marginBottom: 4 }}>7일 평균</div>
+              <div style={{ fontSize: 11, color: '#64748b', marginBottom: 4 }}>7일 평균 방문자</div>
               <div style={{ fontSize: 16, fontWeight: 800, color: '#0f172a' }}>
                 {Math.round(avg7).toLocaleString()}명
                 {hasTrend && trendDiff !== 0 && (
@@ -2708,27 +2721,41 @@ function GrowthGoalsBoard({ stages, analytics, groupbuyClicks7, moneyClicks7, on
               {hasTrend && <div style={{ fontSize: 10.5, color: '#94a3b8', marginTop: 2 }}>지난 7일 대비</div>}
             </div>
             <div style={{ background: '#f8fafc', borderRadius: 10, padding: '12px 14px' }}>
-              <div style={{ fontSize: 11, color: '#64748b', marginBottom: 4 }}>7일 합계</div>
-              <div style={{ fontSize: 16, fontWeight: 800, color: '#0f172a' }}>{week7.toLocaleString()}명</div>
+              <div style={{ fontSize: 11, color: '#64748b', marginBottom: 4 }}>상세조회(7일)</div>
+              <div style={{ fontSize: 16, fontWeight: 800, color: '#0f172a' }}>{detailViews7.toLocaleString()}회</div>
             </div>
             <button onClick={onGoRevenue} title="상품별로 보기 → 수익화 현황"
               style={{ background: '#f8fafc', borderRadius: 10, padding: '12px 14px', border: '1px solid transparent',
                 cursor: 'pointer', textAlign: 'left', font: 'inherit' }}>
-              <div style={{ fontSize: 11, color: '#64748b', marginBottom: 4 }}>공구 클릭(7일)</div>
+              <div style={{ fontSize: 11, color: '#64748b', marginBottom: 4 }}>공구 구매처 클릭(7일)</div>
               <div style={{ fontSize: 16, fontWeight: 800, color: '#0f172a' }}>{groupbuyClicks7.toLocaleString()}회</div>
               <div style={{ fontSize: 10, color: '#6366f1', fontWeight: 700, marginTop: 2 }}>상품별로 보기 →</div>
             </button>
             <button onClick={onGoRevenue} title="상품별로 보기 → 수익화 현황"
               style={{ background: '#f8fafc', borderRadius: 10, padding: '12px 14px', border: '1px solid transparent',
                 cursor: 'pointer', textAlign: 'left', font: 'inherit' }}>
-              <div style={{ fontSize: 11, color: '#64748b', marginBottom: 4 }}>구매처(제휴) 클릭(7일)</div>
+              <div style={{ fontSize: 11, color: '#64748b', marginBottom: 4 }}>제휴 구매처 클릭(7일)</div>
               <div style={{ fontSize: 16, fontWeight: 800, color: '#0f172a' }}>{moneyClicks7.toLocaleString()}회</div>
               <div style={{ fontSize: 10, color: '#6366f1', fontWeight: 700, marginTop: 2 }}>상품별로 보기 →</div>
             </button>
             <div style={{ background: '#f8fafc', borderRadius: 10, padding: '12px 14px' }}>
-              <div style={{ fontSize: 11, color: '#64748b', marginBottom: 4 }}>구매처 클릭률(7일)</div>
+              <div style={{ fontSize: 11, color: '#64748b', marginBottom: 4 }}>전체 구매처 클릭(7일)</div>
+              <div style={{ fontSize: 16, fontWeight: 800, color: '#0f172a' }}>{totalMoneyClicks7.toLocaleString()}회</div>
+            </div>
+            <div style={{ background: '#f8fafc', borderRadius: 10, padding: '12px 14px' }}>
+              <div style={{ fontSize: 11, color: '#64748b', marginBottom: 4 }}>공구 클릭률(7일)</div>
               <div style={{ fontSize: 16, fontWeight: 800, color: '#0f172a' }}>
-                {clickRate7 === null ? '–' : `${clickRate7.toFixed(1)}%`}
+                {groupbuyRate7 === null ? '–' : `${groupbuyRate7.toFixed(1)}%`}
+              </div>
+              <div style={{ fontSize: 10, color: '#94a3b8', marginTop: 2 }}>상세조회 → 공구 구매처</div>
+            </div>
+            <div style={{ background: '#f8fafc', borderRadius: 10, padding: '12px 14px' }}>
+              <div style={{ fontSize: 11, color: '#64748b', marginBottom: 4 }}>제휴 클릭률(7일)</div>
+              <div style={{ fontSize: 16, fontWeight: 800, color: '#0f172a' }}>
+                {affiliateRate7 === null ? '–' : `${affiliateRate7.toFixed(1)}%`}
+              </div>
+              <div style={{ fontSize: 10, color: '#94a3b8', marginTop: 2 }}>
+                제휴링크 노출 상세조회({affiliateDetailViews7.toLocaleString()}회) → 제휴
               </div>
             </div>
           </div>
@@ -3366,11 +3393,23 @@ function OutreachBoard({ posts, detailViews, clickBreakdown, onSaved }: {
                   <td style={td}>{views(p.id)} / {clicks(p.id)}</td>
                   <td style={{ ...td, textAlign: 'center' }}>
                     <div style={{ display: 'flex', gap: 4, justifyContent: 'center' }}>
-                      <a href={`/api/og/deal/${p.id}`} target="_blank" rel="noreferrer"
-                        title="공유 이미지 만들기"
+                      <a href={`/api/og/deal/${p.id}?ratio=feed`} target="_blank" rel="noreferrer"
+                        title="인스타 피드용 이미지 (4:5)"
                         style={{ padding: '4px 8px', borderRadius: 6, border: '1px solid #cbd5e1', background: '#fff',
                           fontSize: 11, fontWeight: 600, color: '#475569', textDecoration: 'none' }}>
-                        이미지
+                        피드
+                      </a>
+                      <a href={`/api/og/deal/${p.id}?ratio=story`} target="_blank" rel="noreferrer"
+                        title="인스타 스토리용 이미지 (9:16)"
+                        style={{ padding: '4px 8px', borderRadius: 6, border: '1px solid #cbd5e1', background: '#fff',
+                          fontSize: 11, fontWeight: 600, color: '#475569', textDecoration: 'none' }}>
+                        스토리
+                      </a>
+                      <a href={`/api/og/deal/${p.id}`} target="_blank" rel="noreferrer"
+                        title="블로그·카카오·링크공유용 이미지 (가로형)"
+                        style={{ padding: '4px 8px', borderRadius: 6, border: '1px solid #cbd5e1', background: '#fff',
+                          fontSize: 11, fontWeight: 600, color: '#475569', textDecoration: 'none' }}>
+                        가로형
                       </a>
                       <button onClick={() => copy(trackingUrl(p), `link-${p.id}`)}
                         title="추적링크 복사"

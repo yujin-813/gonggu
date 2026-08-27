@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { recordEvent, getSummary, getTopPosts, getTopSharedPosts, getSourceCounts, getClickCounts, getClickBreakdown, getPostSourceCounts, getRecentSessions, classifySource, CLICK_TYPES } from '@/lib/analytics'
 import { loadPosts } from '@/lib/store'
 import { isPagePublic } from '@/lib/period'
+import { visiblePurchaseLinks } from '@/lib/purchaseLinks'
 import { AUTH_COOKIE, computeToken, safeEqual } from '@/lib/auth'
 import { ADMIN_SEEN_COOKIE, isAdminIp, clientIp, isBotRequest } from '@/lib/adminTrace'
 
@@ -76,9 +77,23 @@ export async function GET() {
   // 구매처 클릭은 진짜 제휴(쿠팡·네이버 파트너스)만. 'other'(제휴 없는 판매처 링크,
   // D-058)는 수수료가 없어서 뺀다.
   const publicIds = new Set(posts.filter(isPagePublic).map(p => p.id))
-  const sumPublic = (counts: Record<number, number>) =>
-    Object.entries(counts).filter(([id]) => publicIds.has(Number(id))).reduce((a, [, v]) => a + v, 0)
-  const groupbuyClicks7 = sumPublic(getClickCounts(7, ['groupbuy']))
-  const moneyClicks7 = sumPublic(getClickCounts(7, ['coupang', 'naver']))
-  return NextResponse.json({ summary, topPosts, topSharedPosts, sources, detailViews, clickBreakdown, postSources, recentSessions, groupbuyClicks7, moneyClicks7 })
+  const sumIds = (counts: Record<number, number>, ids: Set<number>) =>
+    Object.entries(counts).filter(([id]) => ids.has(Number(id))).reduce((a, [, v]) => a + v, 0)
+  const detailViews7 = sumIds(getClickCounts(7, ['detail']), publicIds)
+  const groupbuyClicks7 = sumIds(getClickCounts(7, ['groupbuy']), publicIds)
+  const moneyClicks7 = sumIds(getClickCounts(7, ['coupang', 'naver']), publicIds)
+  // 제휴 클릭률의 분모 — "제휴 링크가 실제로 노출된 상세조회"만. 전체 상세조회로 나누면
+  // 제휴 링크가 아예 없는 상품을 본 사람까지 분모에 들어가서 클릭률이 실제보다 낮게 나온다
+  // (사장님 지적: 4/515=0.8%는 틀린 숫자는 아니지만 쓸모가 없다). commission:false(D-058)
+  // 링크는 제휴가 아니므로 뺀다.
+  const affiliateExposedIds = new Set(
+    posts.filter(p => isPagePublic(p) && visiblePurchaseLinks(p)
+      .some(l => (l.platform === 'coupang' || l.platform === 'naver') && l.commission !== false))
+      .map(p => p.id)
+  )
+  const affiliateDetailViews7 = sumIds(getClickCounts(7, ['detail']), affiliateExposedIds)
+  return NextResponse.json({
+    summary, topPosts, topSharedPosts, sources, detailViews, clickBreakdown, postSources, recentSessions,
+    detailViews7, groupbuyClicks7, moneyClicks7, affiliateDetailViews7,
+  })
 }
