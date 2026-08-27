@@ -1,7 +1,32 @@
+import fs from 'fs'
+import path from 'path'
 import { ImageResponse } from 'next/og'
 import { loadPosts } from '@/lib/store'
 import { isPagePublic, getPeriodState, fmtDate } from '@/lib/period'
 import { getDealVerdict, rateText } from '@/lib/dealGrade'
+
+const MIME_BY_EXT: Record<string, string> = {
+  '.png': 'image/png', '.webp': 'image/webp', '.gif': 'image/gif',
+  '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg',
+}
+
+/** 상품 이미지를 base64로 읽어 data URI로 만든다 — 우리가 올렸거나(uploads) 수집기가
+ * 받아둔(scraped) 로컬 파일만. satori가 원격 URL을 직접 불러오게 하면 그 사이트가 느리거나
+ * 막혀 있을 때 이미지 생성 자체가 실패한다(원칙 1 — 판정 이미지는 항상 나와야 한다).
+ * 외부 URL(인스타 CDN 등)은 지금은 건너뛴다 — 텍스트만으로도 이미지는 이미 나가고 있었다. */
+function loadLocalImageDataUri(imgPath: string | null | undefined): string | null {
+  if (!imgPath || !imgPath.startsWith('/')) return null
+  const publicDir = path.join(process.cwd(), 'public')
+  const full = path.join(publicDir, imgPath)
+  if (!full.startsWith(publicDir + path.sep)) return null
+  try {
+    const buf = fs.readFileSync(full)
+    const mime = MIME_BY_EXT[path.extname(full).toLowerCase()] || 'image/jpeg'
+    return `data:${mime};base64,${buf.toString('base64')}`
+  } catch {
+    return null
+  }
+}
 
 // 카카오톡·DM으로 보냈을 때 링크를 누르기 전에 이미 "싼지 아닌지"가 읽히는 이미지.
 // 상품 사진만 보내면 그냥 광고로 보이지만, 가격 비교와 판정이 그려져 있으면 받는 사람이
@@ -65,6 +90,7 @@ export async function GET(req: Request, { params }: { params: { id: string } }) 
 
   // 비교 가격은 두 개까지만 — 더 넣으면 글자가 작아져서 폰에서 안 읽힌다
   const compares = v.comparePrices.slice(0, 2)
+  const imageDataUri = loadLocalImageDataUri(post.img)
   const discountText = v.discountRate !== null
     ? `${v.referenceLabel} 대비 약 ${rateText(v.discountRate)}`
     : v.display.key === 'exclusive' ? '여기서만 만나볼 수 있어요' : '아직 가격 비교가 어려워요'
@@ -73,7 +99,7 @@ export async function GET(req: Request, { params }: { params: { id: string } }) 
     return new ImageResponse(
       (
         <div style={{
-          width: '100%', height: '100%', display: 'flex', flexDirection: 'column',
+          width: '100%', height: '100%', display: 'flex', flexDirection: 'column', position: 'relative',
           background: '#FFFFFF', padding: '36px 40px', fontFamily: 'sans-serif',
         }}>
           {/* 머리 — 브랜드와 판정 등급 */}
@@ -91,16 +117,33 @@ export async function GET(req: Request, { params }: { params: { id: string } }) 
             </div>
           </div>
 
-          {/* 상품명 */}
-          <div style={{
-            display: 'flex', marginTop: 22, fontSize: 34, fontWeight: 800, color: '#1A1A1A',
-            lineHeight: 1.25, maxHeight: 88, overflow: 'hidden',
+          {/* 상품명 — 오른쪽에 사진이 얹히므로(있을 때만) 그만큼 폭을 줄인다.
+              width를 조건부로 undefined를 주면 satori가 스타일 파싱 중 죽어서(값이 없는데
+              있는 키로 남는다), 아예 다른 style 객체를 쓴다. display:flex + maxHeight로
+              2줄을 자르면 satori가 박스 높이를 제대로 못 잡아 다음 줄(공구가)과 겹쳐 보였다
+              (사진 유무와 무관한 기존 버그) — satori가 공식으로 권장하는 webkit line-clamp
+              방식(-webkit-box)으로 바꾸니 박스 높이가 제대로 잡힌다 */}
+          <div style={imageDataUri ? {
+            display: '-webkit-box', WebkitBoxOrient: 'vertical', WebkitLineClamp: 2,
+            marginTop: 22, fontSize: 34, fontWeight: 800, color: '#1A1A1A',
+            lineHeight: 1.25, overflow: 'hidden', width: 500,
+          } : {
+            display: '-webkit-box', WebkitBoxOrient: 'vertical', WebkitLineClamp: 2,
+            marginTop: 22, fontSize: 34, fontWeight: 800, color: '#1A1A1A',
+            lineHeight: 1.25, overflow: 'hidden',
           }}>
-            {post.title.length > 42 ? `${post.title.slice(0, 42)}…` : post.title}
+            {post.title.length > (imageDataUri ? 28 : 42)
+              ? `${post.title.slice(0, imageDataUri ? 28 : 42)}…` : post.title}
           </div>
 
-          {/* 가격 비교 — 공구가를 크게, 다른 판매처를 옆에 작게 */}
-          <div style={{ display: 'flex', alignItems: 'flex-end', gap: 28, marginTop: 'auto' }}>
+          {/* 가격 비교·바닥(할인율·마감)은 absolute로 하단에 고정한다. marginTop: 'auto'를
+              쓰면 satori가 상품명 줄바꿈 높이를 실제보다 작게 측정해 이 블록이 두 줄째
+              상품명과 겹쳐 보이는 문제가 있었다(사진 유무와 무관한 기존 버그) — 화면 크기가
+              800×400으로 고정이라 절대 좌표를 써도 안전하다 */}
+          <div style={{
+            display: 'flex', alignItems: 'flex-end', gap: 28,
+            position: 'absolute', left: 40, right: 40, top: 224,
+          }}>
             <div style={{ display: 'flex', flexDirection: 'column' }}>
               <span style={{ fontSize: 19, color: '#888888', fontWeight: 600 }}>공구가</span>
               <span style={{ fontSize: 52, fontWeight: 900, color: '#1A1A1A', lineHeight: 1.1 }}>
@@ -116,14 +159,24 @@ export async function GET(req: Request, { params }: { params: { id: string } }) 
             </div>
           </div>
 
-          {/* 바닥 — 할인율과 마감 */}
           <div style={{
             display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-            marginTop: 22, paddingTop: 18, borderTop: '2px solid #EEEEEE',
+            position: 'absolute', left: 40, right: 40, bottom: 36,
+            paddingTop: 18, borderTop: '2px solid #EEEEEE',
           }}>
             <span style={{ fontSize: 26, fontWeight: 800, color: color.fg }}>{discountText}</span>
             {dday && <span style={{ fontSize: 22, fontWeight: 700, color: '#888888' }}>{dday}</span>}
           </div>
+
+          {/* 상품 사진 — 오른쪽 위에 얹는다 */}
+          {imageDataUri && (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={imageDataUri} width={168} height={168}
+              style={{
+                position: 'absolute', top: 88, right: 40,
+                borderRadius: 16, objectFit: 'cover', border: '1px solid #EEEEEE',
+              }} />
+          )}
         </div>
       ),
       { width, height },
@@ -165,6 +218,13 @@ export async function GET(req: Request, { params }: { params: { id: string } }) 
           }}>
             {post.title.length > 34 ? `${post.title.slice(0, 34)}…` : post.title}
           </div>
+
+          {/* 상품 사진 — 있을 때만. 세로형은 폭이 넉넉해서 한 줄 전체를 쓴다 */}
+          {imageDataUri && (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={imageDataUri} width={952} height={340}
+              style={{ borderRadius: 20, objectFit: 'cover', border: '1px solid #EEEEEE' }} />
+          )}
 
           {/* 가격 — 공구가를 크게, 다른 판매처를 아래에 작게 */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>

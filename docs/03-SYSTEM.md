@@ -41,7 +41,9 @@
 - 상세 하단 **공유 권유** — 판정에 맞춘 문구(`shareLabel`)를 눈에 보이게 꺼냈다. 31일간 공유 0회였다
 - 공유 카드 이미지 `/api/og/deal/[id]` — 판정 결과를 그린 PNG. 기본(파라미터 없음)은 800×400(2:1,
   블로그·카카오·링크공유 미리보기용). `?ratio=feed`는 1080×1350(4:5, 인스타 피드),
-  `?ratio=story`는 1080×1920(9:16, 인스타 스토리) — 「꿀딜 확산 후보」에서 셋 다 버튼으로 낸다 (`D-064`)
+  `?ratio=story`는 1080×1920(9:16, 인스타 스토리) — 「꿀딜 확산 후보」에서 셋 다 버튼으로 낸다 (`D-064`).
+  로컬(`/uploads`·`/scraped`)에 있는 상품 사진은 같이 그려 넣는다. 외부 URL 이미지는 안 넣는다 —
+  그 사이트가 막혀 있으면 이미지 생성 자체가 실패하기 때문 (`D-066`)
 - SEO — JSON-LD(WebSite/ItemList/Product·Offer/BreadcrumbList), sitemap.xml(430 URL), robots.txt,
   네이버·구글 소유확인. sitemap `lastmod`는 `updated_at||scraped_at`, 가격·마감상태 변경 시
   IndexNow 통보(`lib/indexnow.ts`, `D-055`)
