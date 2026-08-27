@@ -719,7 +719,8 @@ export default function AdminPage() {
         {adminTab === 'data' && (
           <>
             <PurchaseLogBoard posts={posts} records={purchaseLog} onSaved={fetchPurchaseLog} />
-            <GrowthGoalsBoard stages={growthGoals} analytics={analytics} moneyClicks7={moneyClicks7} onSaved={fetchGrowthGoals} />
+            <GrowthGoalsBoard stages={growthGoals} analytics={analytics} moneyClicks7={moneyClicks7} onSaved={fetchGrowthGoals}
+              onGoRevenue={() => { setAdminTab('revenue'); document.getElementById('admin-tabs')?.scrollIntoView({ behavior: 'smooth', block: 'start' }) }} />
             <VisitorFlow sessions={recentSessions} posts={posts} clickBreakdown={clickBreakdown} postSources={postSources} sources={sources} onRefresh={fetchAnalytics} />
           </>
         )}
@@ -2558,11 +2559,12 @@ function PurchaseLogBoard({ posts, records, onSaved }: {
  * 편차가 커서(주말 vs 평일), 좋은 날 하루로 다음 단계를 넘긴 것처럼 보이거나 나쁜 날
  * 하루로 이미 넘은 단계 아래로 떨어져 보이면 판정이 널뛴다.
  */
-function GrowthGoalsBoard({ stages, analytics, moneyClicks7, onSaved }: {
+function GrowthGoalsBoard({ stages, analytics, moneyClicks7, onSaved, onGoRevenue }: {
   stages: number[]
   analytics: DayStat[]
   moneyClicks7: number
   onSaved: () => void
+  onGoRevenue: () => void
 }) {
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState<string[]>([])
@@ -2696,10 +2698,13 @@ function GrowthGoalsBoard({ stages, analytics, moneyClicks7, onSaved }: {
               <div style={{ fontSize: 11, color: '#64748b', marginBottom: 4 }}>7일 합계</div>
               <div style={{ fontSize: 16, fontWeight: 800, color: '#0f172a' }}>{week7.toLocaleString()}명</div>
             </div>
-            <div style={{ background: '#f8fafc', borderRadius: 10, padding: '12px 14px' }}>
+            <button onClick={onGoRevenue} title="상품별로 보기 → 수익화 현황"
+              style={{ background: '#f8fafc', borderRadius: 10, padding: '12px 14px', border: '1px solid transparent',
+                cursor: 'pointer', textAlign: 'left', font: 'inherit' }}>
               <div style={{ fontSize: 11, color: '#64748b', marginBottom: 4 }}>구매처 클릭(7일)</div>
               <div style={{ fontSize: 16, fontWeight: 800, color: '#0f172a' }}>{moneyClicks7.toLocaleString()}회</div>
-            </div>
+              <div style={{ fontSize: 10, color: '#6366f1', fontWeight: 700, marginTop: 2 }}>상품별로 보기 →</div>
+            </button>
             <div style={{ background: '#f8fafc', borderRadius: 10, padding: '12px 14px' }}>
               <div style={{ fontSize: 11, color: '#64748b', marginBottom: 4 }}>구매처 클릭률(7일)</div>
               <div style={{ fontSize: 16, fontWeight: 800, color: '#0f172a' }}>
@@ -2858,7 +2863,7 @@ function TodayPriorities({ posts, detailViews, clickBreakdown, postSources, sour
         <FunnelArrow rate={pct(totalDetail, totalSearch)} />
         <FunnelStep label="상세 조회" value={totalDetail} />
         <FunnelArrow rate={pct(totalMoneyClicks, totalDetail)} />
-        <FunnelStep label="구매처 클릭" value={totalMoneyClicks} highlight />
+        <FunnelStep label="구매처 클릭" value={totalMoneyClicks} highlight onClick={() => onGoTo('revenue')} />
       </div>
       <p style={{ fontSize: 11.5, color: '#94a3b8', margin: '6px 0 18px', lineHeight: 1.6 }}>
         최근 14일 · 상세조회는 검색으로 들어와 본 것만 센 값이에요(전체 조회수는 아래 목록의
@@ -2910,12 +2915,16 @@ function TodayPriorities({ posts, detailViews, clickBreakdown, postSources, sour
   )
 }
 
-function FunnelStep({ label, value, highlight }: { label: string; value: number; highlight?: boolean }) {
+function FunnelStep({ label, value, highlight, onClick }: { label: string; value: number; highlight?: boolean; onClick?: () => void }) {
+  const Tag = onClick ? 'button' : 'div'
   return (
-    <div style={{ textAlign: 'center', padding: '2px 10px' }}>
+    <Tag onClick={onClick} title={onClick ? '상품별로 보기 → 수익화 현황' : undefined}
+      style={{ textAlign: 'center', padding: '2px 10px', border: 'none', background: 'none',
+        cursor: onClick ? 'pointer' : 'default', font: 'inherit' }}>
       <div style={{ fontSize: 11.5, color: '#64748b', fontWeight: 600, marginBottom: 2 }}>{label}</div>
       <div style={{ fontSize: 19, fontWeight: 800, color: highlight ? '#15803d' : '#0f172a' }}>{value.toLocaleString()}</div>
-    </div>
+      {onClick && <div style={{ fontSize: 9.5, color: '#6366f1', fontWeight: 700 }}>상품별로 →</div>}
+    </Tag>
   )
 }
 
