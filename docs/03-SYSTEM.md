@@ -12,7 +12,7 @@
 | 단계 | 운영 중 · 실사용자 있음 (2026-08-19 기준 사람 방문 고유 IP 163명/2일) |
 | 스택 | Next.js 14 (App Router) · React 18 · TypeScript · 파이썬 수집기 |
 | 저장소 | **파일 기반** — `data/*.json`. DB 없음 |
-| 코드 규모 | `lib/` 3,426줄 · `app/admin` + `components/` 6,891줄 · 파이썬 3,019줄 |
+| 코드 규모 | `lib/` 3,416줄 · `app/admin` + `components/` 6,891줄 · 파이썬 3,019줄 |
 | 데이터 규모 | 게시물 2,537건 (공개 349건) · 인플루언서 소스 61개 · analytics 31일치 |
 | 배포 | EC2 `13.125.121.62`(t3.small) · PM2(fork) + nginx · `bash deploy.sh` — **무중단**(3002↔3003 슬롯 교대, `D-028`) |
 | 도메인 | https://gonggu.asknuggetdata.com |
@@ -203,7 +203,8 @@ extraction_debug, scraped_at, collection_status, collection_error
 ```
 data/
   posts.json                2,317건 · 6.3MB   ← 전부 메모리에 올렸다 저장한다
-  analytics.json            31일치 (30일 초과분 자동 정리 · postClicks·postSources·recent 포함)
+  analytics.json            무기한 누적(`D-065`) · daily·postClicks·postSources는 날짜별로 계속 쌓임.
+                             recent(개별 이벤트 타임라인)만 최근 300건(≈일주일) 링 버퍼로 제한
   admin_ips.json            관리자 IP (14일 TTL)
   influencer_sources.json   57개
   collections.json          거의 비어 있음

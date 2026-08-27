@@ -77,23 +77,13 @@ function load(): AnalyticsData {
 }
 
 function save(data: AnalyticsData) {
-  // 30일 이전 데이터 정리
-  const cutoff = new Date()
-  cutoff.setDate(cutoff.getDate() - 30)
-  const cutoffStr = cutoff.toISOString().split('T')[0]
-  for (const date of Object.keys(data.daily)) {
-    if (date < cutoffStr) delete data.daily[date]
-  }
-  if (data.postClicks) {
-    for (const date of Object.keys(data.postClicks)) {
-      if (date < cutoffStr) delete data.postClicks[date]
-    }
-  }
-  if (data.postSources) {
-    for (const date of Object.keys(data.postSources)) {
-      if (date < cutoffStr) delete data.postSources[date]
-    }
-  }
+  // 예전엔 30일이 지난 daily·postClicks·postSources를 여기서 지웠다. 지금 화면은 전부
+  // 최근 N일만 잘라 보여주니 당장은 안 보이지만, 나중에 "몇 달 전엔 어땠나"를 보려 해도
+  // 이미 사라진 뒤였다 — 날짜별 조회수·클릭수는 지우지 않고 계속 쌓는다(D-065).
+  // 각 조회 함수(getSummary 등)가 스스로 최근 N일만 잘라 쓰므로 오래 쌓여도 계산량엔
+  // 영향이 없다. recent(세션 단위 최근 이벤트 링 버퍼)는 원래도 날짜가 아니라 개수로
+  // 제한하므로 그대로 둔다.
+
   // 임시 파일에 쓴 뒤 rename — 쓰기 도중 프로세스가 죽어도 기존 파일이 손상되지 않는다.
   const tmp = `${FILE}.${process.pid}.${Date.now()}.tmp`
   fs.writeFileSync(tmp, JSON.stringify(data, null, 2))
