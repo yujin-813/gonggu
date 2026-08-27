@@ -55,8 +55,8 @@ export default function Header({
         <>
           <div className="header-menu-overlay" onClick={() => setMenuOpen(false)} />
           <div className="header-menu-panel" onClick={e => e.stopPropagation()}>
-            <Link href="/request" className="header-menu-item" onClick={() => setMenuOpen(false)}>
-              <PackagePlus size={16} /> 내 공구 등록 요청하기
+            <Link href="/propose" className="header-menu-item" onClick={() => setMenuOpen(false)}>
+              <PackagePlus size={16} /> 제휴 문의하기
             </Link>
             <Link href="/influencers" className="header-menu-item" onClick={() => setMenuOpen(false)}>
               <Users size={16} /> 인플루언서 목록

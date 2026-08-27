@@ -36,35 +36,28 @@ function getTransporter() {
 }
 
 export async function sendInquiryEmail(opts: {
-  kind: string
-  name: string
+  email: string
   contact: string
-  link?: string | null
-  product?: string | null
   message: string
 }): Promise<boolean> {
   const t = getTransporter()
   if (!t) return false
 
   const to = process.env.INQUIRY_TO_EMAIL || process.env.SMTP_USER
-  const kindLabel = { influencer: '인플루언서', brand: '브랜드', company: '업체' }[opts.kind] || opts.kind
 
   try {
     await t.sendMail({
       from: process.env.SMTP_USER,
       to,
-      replyTo: /.+@.+\..+/.test(opts.contact) ? opts.contact : undefined,
-      subject: `[꿀공구 제휴 문의] ${kindLabel} · ${opts.name}`,
+      replyTo: opts.email,
+      subject: `[꿀공구 제휴 문의] ${opts.email}`,
       text: [
-        `구분: ${kindLabel}`,
-        `이름: ${opts.name}`,
+        `연락받을 이메일: ${opts.email}`,
         `연락처: ${opts.contact}`,
-        opts.link ? `인스타그램/사이트: ${opts.link}` : null,
-        opts.product ? `공구 상품: ${opts.product}` : null,
         '',
-        '제안 내용:',
+        '제휴 내용:',
         opts.message,
-      ].filter(Boolean).join('\n'),
+      ].join('\n'),
     })
     return true
   } catch (e) {

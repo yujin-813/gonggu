@@ -4,19 +4,18 @@ import path from 'path'
 // 인플루언서·브랜드가 "우리 공구도 올려주세요" "제휴하고 싶어요"라고 생각해도 연락할 곳이
 // 없었다. /request(app/api/posts/request)는 "이 공구 하나를 등록해 주세요"용이라 구매
 // 링크·가격이 필수다 — 아직 판매 페이지가 없는 제휴 제안은 못 받는다. 이건 별도 창구다.
+//
+// 원래는 구분(인플루언서/브랜드/업체)·이름·인스타·상품까지 받았는데, 입력 부담을 줄이려고
+// 이메일·연락처·제휴내용 세 칸으로 줄였다(D-067) — 누구인지·무슨 상품인지는 답장하면서
+// 물어보면 된다.
 
 const DATA_DIR = path.join(process.cwd(), 'data')
 const FILE = path.join(DATA_DIR, 'inquiries.json')
 
-export type InquiryKind = 'influencer' | 'brand' | 'company'
-
 export interface Inquiry {
   id: string
-  kind: InquiryKind
-  name: string
+  email: string
   contact: string
-  link?: string | null
-  product?: string | null
   message: string
   createdAt: string
   /** 이메일 발송 성공 여부 — 실패해도 데이터는 남는다. 관리자 목록이 최종 백업이다 */

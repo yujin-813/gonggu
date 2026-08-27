@@ -2,23 +2,14 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import { ArrowLeft } from 'lucide-react'
-import type { InquiryKind } from '@/lib/inquiries'
-
-const KIND_LABEL: Record<InquiryKind, string> = {
-  influencer: '인플루언서',
-  brand: '브랜드',
-  company: '업체',
-}
 
 // /request(공구 등록 요청)와 다른 창구다. 그쪽은 "이 공구 하나를 올려주세요"라 구매
 // 링크·가격이 필수인데, 여기는 "우리랑 같이 해볼래요?" 제휴 제안이라 아직 판매 페이지가
-// 없어도 된다.
+// 없어도 된다. 원래는 구분·이름·인스타·상품까지 받았는데 입력 부담을 줄이려고 이메일·
+// 연락처·제휴내용 세 칸으로 줄였다(D-067) — 누구인지·무슨 상품인지는 답장하며 물어본다.
 export default function ProposePage() {
-  const [kind, setKind] = useState<InquiryKind>('influencer')
-  const [name, setName] = useState('')
+  const [email, setEmail] = useState('')
   const [contact, setContact] = useState('')
-  const [link, setLink] = useState('')
-  const [product, setProduct] = useState('')
   const [message, setMessage] = useState('')
   const [website, setWebsite] = useState('')  // 허니팟
   const [loading, setLoading] = useState(false)
@@ -27,8 +18,8 @@ export default function ProposePage() {
 
   async function handleSubmit() {
     setError('')
-    if (!name.trim() || !contact.trim()) { setError('이름과 연락처를 입력해주세요'); return }
-    if (!message.trim()) { setError('제안 내용을 입력해주세요'); return }
+    if (!email.trim() || !contact.trim()) { setError('이메일과 연락처를 입력해주세요'); return }
+    if (!message.trim()) { setError('제휴 내용을 입력해주세요'); return }
 
     setLoading(true)
     try {
@@ -36,8 +27,7 @@ export default function ProposePage() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          kind, name: name.trim(), contact: contact.trim(),
-          link: link.trim(), product: product.trim(), message: message.trim(), website,
+          email: email.trim(), contact: contact.trim(), message: message.trim(), website,
         }),
       })
       if (!res.ok) {
@@ -90,34 +80,13 @@ export default function ProposePage() {
       </div>
 
       <div className="modal" style={{ maxWidth: 480, margin: '16px auto', borderRadius: 16, maxHeight: 'none' }}>
-        <label>구분 *</label>
-        <div className="modal-row" style={{ marginBottom: 12 }}>
-          {(Object.keys(KIND_LABEL) as InquiryKind[]).map(k => (
-            <button
-              key={k}
-              type="button"
-              onClick={() => setKind(k)}
-              className={`cat-btn ${kind === k ? 'active' : ''}`}
-              style={{ flex: 1 }}
-            >
-              {KIND_LABEL[k]}
-            </button>
-          ))}
-        </div>
-
-        <label>이름 *</label>
-        <input type="text" value={name} onChange={e => setName(e.target.value)} placeholder="이름 또는 브랜드명" style={{ width: '100%', marginBottom: 12 }} />
+        <label>연락받을 이메일 *</label>
+        <input type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="you@example.com" style={{ width: '100%', marginBottom: 12 }} />
 
         <label>연락처 *</label>
-        <input type="text" value={contact} onChange={e => setContact(e.target.value)} placeholder="이메일 또는 전화번호" style={{ width: '100%', marginBottom: 12 }} />
+        <input type="text" value={contact} onChange={e => setContact(e.target.value)} placeholder="전화번호 또는 인스타그램 계정" style={{ width: '100%', marginBottom: 12 }} />
 
-        <label>인스타그램 또는 사이트 <span style={{ fontSize: 12, color: '#94a3b8', fontWeight: 400 }}>(선택)</span></label>
-        <input type="text" value={link} onChange={e => setLink(e.target.value)} placeholder="https://instagram.com/..." style={{ width: '100%', marginBottom: 12 }} />
-
-        <label>공구 상품 <span style={{ fontSize: 12, color: '#94a3b8', fontWeight: 400 }}>(선택)</span></label>
-        <input type="text" value={product} onChange={e => setProduct(e.target.value)} placeholder="어떤 상품인가요?" style={{ width: '100%', marginBottom: 12 }} />
-
-        <label>제안 내용 *</label>
+        <label>제휴 내용 *</label>
         <textarea
           value={message}
           onChange={e => setMessage(e.target.value)}

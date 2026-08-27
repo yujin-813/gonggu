@@ -1994,8 +1994,6 @@ const SOURCE_KO: Record<string, string> = {
   inapp: '앱 안에서', external: '외부 링크', direct: '직접 방문',
 }
 
-const INQUIRY_KIND_KO: Record<string, string> = { influencer: '인플루언서', brand: '브랜드', company: '업체' }
-
 /**
  * 제휴 문의 — "우리 공구도 올려주세요" "제휴하고 싶어요" 창구(`/propose`)로 들어온 것들.
  *
@@ -2049,10 +2047,7 @@ function InquiryList({ inquiries, onRefresh }: { inquiries: Inquiry[]; onRefresh
             <div key={i.id} style={{ border: '1px solid #e2e8f0', borderRadius: 10, padding: '12px 14px',
               opacity: i.handled ? 0.6 : 1 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 6 }}>
-                <span style={{ fontSize: 11, fontWeight: 700, color: '#4f46e5', background: '#eef2ff', borderRadius: 6, padding: '2px 8px' }}>
-                  {INQUIRY_KIND_KO[i.kind] || i.kind}
-                </span>
-                <span style={{ fontSize: 13.5, fontWeight: 700 }}>{i.name}</span>
+                <span style={{ fontSize: 13.5, fontWeight: 700 }}>{i.email}</span>
                 <span style={{ fontSize: 12, color: '#94a3b8' }}>{i.contact}</span>
                 {!i.emailed && (
                   <span style={{ fontSize: 11, fontWeight: 700, color: '#b45309', background: '#fef3c7', borderRadius: 6, padding: '2px 8px' }}
@@ -2064,13 +2059,6 @@ function InquiryList({ inquiries, onRefresh }: { inquiries: Inquiry[]; onRefresh
                   {new Date(i.createdAt).toLocaleString('ko-KR')}
                 </span>
               </div>
-              {i.link && (
-                <a href={i.link.startsWith('http') ? i.link : `https://${i.link}`} target="_blank" rel="noreferrer"
-                  style={{ fontSize: 12, color: '#6366f1', fontWeight: 600, textDecoration: 'none' }}>
-                  {i.link} ↗
-                </a>
-              )}
-              {i.product && <div style={{ fontSize: 12.5, color: '#475569', marginTop: 4 }}>상품: {i.product}</div>}
               <p style={{ fontSize: 13, color: '#334155', lineHeight: 1.6, margin: '8px 0 0', whiteSpace: 'pre-wrap' }}>{i.message}</p>
               <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 8 }}>
                 <button onClick={() => toggle(i.id, !i.handled)} disabled={busyId === i.id}
