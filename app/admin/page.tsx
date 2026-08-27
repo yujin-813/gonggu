@@ -1858,7 +1858,8 @@ function VisitorFlow({ sessions, posts, clickBreakdown, postSources, sources, on
     .filter(s => s.source === 'naver_search' || s.source === 'google_search' || s.source === 'other_search')
     .reduce((sum, s) => sum + s.count, 0)
   const totalDetail = posts.reduce((sum, p) => sum + searchIn(p.id), 0)
-  const totalMoney = Object.values(clickBreakdown).reduce((sum, row) => sum + (row.coupang || 0) + (row.naver || 0) + (row.other || 0), 0)
+  // 진짜 제휴(쿠팡·네이버)만 "구매처 클릭"으로 센다 — 'other'는 제휴 없는 판매처 링크(D-058)라 뺀다
+  const totalMoney = Object.values(clickBreakdown).reduce((sum, row) => sum + (row.coupang || 0) + (row.naver || 0), 0)
   const pct = (n: number, d: number) => (d > 0 ? `${Math.round((n / d) * 100)}%` : '–')
 
   const when = (iso: string) => {
@@ -1875,9 +1876,13 @@ function VisitorFlow({ sessions, posts, clickBreakdown, postSources, sources, on
     if (e.t === 'view') return null
     if (e.t === 'click' && e.c === 'detail') return { label: '상세', sub: title(e.p), money: false, strong: false }
     if (e.t === 'join' || (e.t === 'click' && e.c === 'groupbuy')) return { label: '공구로 나감', sub: title(e.p), money: false, strong: true }
-    if (e.t === 'click' && (e.c === 'coupang' || e.c === 'naver' || e.c === 'other')) {
+    // coupang·naver만 "돈이 될 수 있는" 클릭으로 강조한다 — other는 제휴 없는 판매처
+    // 링크(D-058)라 수수료가 없다
+    if (e.t === 'click' && (e.c === 'coupang' || e.c === 'naver')) {
       return { label: `${e.c} 구매`, sub: title(e.p), money: true, strong: true }
     }
+    if (e.t === 'click' && e.c === 'other') return { label: '판매처(제휴없음)', sub: title(e.p), money: false, strong: false }
+    if (e.t === 'click' && e.c === 'calendar') return { label: '캘린더 담기', sub: title(e.p), money: false, strong: false }
     if (e.t === 'bookmark') return { label: '찜', sub: title(e.p), money: false, strong: true }
     if (e.t === 'share') return { label: '공유', sub: title(e.p), money: false, strong: true }
     if (e.t === 'search') return { label: '검색', sub: '', money: false, strong: false }
@@ -2804,9 +2809,11 @@ function TodayPriorities({ posts, detailViews, clickBreakdown, postSources, sour
     const row = postSources[id] || {}
     return (row.naver_search || 0) + (row.google_search || 0) + (row.other_search || 0)
   }
+  // 진짜 제휴(쿠팡·네이버 파트너스)만 "구매처 클릭"으로 센다. 'other'(제휴 없는 판매처
+  // 링크, D-058)는 수수료가 없어서 뺀다
   const moneyClicks = (id: number) => {
     const row = clickBreakdown[id] || {}
-    return (row.coupang || 0) + (row.naver || 0) + (row.other || 0)
+    return (row.coupang || 0) + (row.naver || 0)
   }
 
   // 14일 기준 — 위 세 집계와 같은 창(getSourceCounts(14)/getClickBreakdown(14)/getPostSourceCounts(14))
@@ -2961,7 +2968,6 @@ function RevenueBoard({ posts, clicks, sources, onGoFill, onSaved }: {
         const groupbuy = n(p.id, 'groupbuy')
         const coupang = n(p.id, 'coupang')
         const naver = n(p.id, 'naver')
-        const other = n(p.id, 'other')
         return {
           post: p,
           detail,
@@ -2969,11 +2975,11 @@ function RevenueBoard({ posts, clicks, sources, onGoFill, onSaved }: {
           coupang,
           naver,
           search: searchIn(p.id),
-          // 공구 클릭률 — 판매자 링크라 수수료가 없다. 구매처 클릭률(쿠팡·네이버·기타) —
-          // 이게 돈이 되는 쪽이다. 사장님이 두 개를 나눠 보고 싶어 해서 합친 클릭률 대신
-          // 이 둘로 바꿨다(입력이 번거로운 구매 기록 대신, 이미 자동으로 쌓이는 값)
+          // 공구 클릭률 — 판매자 링크라 수수료가 없다. 구매처 클릭률(쿠팡·네이버 파트너스만) —
+          // 이게 진짜 돈이 되는 쪽이다. 'other'(제휴 없는 판매처 링크, D-058)는 수수료가
+          // 없어서 뺐다 — 사장님이 정확히 이 두 종류만 세면 된다고 확인해줬다.
           groupbuyRate: detail > 0 ? groupbuy / detail * 100 : null,
-          buyerRate: detail > 0 ? (coupang + naver + other) / detail * 100 : null,
+          buyerRate: detail > 0 ? (coupang + naver) / detail * 100 : null,
           linked: hasPurchaseLink(p),
           broken: brokenPurchaseLinks(p).length > 0,
           // 대체 상품만 있고 동일 상품은 없는 상태 — "없음"이라고 하면 이미 채운 걸 또 채우려 든다
@@ -3038,7 +3044,8 @@ function RevenueBoard({ posts, clicks, sources, onGoFill, onSaved }: {
         <br />
         <span style={{ color: '#94a3b8' }}>검색유입 열은 오늘부터 쌓입니다 — 지난 기록은 상품과 안 묶여 있어서 소급이 안 돼요.
         공구 클릭률은 상세조회 대비 공구 링크(판매자, 수수료 없음) 클릭 비율, 구매처 클릭률은
-        상세조회 대비 쿠팡·네이버·기타 클릭(돈이 되는 쪽) 비율이에요 — 실제 구매 여부는 몰라요.</span>
+        상세조회 대비 쿠팡·네이버 파트너스 클릭(돈이 될 수 있는 쪽) 비율이에요 — 제휴 없는
+        판매처 링크(D-058)는 안 셉니다. 실제 구매 여부는 몰라요.</span>
       </p>
 
       <div style={{ display: 'flex', gap: 6, marginBottom: 14, flexWrap: 'wrap' }}>

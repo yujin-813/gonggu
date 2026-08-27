@@ -68,8 +68,9 @@ export async function GET() {
   const clickBreakdown = getClickBreakdown(14)
   const postSources = getPostSourceCounts(14)
   const recentSessions = getRecentSessions(40)
-  // 성장 목표 카드의 "구매처 클릭" — 돈이 되는 클릭만(쿠팡·네이버·기타), 공구 클릭은 뺀다.
-  // 판매자 링크라 수수료가 없기 때문이다(수익화 현황 표와 같은 기준, D-014 근처 관례).
-  const moneyClicks7 = Object.values(getClickCounts(7, ['coupang', 'naver', 'other'])).reduce((a, b) => a + b, 0)
+  // 성장 목표 카드의 "구매처 클릭" — 진짜 제휴(쿠팡·네이버 파트너스)만 센다. 공구 클릭은
+  // 판매자 링크라 수수료가 없어서 빼고, 'other'(제휴 없는 판매처 링크, D-058)도 수수료가
+  // 없어서 뺀다 — "구매처 클릭"은 돈이 될 가능성이 있는 클릭만을 뜻한다(사장님 기준).
+  const moneyClicks7 = Object.values(getClickCounts(7, ['coupang', 'naver'])).reduce((a, b) => a + b, 0)
   return NextResponse.json({ summary, topPosts, topSharedPosts, sources, detailViews, clickBreakdown, postSources, recentSessions, moneyClicks7 })
 }
