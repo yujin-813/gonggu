@@ -1,6 +1,6 @@
 'use client'
 import { useState, useEffect, useMemo, useCallback } from 'react'
-import type { Post, ScraperStatus, InfluencerSource, Collection, PurchaseLink, PurchaseLinkRelation } from '@/lib/types'
+import type { Post, ScraperStatus, InfluencerSource, Collection, PurchaseLink, PurchaseLinkRelation, PurchaseRecord } from '@/lib/types'
 import { RELATION_DEFAULT_REASON } from '@/lib/types'
 import { daysLeft, periodLabel, isExpired, isCustomerVisible, isPagePublic, fmtDate, getPeriodState, DEADLINE_UNKNOWN_DAYS } from '@/lib/period'
 import { hasPurchaseLink, normalizePurchaseLinks, brokenPurchaseLinks, isAffiliateLink, isSameProduct, alternativeLinks, sameProductLinks, PLATFORM_LABEL } from '@/lib/purchaseLinks'
@@ -132,6 +132,7 @@ export default function AdminPage() {
   // 최근 7일 구매처(쿠팡·네이버·기타) 클릭 합계 — 성장 목표 카드
   const [moneyClicks7, setMoneyClicks7] = useState(0)
   const [growthGoals, setGrowthGoals] = useState<number[]>([])
+  const [purchaseLog, setPurchaseLog] = useState<PurchaseRecord[]>([])
   const [inquiries, setInquiries] = useState<Inquiry[]>([])
   // 「오늘 손보면 돈 되는 일」에서 '목록으로 →'를 누르면 채우기 탭의 어느 세부 탭으로
   // 갈지 함께 정한다 — 탭만 바꾸면 항상 '미확인'으로 열려서, ⚠️ 종료+대체상품없음 항목을
@@ -190,6 +191,11 @@ export default function AdminPage() {
   const fetchGrowthGoals = useCallback(async () => {
     const r = await fetch('/api/growth-goals')
     if (r.ok) { const d = await r.json(); setGrowthGoals(d.stages || []) }
+  }, [])
+
+  const fetchPurchaseLog = useCallback(async () => {
+    const r = await fetch('/api/purchase-log')
+    if (r.ok) { const d = await r.json(); setPurchaseLog(d.records || []) }
   }, [])
 
   const fetchInquiries = useCallback(async () => {
@@ -322,13 +328,14 @@ export default function AdminPage() {
     fetchPosts()
     fetchAnalytics()
     fetchGrowthGoals()
+    fetchPurchaseLog()
     fetchInquiries()
     fetchInfluencerSources()
     fetchInpockStatus()
     fetchCollections()
     const iv = setInterval(() => { fetchInpockStatus() }, 5000)
     return () => clearInterval(iv)
-  }, [fetchPosts, fetchAnalytics, fetchGrowthGoals, fetchInquiries, fetchInfluencerSources, fetchInpockStatus, fetchCollections])
+  }, [fetchPosts, fetchAnalytics, fetchGrowthGoals, fetchPurchaseLog, fetchInquiries, fetchInfluencerSources, fetchInpockStatus, fetchCollections])
 
   async function togglePublished(p: Post) {
     const isPublished = p.status === 'published' || (!p.status && p.published !== false)
@@ -711,6 +718,7 @@ export default function AdminPage() {
 
         {adminTab === 'data' && (
           <>
+            <PurchaseLogBoard posts={posts} records={purchaseLog} onSaved={fetchPurchaseLog} />
             <GrowthGoalsBoard stages={growthGoals} analytics={analytics} moneyClicks7={moneyClicks7} onSaved={fetchGrowthGoals} />
             <VisitorFlow sessions={recentSessions} posts={posts} clickBreakdown={clickBreakdown} postSources={postSources} sources={sources} onRefresh={fetchAnalytics} />
           </>
@@ -2286,6 +2294,262 @@ function PurchaseLinkModal({ post, onClose, onSaved }: { post: Post; onClose: ()
  * 된다. 데이터가 없는데 "+82%"를 보여주면 그게 바로 틀린 숫자를 내보내는 것이다(원칙 1).
  * 자리는 비워 두고 며칠 뒤 데이터가 차면 그때 만든다.
  */
+const LINK_TYPE_LABEL: Record<string, string> = {
+  groupbuy: '공구 링크(자체)', coupang: '쿠팡', naver: '네이버', other: '기타 판매처',
+}
+const PURCHASE_SOURCE_OPTIONS: { value: string; label: string }[] = [
+  { value: 'naver_search', label: '네이버 검색' },
+  { value: 'google_search', label: '구글 검색' },
+  { value: 'other_search', label: '기타 검색' },
+  { value: 'instagram', label: '인스타그램' },
+  { value: 'kakao', label: '카카오톡' },
+  { value: 'calendar', label: '캘린더 알림' },
+  { value: 'direct', label: '직접 방문·북마크' },
+  { value: 'external', label: '외부 사이트' },
+  { value: 'inapp', label: '앱 내 브라우저(경로 미상)' },
+]
+const PURCHASE_STAGES = [1, 5, 20]
+
+/**
+ * 구매 기록 — 쿠팡·네이버 파트너스 대시보드에서 실제 구매를 확인하면 관리자가 손으로
+ * 남긴다(자동 감지 아님, 그런 API가 없다 — 원칙 2). "어떤 상세페이지·유입경로·링크에서
+ * 돈이 생겼는가"를 사례로 쌓아 패턴을 찾는 게 목적이다.
+ *
+ * 목표를 금액(예: 1만원)이 아니라 **구매 건수**(1→5→20)로 잡는다 — 지금은 반복성을
+ * 확인하는 단계다. 서로 다른 날짜·상품에서 5건쯤 쌓이면 "마감상품 대체구매 4건 ·
+ * 진행중 가격비교 1건"처럼 실제 데이터로 패턴이 드러난다(사장님 기준).
+ */
+function PurchaseLogBoard({ posts, records, onSaved }: {
+  posts: Post[]
+  records: PurchaseRecord[]
+  onSaved: () => void
+}) {
+  const [showForm, setShowForm] = useState(false)
+  const [postQuery, setPostQuery] = useState('')
+  const [selectedPost, setSelectedPost] = useState<Post | null>(null)
+  const [source, setSource] = useState('naver_search')
+  const [linkType, setLinkType] = useState<'groupbuy' | 'coupang' | 'naver' | 'other'>('coupang')
+  const [endedAtPurchase, setEndedAtPurchase] = useState(false)
+  const [orderAmount, setOrderAmount] = useState('')
+  const [revenue, setRevenue] = useState('')
+  const [purchasedAt, setPurchasedAt] = useState(new Date().toISOString().slice(0, 10))
+  const [note, setNote] = useState('')
+  const [saving, setSaving] = useState(false)
+
+  const matches = !selectedPost && postQuery.trim().length >= 2
+    ? posts.filter(p => p.title.includes(postQuery) || p.account.includes(postQuery)).slice(0, 8)
+    : []
+
+  const sorted = [...records].sort((a, b) => b.purchasedAt.localeCompare(a.purchasedAt))
+  const count = records.length
+  const nextStage = PURCHASE_STAGES.find(s => s > count) ?? null
+  const pct = nextStage !== null ? Math.min(100, Math.round((count / nextStage) * 100)) : 100
+
+  // "어디서 돈이 생기는가" — 마감된 뒤 대체 구매처로 나간 건지, 진행 중인데 가격 비교로
+  // 나간 건지. 공구 링크(groupbuy) 자체는 수수료가 없어 여기 안 들어간다.
+  const endedAltCount = records.filter(r => r.endedAtPurchase && r.linkType !== 'groupbuy').length
+  const activeCompareCount = records.filter(r => !r.endedAtPurchase && r.linkType !== 'groupbuy').length
+
+  function resetForm() {
+    setSelectedPost(null); setPostQuery(''); setSource('naver_search'); setLinkType('coupang')
+    setEndedAtPurchase(false); setOrderAmount(''); setRevenue('')
+    setPurchasedAt(new Date().toISOString().slice(0, 10)); setNote('')
+  }
+
+  async function save() {
+    if (!selectedPost) return
+    setSaving(true)
+    try {
+      await fetch('/api/purchase-log', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          postId: selectedPost.id, postTitle: selectedPost.title, source, linkType, endedAtPurchase,
+          orderAmount: parseInt(orderAmount) || 0, revenue: parseInt(revenue) || 0,
+          purchasedAt, note: note.trim() || undefined,
+        }),
+      })
+      onSaved()
+      setShowForm(false)
+      resetForm()
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  async function remove(id: string) {
+    await fetch('/api/purchase-log', {
+      method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id }),
+    })
+    onSaved()
+  }
+
+  const th: React.CSSProperties = { padding: '8px 10px', fontSize: 11.5, fontWeight: 700, color: '#64748b', textAlign: 'right', whiteSpace: 'nowrap' }
+  const td: React.CSSProperties = { padding: '9px 10px', fontSize: 13, textAlign: 'right', whiteSpace: 'nowrap', borderTop: '1px solid #f1f5f9' }
+
+  return (
+    <div style={{ background: '#fff', borderRadius: 12, padding: 20, marginBottom: 24, border: '1px solid #e2e8f0' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+        <h3 style={{ margin: 0, fontSize: 15, fontWeight: 700, color: '#1e293b' }}>구매 기록</h3>
+        {!showForm && (
+          <button onClick={() => setShowForm(true)}
+            style={{ marginLeft: 'auto', padding: '4px 10px', borderRadius: 7, border: '1px solid #cbd5e1',
+              background: '#fff', cursor: 'pointer', fontSize: 11.5, fontWeight: 600, color: '#475569' }}>
+            + 구매 기록 추가
+          </button>
+        )}
+      </div>
+      <p style={{ fontSize: 11.5, color: '#94a3b8', margin: '0 0 16px', lineHeight: 1.6 }}>
+        쿠팡·네이버 파트너스 대시보드에서 실제 구매를 확인하면 여기에 손으로 남겨요. 지금 목표는
+        금액이 아니라 반복성이에요 — 어떤 상세페이지·유입경로·링크에서 돈이 생기는지 사례를 쌓아요.
+      </p>
+
+      {showForm && (
+        <div style={{ marginBottom: 18, padding: 14, borderRadius: 10, background: '#f8fafc', border: '1px solid #e2e8f0' }}>
+          <div style={{ position: 'relative', marginBottom: 8 }}>
+            {selectedPost ? (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 10px',
+                borderRadius: 8, border: '1.5px solid #6366f1', background: '#eef2ff' }}>
+                <span style={{ fontSize: 13, fontWeight: 700, color: '#1e293b', flex: 1 }}>{selectedPost.title}</span>
+                <button onClick={() => { setSelectedPost(null); setPostQuery('') }}
+                  style={{ border: 'none', background: 'none', cursor: 'pointer', fontSize: 12, color: '#6366f1', fontWeight: 700 }}>
+                  변경
+                </button>
+              </div>
+            ) : (
+              <input value={postQuery} onChange={e => setPostQuery(e.target.value)}
+                placeholder="상품명 검색 (2글자 이상)" style={{ ...fillInput, fontSize: 13, width: '100%' }} />
+            )}
+            {matches.length > 0 && (
+              <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 10,
+                background: '#fff', border: '1px solid #e2e8f0', borderRadius: 8, marginTop: 4,
+                boxShadow: '0 8px 16px rgba(0,0,0,.08)', maxHeight: 220, overflowY: 'auto' }}>
+                {matches.map(p => (
+                  <button key={p.id} onClick={() => { setSelectedPost(p); setPostQuery('') }}
+                    style={{ display: 'block', width: '100%', textAlign: 'left', padding: '8px 10px',
+                      border: 'none', background: 'none', cursor: 'pointer', fontSize: 12.5, color: '#1e293b',
+                      borderBottom: '1px solid #f1f5f9' }}>
+                    {p.title} <span style={{ color: '#94a3b8' }}>· {p.account}</span>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+
+          <div className="admin-2col" style={{ gap: 8, marginBottom: 8 }}>
+            <select value={source} onChange={e => setSource(e.target.value)} style={{ ...fillInput, fontSize: 13 }}>
+              {PURCHASE_SOURCE_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+            </select>
+            <select value={linkType} onChange={e => setLinkType(e.target.value as typeof linkType)} style={{ ...fillInput, fontSize: 13 }}>
+              {(['coupang', 'naver', 'other', 'groupbuy'] as const).map(k => <option key={k} value={k}>{LINK_TYPE_LABEL[k]}</option>)}
+            </select>
+          </div>
+
+          <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12.5, color: '#475569', marginBottom: 8, cursor: 'pointer' }}>
+            <input type="checkbox" checked={endedAtPurchase} onChange={e => setEndedAtPurchase(e.target.checked)} />
+            이 구매 시점에 공구가 마감 상태였어요
+          </label>
+
+          <div className="admin-2col" style={{ gap: 8, marginBottom: 8 }}>
+            <input type="number" value={orderAmount} onChange={e => setOrderAmount(e.target.value)}
+              placeholder="주문금액 (원)" style={{ ...fillInput, fontSize: 13 }} />
+            <input type="number" value={revenue} onChange={e => setRevenue(e.target.value)}
+              placeholder="수익 (원)" style={{ ...fillInput, fontSize: 13 }} />
+          </div>
+          <input type="date" value={purchasedAt} onChange={e => setPurchasedAt(e.target.value)}
+            style={{ ...fillInput, fontSize: 13, marginBottom: 8 }} />
+          <input value={note} onChange={e => setNote(e.target.value)}
+            placeholder="메모 (선택)" style={{ ...fillInput, fontSize: 13, marginBottom: 10 }} />
+
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button onClick={save} disabled={!selectedPost || saving}
+              className="btn-submit" style={{ width: 'auto', padding: '8px 16px',
+                opacity: !selectedPost || saving ? .5 : 1 }}>
+              {saving ? '저장 중...' : '저장'}
+            </button>
+            <button onClick={() => { setShowForm(false); resetForm() }}
+              style={{ padding: '8px 16px', borderRadius: 12, border: '1px solid #cbd5e1', background: '#fff',
+                cursor: 'pointer', fontSize: 14, fontWeight: 600, color: '#475569' }}>
+              취소
+            </button>
+          </div>
+        </div>
+      )}
+
+      <div style={{ marginBottom: 20 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 6 }}>
+          <span style={{ fontSize: 14, fontWeight: 800, color: '#0f172a' }}>
+            {nextStage === null ? '목표 20건 달성 🎉' : `누적 구매 ${count}건 · 다음 목표 ${nextStage}건`}
+          </span>
+        </div>
+        {nextStage !== null && (
+          <div style={{ height: 12, borderRadius: 6, background: '#e2e8f0', overflow: 'hidden' }}>
+            <div style={{ width: `${pct}%`, height: '100%', borderRadius: 6, background: '#f59e0b', transition: 'width .3s' }} />
+          </div>
+        )}
+      </div>
+
+      {count >= 3 && (
+        <div style={{ marginBottom: 20, padding: 12, borderRadius: 10, background: '#f8fafc' }}>
+          <div style={{ fontSize: 11.5, fontWeight: 700, color: '#64748b', marginBottom: 6 }}>
+            🔍 어디서 돈이 생기는지
+          </div>
+          <div style={{ fontSize: 13, fontWeight: 700, color: '#0f172a' }}>
+            마감상품 대체구매 {endedAltCount}건 · 진행중 가격비교 {activeCompareCount}건
+          </div>
+        </div>
+      )}
+
+      {sorted.length > 0 && (
+        <div style={{ overflowX: 'auto' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 640 }}>
+            <thead>
+              <tr>
+                <th style={{ ...th, textAlign: 'left' }}>상품</th>
+                <th style={{ ...th, textAlign: 'left' }}>유입</th>
+                <th style={{ ...th, textAlign: 'left' }}>링크</th>
+                <th style={th}>주문금액</th>
+                <th style={th}>수익</th>
+                <th style={th}>날짜</th>
+                <th style={{ ...th, textAlign: 'center' }}></th>
+              </tr>
+            </thead>
+            <tbody>
+              {sorted.map(r => (
+                <tr key={r.id}>
+                  <td style={{ ...td, textAlign: 'left', maxWidth: 220 }}>
+                    <a href={`/post/${r.postId}`} target="_blank" rel="noreferrer" style={{ color: '#1e293b', fontWeight: 600, textDecoration: 'none' }}>
+                      {r.postTitle}
+                    </a>
+                    <span style={{ marginLeft: 6, fontSize: 10.5, color: r.endedAtPurchase ? '#dc2626' : '#22c55e', fontWeight: 700 }}>
+                      {r.endedAtPurchase ? '마감' : '진행중'}
+                    </span>
+                  </td>
+                  <td style={{ ...td, textAlign: 'left' }}>{PURCHASE_SOURCE_OPTIONS.find(o => o.value === r.source)?.label || r.source || '–'}</td>
+                  <td style={{ ...td, textAlign: 'left' }}>{LINK_TYPE_LABEL[r.linkType]}</td>
+                  <td style={td}>{r.orderAmount.toLocaleString()}원</td>
+                  <td style={{ ...td, fontWeight: 700, color: '#15803d' }}>{r.revenue.toLocaleString()}원</td>
+                  <td style={td}>{r.purchasedAt}</td>
+                  <td style={{ ...td, textAlign: 'center' }}>
+                    <button onClick={() => remove(r.id)}
+                      style={{ border: 'none', background: 'none', cursor: 'pointer', fontSize: 11, color: '#94a3b8', fontWeight: 600 }}>
+                      삭제
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+      {sorted.length === 0 && !showForm && (
+        <p style={{ textAlign: 'center', padding: '16px 0', fontSize: 13.5, fontWeight: 700, color: '#64748b' }}>
+          아직 기록된 구매가 없어요
+        </p>
+      )}
+    </div>
+  )
+}
+
 /**
  * 성장 목표 — 일 방문자 기준 단계(기본 150→300→500→1,000→3,000→10,000)로 지금 어디까지
  * 왔는지 보여준다. 단계는 사장님이 나중에 고칠 수 있다(/api/growth-goals).

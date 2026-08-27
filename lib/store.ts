@@ -1,6 +1,6 @@
 import fs from 'fs'
 import path from 'path'
-import type { Post, ScraperStatus, InfluencerSource, Collection } from './types'
+import type { Post, ScraperStatus, InfluencerSource, Collection, PurchaseRecord } from './types'
 
 // 배포 환경에서 git pull로 덮어쓰이지 않도록 data/ 디렉토리 사용
 const DATA_DIR    = path.join(process.cwd(), 'data')
@@ -9,6 +9,7 @@ const STATUS_FILE = path.join(DATA_DIR, 'scraper_status.json')
 const PROFILES_FILE = path.join(DATA_DIR, 'tracked_profiles.json')
 const COLLECTIONS_FILE = path.join(DATA_DIR, 'collections.json')
 const GROWTH_GOALS_FILE = path.join(DATA_DIR, 'growth_goals.json')
+const PURCHASE_LOG_FILE = path.join(DATA_DIR, 'purchase_log.json')
 
 // 일 방문자 기준 성장 단계. 사장님이 관리자 화면에서 나중에 바꿀 수 있다 — 이건 그때까지의 기본값.
 const DEFAULT_GROWTH_STAGES = [150, 300, 500, 1000, 3000, 10000]
@@ -162,4 +163,16 @@ export function loadGrowthGoals(): { stages: number[] } {
 export function saveGrowthGoals(goals: { stages: number[] }): void {
   ensureDir()
   atomicWrite(GROWTH_GOALS_FILE, JSON.stringify(goals, null, 2))
+}
+
+export function loadPurchaseLog(): PurchaseRecord[] {
+  ensureDir()
+  if (!fs.existsSync(PURCHASE_LOG_FILE)) return []
+  try { return JSON.parse(fs.readFileSync(PURCHASE_LOG_FILE, 'utf-8')) }
+  catch { return [] }
+}
+
+export function savePurchaseLog(records: PurchaseRecord[]): void {
+  ensureDir()
+  atomicWrite(PURCHASE_LOG_FILE, JSON.stringify(records, null, 2))
 }

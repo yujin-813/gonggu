@@ -57,6 +57,9 @@ function isProtected(req: NextRequest): boolean {
   // 성장 목표 단계 (관리자 전용)
   if (pathname === '/api/growth-goals') return true
 
+  // 구매 기록 (관리자 전용)
+  if (pathname === '/api/purchase-log') return true
+
   // 옵션 가져오기 — 임의 URL을 서버가 대신 요청해 주는 창구라 반드시 막아야 한다
   if (pathname === '/api/options') return true
 
@@ -103,6 +106,7 @@ export const config = {
     '/api/analytics',
     '/api/admin-ips',
     '/api/growth-goals',
+    '/api/purchase-log',
     '/api/options',
   ],
 }

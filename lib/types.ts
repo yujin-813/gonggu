@@ -228,6 +228,32 @@ export interface PurchaseLink {
   commission_checked_at?: string | null
 }
 
+/**
+ * 실제로 확인된 구매 한 건 — 쿠팡·네이버 파트너스 대시보드에서 관리자가 직접 보고 손으로
+ * 남긴다(자동 감지 아님, 그런 API가 없다). "돈이 언제 생기는가"를 실제 사례로 쌓아서
+ * 패턴을 찾으려는 목적 — 상세페이지·유입경로·클릭한 링크까지 함께 남긴다.
+ */
+export interface PurchaseRecord {
+  id: string
+  postId: number
+  /** 기록 당시 상품명 — 나중에 공구 제목이 바뀌거나 글이 지워져도 기록은 남는다 */
+  postTitle: string
+  /** 유입 경로 — lib/analytics.ts의 TrafficSource 값 */
+  source: string
+  /** 어떤 링크를 눌러서 나갔는지 */
+  linkType: 'groupbuy' | 'coupang' | 'naver' | 'other'
+  /** 이 구매가 일어난 시점에 공구가 마감 상태였는지 — "마감상품 대체구매"와
+   * "진행중 가격비교"를 가르는 기준 */
+  endedAtPurchase: boolean
+  orderAmount: number
+  revenue: number
+  note?: string
+  /** 실제 구매(주문)가 일어난 날짜 */
+  purchasedAt: string
+  /** 관리자가 이 기록을 남긴 시각 */
+  recordedAt: string
+}
+
 export interface Collection {
   id: string
   title: string
