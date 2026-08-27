@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { recordEvent, getSummary, getTopPosts, getTopSharedPosts, getSourceCounts, getClickCounts, getClickBreakdown, getPostSourceCounts, getRecentSessions, classifySource, CLICK_TYPES } from '@/lib/analytics'
 import { loadPosts } from '@/lib/store'
+import { isPagePublic } from '@/lib/period'
 import { AUTH_COOKIE, computeToken, safeEqual } from '@/lib/auth'
 import { ADMIN_SEEN_COOKIE, isAdminIp, clientIp, isBotRequest } from '@/lib/adminTrace'
 
@@ -68,9 +69,16 @@ export async function GET() {
   const clickBreakdown = getClickBreakdown(14)
   const postSources = getPostSourceCounts(14)
   const recentSessions = getRecentSessions(40)
-  // 성장 목표 카드의 "구매처 클릭" — 진짜 제휴(쿠팡·네이버 파트너스)만 센다. 공구 클릭은
-  // 판매자 링크라 수수료가 없어서 빼고, 'other'(제휴 없는 판매처 링크, D-058)도 수수료가
-  // 없어서 뺀다 — "구매처 클릭"은 돈이 될 가능성이 있는 클릭만을 뜻한다(사장님 기준).
-  const moneyClicks7 = Object.values(getClickCounts(7, ['coupang', 'naver'])).reduce((a, b) => a + b, 0)
-  return NextResponse.json({ summary, topPosts, topSharedPosts, sources, detailViews, clickBreakdown, postSources, recentSessions, moneyClicks7 })
+  // 성장 목표 카드의 "공구 클릭"·"구매처 클릭" — 지금 고객 화면에 실제로 떠 있는 상품만
+  // 센다(isPagePublic). 제외됐거나 비공개인 상품의 옛 클릭까지 합치면, 여기 나오는
+  // 합계와 「수익화 현황 → 상품별로 보기」(똑같이 isPagePublic만 나열)의 합이 안 맞아서
+  // "어디 갔지?"가 된다 — 사장님이 실제로 이 불일치를 발견하고 지적했다.
+  // 구매처 클릭은 진짜 제휴(쿠팡·네이버 파트너스)만. 'other'(제휴 없는 판매처 링크,
+  // D-058)는 수수료가 없어서 뺀다.
+  const publicIds = new Set(posts.filter(isPagePublic).map(p => p.id))
+  const sumPublic = (counts: Record<number, number>) =>
+    Object.entries(counts).filter(([id]) => publicIds.has(Number(id))).reduce((a, [, v]) => a + v, 0)
+  const groupbuyClicks7 = sumPublic(getClickCounts(7, ['groupbuy']))
+  const moneyClicks7 = sumPublic(getClickCounts(7, ['coupang', 'naver']))
+  return NextResponse.json({ summary, topPosts, topSharedPosts, sources, detailViews, clickBreakdown, postSources, recentSessions, groupbuyClicks7, moneyClicks7 })
 }

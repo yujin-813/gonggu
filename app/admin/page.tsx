@@ -129,7 +129,9 @@ export default function AdminPage() {
   const [postSources, setPostSources] = useState<Record<string, Record<string, number>>>({})
   // 최근 방문의 개별 동작 — 세션 단위로 묶어 흐름을 본다
   const [recentSessions, setRecentSessions] = useState<RecentSession[]>([])
-  // 최근 7일 구매처(쿠팡·네이버·기타) 클릭 합계 — 성장 목표 카드
+  // 최근 7일 공구/구매처(쿠팡·네이버) 클릭 합계 — 성장 목표 카드. 지금 공개 중인 상품만
+  // 센다(isPagePublic) — 「수익화 현황 → 상품별로 보기」와 같은 기준으로 맞춰야 합계가 안 어긋난다
+  const [groupbuyClicks7, setGroupbuyClicks7] = useState(0)
   const [moneyClicks7, setMoneyClicks7] = useState(0)
   const [growthGoals, setGrowthGoals] = useState<number[]>([])
   const [purchaseLog, setPurchaseLog] = useState<PurchaseRecord[]>([])
@@ -184,6 +186,7 @@ export default function AdminPage() {
       setClickBreakdown(d.clickBreakdown || {})
       setPostSources(d.postSources || {})
       setRecentSessions(d.recentSessions || [])
+      setGroupbuyClicks7(d.groupbuyClicks7 || 0)
       setMoneyClicks7(d.moneyClicks7 || 0)
     }
   }, [])
@@ -719,7 +722,7 @@ export default function AdminPage() {
         {adminTab === 'data' && (
           <>
             <PurchaseLogBoard posts={posts} records={purchaseLog} onSaved={fetchPurchaseLog} />
-            <GrowthGoalsBoard stages={growthGoals} analytics={analytics} moneyClicks7={moneyClicks7} onSaved={fetchGrowthGoals}
+            <GrowthGoalsBoard stages={growthGoals} analytics={analytics} groupbuyClicks7={groupbuyClicks7} moneyClicks7={moneyClicks7} onSaved={fetchGrowthGoals}
               onGoRevenue={() => { setAdminTab('revenue'); document.getElementById('admin-tabs')?.scrollIntoView({ behavior: 'smooth', block: 'start' }) }} />
             <VisitorFlow sessions={recentSessions} posts={posts} clickBreakdown={clickBreakdown} postSources={postSources} sources={sources} onRefresh={fetchAnalytics} />
           </>
@@ -1858,8 +1861,12 @@ function VisitorFlow({ sessions, posts, clickBreakdown, postSources, sources, on
     .filter(s => s.source === 'naver_search' || s.source === 'google_search' || s.source === 'other_search')
     .reduce((sum, s) => sum + s.count, 0)
   const totalDetail = posts.reduce((sum, p) => sum + searchIn(p.id), 0)
-  // 진짜 제휴(쿠팡·네이버)만 "구매처 클릭"으로 센다 — 'other'는 제휴 없는 판매처 링크(D-058)라 뺀다
-  const totalMoney = Object.values(clickBreakdown).reduce((sum, row) => sum + (row.coupang || 0) + (row.naver || 0), 0)
+  // 진짜 제휴(쿠팡·네이버)만 "구매처 클릭"으로 센다 — 'other'는 제휴 없는 판매처 링크(D-058)라 뺀다.
+  // 지금 공개 중인 상품만 센다 — 「수익화 현황 → 상품별로 보기」와 같은 기준으로 맞춘다
+  const publicIds = new Set(posts.filter(isPagePublic).map(p => p.id))
+  const totalMoney = Object.entries(clickBreakdown)
+    .filter(([id]) => publicIds.has(Number(id)))
+    .reduce((sum, [, row]) => sum + (row.coupang || 0) + (row.naver || 0), 0)
   const pct = (n: number, d: number) => (d > 0 ? `${Math.round((n / d) * 100)}%` : '–')
 
   const when = (iso: string) => {
@@ -2564,9 +2571,10 @@ function PurchaseLogBoard({ posts, records, onSaved }: {
  * 편차가 커서(주말 vs 평일), 좋은 날 하루로 다음 단계를 넘긴 것처럼 보이거나 나쁜 날
  * 하루로 이미 넘은 단계 아래로 떨어져 보이면 판정이 널뛴다.
  */
-function GrowthGoalsBoard({ stages, analytics, moneyClicks7, onSaved, onGoRevenue }: {
+function GrowthGoalsBoard({ stages, analytics, groupbuyClicks7, moneyClicks7, onSaved, onGoRevenue }: {
   stages: number[]
   analytics: DayStat[]
+  groupbuyClicks7: number
   moneyClicks7: number
   onSaved: () => void
   onGoRevenue: () => void
@@ -2706,7 +2714,14 @@ function GrowthGoalsBoard({ stages, analytics, moneyClicks7, onSaved, onGoRevenu
             <button onClick={onGoRevenue} title="상품별로 보기 → 수익화 현황"
               style={{ background: '#f8fafc', borderRadius: 10, padding: '12px 14px', border: '1px solid transparent',
                 cursor: 'pointer', textAlign: 'left', font: 'inherit' }}>
-              <div style={{ fontSize: 11, color: '#64748b', marginBottom: 4 }}>구매처 클릭(7일)</div>
+              <div style={{ fontSize: 11, color: '#64748b', marginBottom: 4 }}>공구 클릭(7일)</div>
+              <div style={{ fontSize: 16, fontWeight: 800, color: '#0f172a' }}>{groupbuyClicks7.toLocaleString()}회</div>
+              <div style={{ fontSize: 10, color: '#6366f1', fontWeight: 700, marginTop: 2 }}>상품별로 보기 →</div>
+            </button>
+            <button onClick={onGoRevenue} title="상품별로 보기 → 수익화 현황"
+              style={{ background: '#f8fafc', borderRadius: 10, padding: '12px 14px', border: '1px solid transparent',
+                cursor: 'pointer', textAlign: 'left', font: 'inherit' }}>
+              <div style={{ fontSize: 11, color: '#64748b', marginBottom: 4 }}>구매처(제휴) 클릭(7일)</div>
               <div style={{ fontSize: 16, fontWeight: 800, color: '#0f172a' }}>{moneyClicks7.toLocaleString()}회</div>
               <div style={{ fontSize: 10, color: '#6366f1', fontWeight: 700, marginTop: 2 }}>상품별로 보기 →</div>
             </button>
@@ -2825,7 +2840,9 @@ function TodayPriorities({ posts, detailViews, clickBreakdown, postSources, sour
   // 한 사람이 여러 상품을 보면 분모보다 분자가 커진다. 같은 모수(검색으로 온 사람의
   // 클릭)로 맞춰야 비율이 뜻을 가진다
   const totalDetail = posts.reduce((sum, p) => sum + searchIn(p.id), 0)
-  const totalMoneyClicks = posts.reduce((sum, p) => sum + moneyClicks(p.id), 0)
+  // 지금 공개 중인 상품만 센다 — 「수익화 현황 → 상품별로 보기」도 isPagePublic만 나열하므로
+  // 여기서 제외·비공개 상품의 옛 클릭까지 합치면 두 숫자가 안 맞아 보인다(사장님이 실제로 지적함)
+  const totalMoneyClicks = posts.filter(isPagePublic).reduce((sum, p) => sum + moneyClicks(p.id), 0)
   const pct = (n: number, d: number) => (d > 0 ? `${Math.round((n / d) * 100)}%` : '–')
 
   const bucketA = posts
