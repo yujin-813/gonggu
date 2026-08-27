@@ -13,7 +13,7 @@
 | 스택 | Next.js 14 (App Router) · React 18 · TypeScript · 파이썬 수집기 |
 | 저장소 | **파일 기반** — `data/*.json`. DB 없음 |
 | 코드 규모 | `lib/` 3,384줄 · `app/admin` + `components/` 6,547줄 · 파이썬 3,019줄 |
-| 데이터 규모 | 게시물 2,448건 (공개 336건) · 인플루언서 소스 59개 · analytics 31일치 |
+| 데이터 규모 | 게시물 2,537건 (공개 349건) · 인플루언서 소스 60개 · analytics 31일치 |
 | 배포 | EC2 `13.125.121.62`(t3.small) · PM2(fork) + nginx · `bash deploy.sh` — **무중단**(3002↔3003 슬롯 교대, `D-028`) |
 | 도메인 | https://gonggu.asknuggetdata.com |
 
@@ -137,11 +137,11 @@ extraction_debug, scraped_at, collection_status, collection_error
 **`Post.status`** — 관리 상태
 | 값 | 의미 | 현재 건수 |
 |---|---|---|
-| `needs_review` | 검수 필요 | 1,101 |
-| `excluded` | 제외됨 (비공구 등) | 955 |
-| `published` | 공개 중 | 259 |
-| `upcoming` | 오픈 예정 | 57 |
-| `ready` | 공개 가능 (품절 자동 숨김 포함, `D-042`) | 60 |
+| `needs_review` | 검수 필요 | 1,111 |
+| `excluded` | 제외됨 (비공구 등) | 974 |
+| `published` | 공개 중 | 295 |
+| `upcoming` | 오픈 예정 | 80 |
+| `ready` | 공개 가능 (품절 자동 숨김 포함, `D-042`) | 61 |
 | `candidate` | 공구 후보 | 0 |
 | (없음) | 옛 데이터 | 16 ⚠️ |
 
