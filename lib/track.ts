@@ -40,8 +40,10 @@ function isAdminSession(): Promise<boolean> {
 }
 
 // 어떤 버튼을 눌렀는지 — 공구 링크와 대체 구매처(쿠팡/네이버) 클릭을 구분해야
-// "공구는 끝났는데 구매 수요는 남아 있다"를 데이터로 확인할 수 있다
-export type ClickType = 'groupbuy' | 'coupang' | 'naver' | 'other' | 'detail'
+// "공구는 끝났는데 구매 수요는 남아 있다"를 데이터로 확인할 수 있다.
+// calendar(캘린더에 담기)는 구매·수수료와 무관해서 따로 둔다 — 'other'에 섞이면
+// 수익화 현황의 "구매처 클릭률"이 오염된다. lib/analytics.ts의 ClickType과 같이 맞출 것
+export type ClickType = 'groupbuy' | 'coupang' | 'naver' | 'other' | 'detail' | 'calendar'
 
 // 유입 경로는 "이 방문의 첫 진입"에서만 의미가 있다. 사이트 안을 돌아다니면 referrer가
 // 우리 도메인으로 바뀌고 URL의 utm도 사라지므로, 처음 들어온 순간 값을 세션에 넣어 두고

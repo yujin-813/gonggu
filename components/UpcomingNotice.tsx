@@ -41,7 +41,7 @@ export default function UpcomingNotice({ post }: { post: Post }) {
           <a
             href={`/api/calendar/${post.id}`}
             className="ended-link-btn"
-            onClick={() => track('click', { postId: post.id, clickType: 'other' })}
+            onClick={() => track('click', { postId: post.id, clickType: 'calendar' })}
           >
             <CalendarPlus size={15} />
             <span>캘린더에 담기</span>
@@ -50,7 +50,7 @@ export default function UpcomingNotice({ post }: { post: Post }) {
 
         <p className="upcoming-alt">
           <a href={googleUrl} target="_blank" rel="noopener noreferrer"
-            onClick={() => track('click', { postId: post.id, clickType: 'other' })}>
+            onClick={() => track('click', { postId: post.id, clickType: 'calendar' })}>
             구글 캘린더에 추가 →
           </a>
         </p>

@@ -150,7 +150,7 @@ export default function EndedDealNotice({ post, purchaseLinks, related, section,
                   target="_blank"
                   rel="noopener noreferrer sponsored"
                   className="ended-alt-card"
-                  onClick={() => track('click', { postId: post.id, clickType: 'other' })}
+                  onClick={() => track('click', { postId: post.id, clickType: link.platform })}
                 >
                   {link.productName && <span className="ended-alt-name">{link.productName}</span>}
                   <span className="ended-alt-reason">{linkReason(link)}</span>

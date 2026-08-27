@@ -367,7 +367,7 @@ export default function PostCard({
           href={`/api/calendar/${post.id}`}
           className="card-cta"
           style={{ background: '#ede9fe', color: '#7c3aed', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, textDecoration: 'none' }}
-          onClick={e => { e.stopPropagation(); track('click', { postId: post.id, clickType: 'other' }) }}
+          onClick={e => { e.stopPropagation(); track('click', { postId: post.id, clickType: 'calendar' }) }}
         >
           <CalendarPlus size={16} /> 캘린더에 담기
         </a>

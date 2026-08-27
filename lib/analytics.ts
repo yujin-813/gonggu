@@ -17,10 +17,11 @@ interface DayData {
 }
 
 // 클릭 종류 — 어떤 버튼을 눌렀는지 구분해야 "공구는 끝났는데 쿠팡으로는 계속 나간다"
-// 같은 판단을 할 수 있다. groupbuy=공구 보러가기, coupang/naver=대체 구매처, detail=상세 조회
-export type ClickType = 'groupbuy' | 'coupang' | 'naver' | 'other' | 'detail'
+// 같은 판단을 할 수 있다. groupbuy=공구 보러가기, coupang/naver=대체 구매처, detail=상세 조회,
+// calendar=캘린더에 담기(구매·수수료와 무관 — 'other'에 섞이면 "구매처 클릭률"이 오염된다)
+export type ClickType = 'groupbuy' | 'coupang' | 'naver' | 'other' | 'detail' | 'calendar'
 
-export const CLICK_TYPES: ClickType[] = ['groupbuy', 'coupang', 'naver', 'other', 'detail']
+export const CLICK_TYPES: ClickType[] = ['groupbuy', 'coupang', 'naver', 'other', 'detail', 'calendar']
 
 interface AnalyticsData {
   daily: Record<string, DayData>
