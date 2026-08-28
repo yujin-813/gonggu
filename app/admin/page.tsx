@@ -110,6 +110,45 @@ const CAT_LABEL: Record<string, string> = {
  * 관리자 목록이 이미 전체 게시물을 들고 있으므로 새 API를 만들지 않고 여기서 센다.
  */
 
+/** 목록형 화면에서 공용으로 쓰는 페이지 번호 매김 — 사장님이 끝없이 이어지는 스크롤을
+ * 싫어해서(공구 목록이 최대 2,500건대) 페이지 크기를 고를 수 있는 넘버링으로 바꿨다. */
+function Pagination({ page, pageSize, total, onPage, onPageSize }: {
+  page: number; pageSize: number; total: number
+  onPage: (p: number) => void; onPageSize: (n: number) => void
+}) {
+  const totalPages = Math.max(1, Math.ceil(total / pageSize))
+  if (totalPages <= 1 && total <= 10) return null
+  const clamped = Math.min(Math.max(1, page), totalPages)
+  const windowStart = Math.max(1, Math.min(clamped - 2, totalPages - 4))
+  const windowEnd = Math.min(totalPages, windowStart + 4)
+  const nums: number[] = []
+  for (let n = windowStart; n <= windowEnd; n++) nums.push(n)
+
+  const btn = (active?: boolean): React.CSSProperties => ({
+    padding: '6px 11px', borderRadius: 7, border: '1px solid #cbd5e1',
+    background: active ? '#6366f1' : '#fff', color: active ? '#fff' : '#475569',
+    cursor: 'pointer', fontSize: 12.5, fontWeight: 600, minWidth: 32,
+  })
+
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap', marginTop: 14 }}>
+      <button onClick={() => onPage(1)} disabled={clamped === 1} style={btn()}>« 처음</button>
+      <button onClick={() => onPage(clamped - 1)} disabled={clamped === 1} style={btn()}>‹ 이전</button>
+      {windowStart > 1 && <span style={{ color: '#94a3b8', fontSize: 12.5 }}>…</span>}
+      {nums.map(n => <button key={n} onClick={() => onPage(n)} style={btn(n === clamped)}>{n}</button>)}
+      {windowEnd < totalPages && <span style={{ color: '#94a3b8', fontSize: 12.5 }}>…</span>}
+      <button onClick={() => onPage(clamped + 1)} disabled={clamped === totalPages} style={btn()}>다음 ›</button>
+      <button onClick={() => onPage(totalPages)} disabled={clamped === totalPages} style={btn()}>마지막 »</button>
+      <span style={{ fontSize: 12, color: '#94a3b8', marginLeft: 4 }}>{clamped} / {totalPages}페이지</span>
+      <div style={{ display: 'flex', gap: 4, marginLeft: 'auto' }}>
+        {[10, 50, 100].map(n => (
+          <button key={n} onClick={() => onPageSize(n)} style={btn(n === pageSize)}>{n}개씩</button>
+        ))}
+      </div>
+    </div>
+  )
+}
+
 export default function AdminPage() {
   const [authed, setAuthed]           = useState<boolean | null>(null)  // null = 확인 중
   const [posts, setPosts]             = useState<Post[]>([])
@@ -118,6 +157,10 @@ export default function AdminPage() {
   const [loading, setLoading]         = useState(true)
   const [filter, setFilter]           = useState<'all' | 'candidate' | 'needs_review' | 'ready' | 'published' | 'expired' | 'excluded' | 'upcoming' | 'upcoming_overdue' | 'featured'>('all')
   const [searchQ, setSearchQ]         = useState('')
+  const [postsPage, setPostsPage]     = useState(1)
+  const [postsPageSize, setPostsPageSize] = useState(10)
+  // 필터·검색이 바뀌면 이전 필터의 3페이지에 있다가 갑자기 빈 페이지를 보게 되므로 1페이지로
+  useEffect(() => { setPostsPage(1) }, [filter, searchQ])
   const [analytics, setAnalytics]     = useState<DayStat[]>([])
   const [topPosts, setTopPosts]       = useState<TopPost[]>([])
   const [topSharedPosts, setTopSharedPosts] = useState<TopPost[]>([])
@@ -513,6 +556,7 @@ export default function AdminPage() {
   // 오픈예정 탭은 원래 순서(수집 순)라 "내일 오픈"이 몇 십 건 사이에 묻혀 안 보였다 —
   // 오픈일이 가까운 순으로 세워서 급한 것부터 눈에 띄게 한다
   if (filter === 'upcoming') visible.sort((a, b) => daysLeft(a.start_date) - daysLeft(b.start_date))
+  const visiblePage = visible.slice((postsPage - 1) * postsPageSize, postsPage * postsPageSize)
 
   const countBy = (s: Post['status']) => posts.filter(p => effectiveStatus(p) === s).length
   const candidateCount   = countBy('candidate')
@@ -601,7 +645,7 @@ export default function AdminPage() {
         {/* 공구 관리 탭 */}
         {adminTab === 'posts' && (
           <>
-            <DuplicateGroups posts={posts} onEdit={setEditingPost} />
+            <DuplicateGroups posts={posts} onEdit={setEditingPost} onDelete={deletePost} />
 
             {/* 전체 수집 */}
             <div style={{ background: '#fff', borderRadius: 12, padding: 20, marginBottom: 24, border: '1px solid #e2e8f0' }}>
@@ -676,9 +720,13 @@ export default function AdminPage() {
                 <div>등록된 공구가 없습니다</div>
               </div>
             ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                {visible.map(p => <AdminPostRow key={p.id} post={p} onToggle={togglePublished} onDelete={deletePost} onEdit={setEditingPost} onToggleAlwaysOn={toggleEvergreenDeal} onToggleSoldOutOnly={toggleSoldOutOnly} onQuickReview={quickReview} onToggleFeatured={toggleFeatured} onSetFeaturedOrder={setFeaturedOrder} onToggleMultiOption={toggleMultiOption} periodLabel={periodLabel(p)} />)}
-              </div>
+              <>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                  {visiblePage.map(p => <AdminPostRow key={p.id} post={p} onToggle={togglePublished} onDelete={deletePost} onEdit={setEditingPost} onToggleAlwaysOn={toggleEvergreenDeal} onToggleSoldOutOnly={toggleSoldOutOnly} onQuickReview={quickReview} onToggleFeatured={toggleFeatured} onSetFeaturedOrder={setFeaturedOrder} onToggleMultiOption={toggleMultiOption} periodLabel={periodLabel(p)} />)}
+                </div>
+                <Pagination page={postsPage} pageSize={postsPageSize} total={visible.length}
+                  onPage={setPostsPage} onPageSize={n => { setPostsPageSize(n); setPostsPage(1) }} />
+              </>
             )}
           </>
         )}
@@ -784,7 +832,7 @@ export default function AdminPage() {
  * 수집기가 시작일 매칭이 어쩌다 실패하면 내용은 같은데 새 글로 다시 수집했다(D-070).
  * 자동으로 지우거나 고치지 않는다 — 사장님이 직접 보고 판단한다. 목록만 보여준다.
  */
-function DuplicateGroups({ posts, onEdit }: { posts: Post[]; onEdit: (p: Post) => void }) {
+function DuplicateGroups({ posts, onEdit, onDelete }: { posts: Post[]; onEdit: (p: Post) => void; onDelete: (id: number) => void }) {
   const groups = useMemo(() => {
     const byBlock: Record<string, Post[]> = {}
     for (const p of posts) {
@@ -811,9 +859,12 @@ function DuplicateGroups({ posts, onEdit }: { posts: Post[]; onEdit: (p: Post) =
   }, [posts])
 
   const [open, setOpen] = useState(false)
+  const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState(10)
   if (groups.length === 0) return null
 
   const statusLabel: Record<string, string> = { published: '공개됨', needs_review: '검수 필요', ready: '공개 가능' }
+  const pageGroups = groups.slice((page - 1) * pageSize, page * pageSize)
 
   return (
     <div style={{ background: '#fffbeb', borderRadius: 12, padding: 16, marginBottom: 24, border: '1px solid #fde68a' }}>
@@ -831,31 +882,42 @@ function DuplicateGroups({ posts, onEdit }: { posts: Post[]; onEdit: (p: Post) =
         </p>
       )}
       {open && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: 12 }}>
-          {groups.map(g => (
-            <div key={g.key} style={{ background: '#fff', borderRadius: 8, padding: 10, border: '1px solid #fde68a' }}>
-              <div style={{ fontSize: 13, fontWeight: 700, color: '#1e293b', marginBottom: 6 }}>{g.title}</div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                {g.posts.map(p => (
-                  <div key={p.id} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12.5 }}>
-                    <span style={{ padding: '2px 8px', borderRadius: 10, fontWeight: 600, fontSize: 11,
-                      background: p.status === 'published' ? '#dcfce7' : '#fef3c7',
-                      color: p.status === 'published' ? '#15803d' : '#b45309' }}>
-                      {statusLabel[p.status || ''] || p.status}
-                    </span>
-                    <span style={{ color: '#64748b' }}>{(p.scraped_at || '').slice(0, 10)} 수집</span>
-                    <span style={{ color: '#64748b' }}>{p.price ? `${p.price.toLocaleString()}원` : '가격 없음'}</span>
-                    <button onClick={() => onEdit(p)}
-                      style={{ marginLeft: 'auto', padding: '3px 10px', borderRadius: 6, border: '1px solid #cbd5e1',
-                        background: '#fff', cursor: 'pointer', fontSize: 11.5, fontWeight: 600, color: '#475569' }}>
-                      열어보기
-                    </button>
-                  </div>
-                ))}
+        <>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: 12 }}>
+            {pageGroups.map(g => (
+              <div key={g.key} style={{ background: '#fff', borderRadius: 8, padding: 10, border: '1px solid #fde68a' }}>
+                <div style={{ fontSize: 13, fontWeight: 700, color: '#1e293b', marginBottom: 6 }}>{g.title}</div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                  {g.posts.map(p => (
+                    <div key={p.id} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12.5 }}>
+                      <span style={{ padding: '2px 8px', borderRadius: 10, fontWeight: 600, fontSize: 11,
+                        background: p.status === 'published' ? '#dcfce7' : '#fef3c7',
+                        color: p.status === 'published' ? '#15803d' : '#b45309' }}>
+                        {statusLabel[p.status || ''] || p.status}
+                      </span>
+                      <span style={{ color: '#64748b' }}>{(p.scraped_at || '').slice(0, 10)} 수집</span>
+                      <span style={{ color: '#64748b' }}>{p.price ? `${p.price.toLocaleString()}원` : '가격 없음'}</span>
+                      <div style={{ marginLeft: 'auto', display: 'flex', gap: 6 }}>
+                        <button onClick={() => onEdit(p)}
+                          style={{ padding: '3px 10px', borderRadius: 6, border: '1px solid #cbd5e1',
+                            background: '#fff', cursor: 'pointer', fontSize: 11.5, fontWeight: 600, color: '#475569' }}>
+                          열어보기
+                        </button>
+                        <button onClick={() => onDelete(p.id)}
+                          style={{ padding: '3px 10px', borderRadius: 6, border: '1px solid #fecaca',
+                            background: '#fef2f2', cursor: 'pointer', fontSize: 11.5, fontWeight: 600, color: '#dc2626' }}>
+                          삭제
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
               </div>
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
+          <Pagination page={page} pageSize={pageSize} total={groups.length}
+            onPage={setPage} onPageSize={n => { setPageSize(n); setPage(1) }} />
+        </>
       )}
     </div>
   )
