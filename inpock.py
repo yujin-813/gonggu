@@ -1369,15 +1369,20 @@ def collect(handles, source_obj=None, write_result=True):
             # 화면에서 "8.17T00:00:00+09:00"처럼 깨지고, 문자열 비교로 마감 여부를 판단하는
             # 곳에서 같은 날짜인데 안 지난 것으로 잘못 계산된다. 날짜만 남긴다.
             deadline = _date_only(b.get("open_until"))
-            # 인플루언서가 직접 적은 일정이라 스티커/구매페이지 추출값보다 정확하다 —
-            # 일정이 바뀌면 fingerprint도 바뀌어 새 내용으로 다시 검수에 올라간다
+            # 인플루언서가 직접 적은 일정이라 스티커/구매페이지 추출값보다 정확하다.
+            # start_date는 fingerprint에 안 넣는다 — 일정 블록과 상품 블록을 매칭하는
+            # match_schedules()가 매번 성공하리라는 보장이 없어서(그날그날 실패할 수 있다),
+            # 내용은 완전히 같은데 매칭만 어쩌다 실패해 시작일이 빈 값이 되면 fingerprint가
+            # 바뀌어 이미 검수·공개된 글이 통째로 다시 수집되는 중복이 실제로 생겼다
+            # (같은 인플루언서 안에서만 233건, 그중 207건은 둘 다 살아있었다). 시작일이 바뀌는
+            # 것만으로는 "새 공구"가 아니다.
             start_date = ""
             sched = sched_by_block.get(b["id"])
             if sched:
                 start_date = sched["start"]
                 if sched["end"]:
                     deadline = sched["end"]
-            fingerprint = hashlib.md5(f"{b['title'].strip()}|{price}|{start_date}|{deadline}".encode()).hexdigest()[:8]
+            fingerprint = hashlib.md5(f"{b['title'].strip()}|{price}|{deadline}".encode()).hexdigest()[:8]
             sc = f"inpock_{b['id']}_{fingerprint}"
             if sc in by_sc:
                 continue  # 완전히 같은 내용으로 이미 수집됨 (검수상태 보존)

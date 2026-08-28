@@ -601,6 +601,8 @@ export default function AdminPage() {
         {/* 공구 관리 탭 */}
         {adminTab === 'posts' && (
           <>
+            <DuplicateGroups posts={posts} onEdit={setEditingPost} />
+
             {/* 전체 수집 */}
             <div style={{ background: '#fff', borderRadius: 12, padding: 20, marginBottom: 24, border: '1px solid #e2e8f0' }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8, marginBottom: 12 }}>
@@ -773,6 +775,88 @@ export default function AdminPage() {
           </>
         )
       })()}
+    </div>
+  )
+}
+
+/**
+ * 같은 인포크 블록(같은 상품 슬롯)에서 제목까지 완전히 같은 글이 여럿 남아있는 경우 —
+ * 수집기가 시작일 매칭이 어쩌다 실패하면 내용은 같은데 새 글로 다시 수집했다(D-070).
+ * 자동으로 지우거나 고치지 않는다 — 사장님이 직접 보고 판단한다. 목록만 보여준다.
+ */
+function DuplicateGroups({ posts, onEdit }: { posts: Post[]; onEdit: (p: Post) => void }) {
+  const groups = useMemo(() => {
+    const byBlock: Record<string, Post[]> = {}
+    for (const p of posts) {
+      const m = /^inpock_(\d+)_/.exec(p.shortcode || '')
+      if (!m) continue
+      ;(byBlock[m[1]] ??= []).push(p)
+    }
+    const result: { key: string; title: string; posts: Post[] }[] = []
+    for (const blockId in byBlock) {
+      const byTitle: Record<string, Post[]> = {}
+      for (const p of byBlock[blockId]) (byTitle[p.title] ??= []).push(p)
+      for (const title in byTitle) {
+        const alive = byTitle[title].filter(p => p.status === 'published' || p.status === 'needs_review' || p.status === 'ready')
+        if (alive.length >= 2) {
+          result.push({
+            key: `${blockId}-${title}`,
+            title,
+            posts: [...alive].sort((a, b) => (b.scraped_at || '').localeCompare(a.scraped_at || '')),
+          })
+        }
+      }
+    }
+    return result
+  }, [posts])
+
+  const [open, setOpen] = useState(false)
+  if (groups.length === 0) return null
+
+  const statusLabel: Record<string, string> = { published: '공개됨', needs_review: '검수 필요', ready: '공개 가능' }
+
+  return (
+    <div style={{ background: '#fffbeb', borderRadius: 12, padding: 16, marginBottom: 24, border: '1px solid #fde68a' }}>
+      <button onClick={() => setOpen(v => !v)}
+        style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%', background: 'none', border: 'none',
+          cursor: 'pointer', textAlign: 'left', padding: 0, font: 'inherit' }}>
+        <span style={{ fontSize: 14, fontWeight: 700, color: '#92400e' }}>
+          ⚠️ 같은 공구로 보이는 중복 {groups.length}건
+        </span>
+        <span style={{ fontSize: 12, color: '#b45309', marginLeft: 'auto' }}>{open ? '접기 ▲' : '펼치기 ▼'}</span>
+      </button>
+      {!open && (
+        <p style={{ fontSize: 12, color: '#92400e', margin: '6px 0 0' }}>
+          수집기가 같은 상품을 새 글로 다시 수집했을 때 생겨요. 자동으로 지우지 않으니 하나씩 확인해주세요.
+        </p>
+      )}
+      {open && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: 12 }}>
+          {groups.map(g => (
+            <div key={g.key} style={{ background: '#fff', borderRadius: 8, padding: 10, border: '1px solid #fde68a' }}>
+              <div style={{ fontSize: 13, fontWeight: 700, color: '#1e293b', marginBottom: 6 }}>{g.title}</div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                {g.posts.map(p => (
+                  <div key={p.id} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12.5 }}>
+                    <span style={{ padding: '2px 8px', borderRadius: 10, fontWeight: 600, fontSize: 11,
+                      background: p.status === 'published' ? '#dcfce7' : '#fef3c7',
+                      color: p.status === 'published' ? '#15803d' : '#b45309' }}>
+                      {statusLabel[p.status || ''] || p.status}
+                    </span>
+                    <span style={{ color: '#64748b' }}>{(p.scraped_at || '').slice(0, 10)} 수집</span>
+                    <span style={{ color: '#64748b' }}>{p.price ? `${p.price.toLocaleString()}원` : '가격 없음'}</span>
+                    <button onClick={() => onEdit(p)}
+                      style={{ marginLeft: 'auto', padding: '3px 10px', borderRadius: 6, border: '1px solid #cbd5e1',
+                        background: '#fff', cursor: 'pointer', fontSize: 11.5, fontWeight: 600, color: '#475569' }}>
+                      열어보기
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   )
 }
