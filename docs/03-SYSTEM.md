@@ -12,7 +12,7 @@
 | 단계 | 운영 중 · 실사용자 있음 (2026-08-19 기준 사람 방문 고유 IP 163명/2일) |
 | 스택 | Next.js 14 (App Router) · React 18 · TypeScript · 파이썬 수집기 |
 | 저장소 | **파일 기반** — `data/*.json`. DB 없음 |
-| 코드 규모 | `lib/` 3,408줄 · `app/admin` + `components/` 7,079줄 · 파이썬 3,059줄 |
+| 코드 규모 | `lib/` 3,415줄 · `app/admin` + `components/` 7,079줄 · 파이썬 3,059줄 |
 | 데이터 규모 | 게시물 2,537건 (공개 349건) · 인플루언서 소스 61개 · analytics 32일치 |
 | 배포 | EC2 `13.125.121.62`(t3.small) · PM2(fork) + nginx · `bash deploy.sh` — **무중단**(3002↔3003 슬롯 교대, `D-028`) |
 | 도메인 | https://gonggu.asknuggetdata.com |
@@ -235,7 +235,7 @@ public/scraped/   수집 이미지 431MB
 |---|---|
 | `lib/store.ts`의 `savePosts()` | **전체 배열을 통째로 다시 쓴다.** 동시에 두 요청이 저장하면 나중 것이 먼저 것을 덮는다. 락이 없다 ⚠️ |
 | `lib/dealGrade.ts` `getDealVerdict()` | 화면의 모든 숫자가 여기서 나온다. 여기를 고치면 카드·상세·공유카드·정렬이 전부 바뀐다 |
-| `AUTO_MATCH_FLOOR = 0.5` | 낮추면 잘못된 자동 매칭이 판정을 뒤집는다 (`D-006`). `lib/compareCandidates.ts`가 이 값을 읽어 "왜 후보가 판정에서 빠졌는지"를 설명한다 |
+| `AUTO_MATCH_FLOOR = 0.5` | 낮추면 잘못된 자동 매칭이 판정을 뒤집는다 (`D-006`). `lib/compareCandidates.ts`가 이 값을 읽어 "왜 후보가 판정에서 빠졌는지"를 설명한다. 여러 상품 공구(`isMultiOption`)일 땐 이 비율과 무관하게 항상 "판정에 안 쓰인다"고 말해야 한다 — `getDealVerdict()`가 그럴 땐 `market_price`를 아예 안 보기 때문이다 (`D-073`) |
 | `lib/compareCandidates.ts`의 매칭 문턱 | 풀면 엉뚱한 상품이 후보로 뜨고, 관리자가 고르는 순간 그대로 틀린 비교가가 된다 (`D-023`) |
 | `lib/postGuards.ts` | 구매 링크 없는 공구의 공개를 막는 유일한 장치 |
 | 자리표시자 정리(`inpock.py`) | `status='upcoming'`인데 `price`가 채워져 있으면 정리가 안 된 것이다(정상은 항상 비어 있어야 함) — `D-036` |

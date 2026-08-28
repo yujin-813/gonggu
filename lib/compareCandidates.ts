@@ -1,5 +1,5 @@
 import type { Post } from './types'
-import { getDealVerdict, AUTO_MATCH_FLOOR } from './dealGrade'
+import { getDealVerdict, AUTO_MATCH_FLOOR, isMultiOption } from './dealGrade'
 import { titleTokens, titleOverlap } from './titleMatch'
 
 /**
@@ -59,16 +59,23 @@ const storedMarketPrice: CandidateProvider = {
     // AUTO_MATCH_FLOOR(50%)와 이 선 사이가 "기계는 못 믿지만 사람은 볼 만한" 구간이고,
     // 그 아래는 후보가 아니라 소음이라 모든 행에 붙어 다니기만 한다.
     if (post.price && price < post.price * 0.2) return []
-    const trusted = !post.price || price >= post.price * AUTO_MATCH_FLOOR
+    // 여러 상품을 파는 공구(isMultiOption)는 getDealVerdict가 market_price를 아예 안 본다
+    // (대표가 하나로 여러 상품을 판정할 수 없어서다). 그런데도 "이미 판정에 쓰이는 값"이라고
+    // 하면 화면 위쪽 경고("판정이 안 붙어요")와 정반대 말을 하는 셈이라 사장님이 실제로
+    // 헷갈렸다 — multi일 땐 절대 trusted로 두지 않는다.
+    const multi = isMultiOption(post)
+    const trusted = !multi && (!post.price || price >= post.price * AUTO_MATCH_FLOOR)
     const ratio = post.price ? Math.round((price / post.price) * 100) : null
     return [{
       providerId: 'market',
       label: '네이버 최저가 (수집해 둔 값)',
       price,
       url: post.market_url,
-      note: trusted
-        ? '이미 판정에 쓰이는 값이에요'
-        : `공구가의 ${ratio}%라 다른 상품이 잡혔을 수 있어서 지금은 판정에서 빠져 있어요`,
+      note: multi
+        ? '여러 상품을 파는 공구라 이 값은 판정에 안 쓰여요 — 비교불가로 남기면 돼요'
+        : trusted
+          ? '이미 판정에 쓰이는 값이에요'
+          : `공구가의 ${ratio}%라 다른 상품이 잡혔을 수 있어서 지금은 판정에서 빠져 있어요`,
       confidence: trusted ? 'medium' : 'low',
     }]
   },
