@@ -13,7 +13,7 @@
 | 스택 | Next.js 14 (App Router) · React 18 · TypeScript · 파이썬 수집기 |
 | 저장소 | **파일 기반** — `data/*.json`. DB 없음 |
 | 코드 규모 | `lib/` 3,408줄 · `app/admin` + `components/` 6,882줄 · 파이썬 3,054줄 |
-| 데이터 규모 | 게시물 2,537건 (공개 349건) · 인플루언서 소스 61개 · analytics 31일치 |
+| 데이터 규모 | 게시물 2,537건 (공개 349건) · 인플루언서 소스 61개 · analytics 32일치 |
 | 배포 | EC2 `13.125.121.62`(t3.small) · PM2(fork) + nginx · `bash deploy.sh` — **무중단**(3002↔3003 슬롯 교대, `D-028`) |
 | 도메인 | https://gonggu.asknuggetdata.com |
 
