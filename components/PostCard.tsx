@@ -11,7 +11,7 @@ import {
 import PriceCompareModal from './PriceCompareModal'
 import { shareContent } from '@/lib/share'
 import { track } from '@/lib/track'
-import { visiblePurchaseLinks, PLATFORM_LABEL, disclosureText } from '@/lib/purchaseLinks'
+import { visiblePurchaseLinks, sameProductLinks, PLATFORM_LABEL, disclosureText } from '@/lib/purchaseLinks'
 import DealVerdictBox from './DealVerdictBox'
 import GradeIcon from './GradeIcon'
 import { getDealVerdict, shareLabel } from '@/lib/dealGrade'
@@ -92,7 +92,10 @@ export default function PostCard({
       ? `${verdict.referenceLabel}보다 ${saved.toLocaleString()}원(${rate}%) 저렴`
       : `${verdict.referenceLabel}보다 ${rate}% 저렴`
   })()
-  const altLinks = closed ? [] : visiblePurchaseLinks(post)
+  // 진행 중일 땐 같은 상품 링크만 보여준다 — 다른 브랜드·비슷한 상품(대체 링크)을 아직
+  // 팔리고 있는 공구 옆에 붙이면 "다른 거 살까"로 읽힌다. 대체 링크는 공구가 끝난
+  // 뒤에만(사장님 확인, D-069) — 그때는 지금 살 수 있는 곳을 최대한 보여줘야 하니 전부 낸다.
+  const altLinks = closed ? visiblePurchaseLinks(post) : sameProductLinks(post)
   const purchaseLink = post.purchase_url || post.url
   const canOpenPurchase = !closed && !isUpcoming && !!purchaseLink
   const openPurchaseLink = () => {
