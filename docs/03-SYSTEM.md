@@ -12,7 +12,7 @@
 | 단계 | 운영 중 · 실사용자 있음 (2026-08-19 기준 사람 방문 고유 IP 163명/2일) |
 | 스택 | Next.js 14 (App Router) · React 18 · TypeScript · 파이썬 수집기 |
 | 저장소 | **파일 기반** — `data/*.json`. DB 없음 |
-| 코드 규모 | `lib/` 3,408줄 · `app/admin` + `components/` 6,879줄 · 파이썬 3,019줄 |
+| 코드 규모 | `lib/` 3,408줄 · `app/admin` + `components/` 6,879줄 · 파이썬 3,054줄 |
 | 데이터 규모 | 게시물 2,537건 (공개 349건) · 인플루언서 소스 61개 · analytics 31일치 |
 | 배포 | EC2 `13.125.121.62`(t3.small) · PM2(fork) + nginx · `bash deploy.sh` — **무중단**(3002↔3003 슬롯 교대, `D-028`) |
 | 도메인 | https://gonggu.asknuggetdata.com |
@@ -114,7 +114,9 @@
 - `collector.py` — 소스 타입에 따라 수집기 라우팅. cron 하루 2회(09:00, 14:00)
 - `inpock.py` — 인포크 링크페이지 파싱, 가격·마감일·브랜드·카테고리 추출, 네이버쇼핑 비교가 조회, **세트 옵션 자동 수집**, 상태 자동 분류
 - `backfill_options.py` / `backfill_market_price.py` / `backfill_brand.py` / `backfill_category.py` — 기존 데이터 보강
-- `check_links.py` — cron 매일 20:00
+- `check_links.py` — cron 매일 20:00. 구매 링크가 죽었으면(404 등) 영구 비공개, 품절이면
+  기간종료와 같은 경로(`ended_at`)로 종료 처리 — 쿠팡 링크가 있으면 자동으로 「종료됐지만
+  살 수 있어요」로 보인다(`D-068`). 재입고 감지되면 `ended_at`을 지워 자동 복구
 
 ### 만들다 만 것
 
@@ -159,7 +161,7 @@ extraction_debug, scraped_at, collection_status, collection_error
 | `excluded` | 제외됨 (비공구 등) | 974 |
 | `published` | 공개 중 | 295 |
 | `upcoming` | 오픈 예정 | 80 |
-| `ready` | 공개 가능 (품절 자동 숨김 포함, `D-042`) | 61 |
+| `ready` | 공개 가능 (검수 끝났지만 미공개) | 61 |
 | `candidate` | 공구 후보 | 0 |
 | (없음) | 옛 데이터 | 16 ⚠️ |
 

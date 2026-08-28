@@ -3,12 +3,22 @@
 
 - 확실히 죽은 링크(404/410, 또는 "존재하지 않는 페이지"류 문구)는 자동으로
   비공개 처리한다(status='excluded', published=False) — 재입고 걱정 없이 영구히 내린다.
-- 품절/일시 품절 문구가 감지되면 published만 False로 내리고 status는 건드리지 않는다 —
+- 품절/일시 품절 문구가 감지되면 기간종료(D-002)와 똑같은 경로를 탄다 — status는 안
+  건드리고 ended_at만 찍는다. "품절도 공구가 끝난 것"이라(사장님 확인, D-068), 마감일이
+  지난 공구와 다르게 취급할 이유가 없다. 이러면 상세 페이지는 계속 살아있고(isPagePublic),
+  쿠팡 파트너스 링크가 이미 붙어 있으면 "종료됐지만 여기서 살 수 있어요"로 자동 공개되며,
+  없으면 "종료됨, 대체 구매처 없음"으로 보인다 — 둘 다 목록에서는 빠진다.
   재입고는 흔한 일이라 판단을 되돌릴 수 있게, 다음 점검에서 품절 문구가 사라지면
-  이 스크립트가 붙인 태그(SOLD_OUT_REASON)를 보고 자동으로 다시 공개한다. 관리자가
-  다른 이유로 수동 비공개한 글은 이 태그가 없으므로 절대 건드리지 않는다.
+  이 스크립트가 붙인 태그(SOLD_OUT_REASON)를 보고 ended_at을 지워 자동 복구한다. 관리자가
+  다른 이유로 수동 종료 확인한 글은 이 태그가 없으므로 절대 건드리지 않는다.
 - 애매한 경우(타임아웃, 5xx, 접속 실패, 리다이렉트 등)는 비공개로 내리지
   않고 review_reason에 "구매링크 확인 필요"만 남겨 관리자가 검토하게 한다.
+
+⚠️ 품절 태그(SOLD_OUT_REASON)가 붙은 공구는 지금 고객 화면에 안 보이더라도 점검 대상에
+계속 포함시켜야 한다 — 안 그러면 ended_at으로 숨겨지는 순간 is_customer_visible이 False가
+되어 점검 대상에서 빠지고, 재입고를 영영 다시 확인할 기회가 없어진다(D-068 전까지 실제로
+이 버그로 재입고 자동 복구가 한 번도 동작하지 않았다 — status='ready'로 내리던 예전 방식도
+같은 이유로 막혀 있었다).
 
 사용법: python3 check_links.py
 """
@@ -154,27 +164,52 @@ def check_link(url):
     return "alive", "정상"
 
 
-def hide_from_customers(p):
-    """admin/page.tsx의 togglePublished와 동일한 규칙으로 숨긴다 — status가 'published'인
-    동안은 published 불리언만 바꿔선 안 보여지지 않는다(isCustomerVisible이 status==='published'
-    이면 published 값을 아예 안 본다), 그래서 status도 같이 내려야 실제로 숨겨진다."""
+def mark_sold_out(p):
+    """품절 감지 — 기간종료와 같은 방식으로 처리한다(status는 그대로, ended_at만 찍는다).
+    lib/period.ts의 isExpired()가 ended_at을 최우선으로 보므로, status/published를 안
+    건드려도 isCustomerVisible이 알아서 목록에서 뺀다 — 상세 페이지(isPagePublic)는
+    status만 보므로 계속 살아있다.
+
+    'upcoming'(오픈 전) 상태는 예외다 — isCustomerVisible이 upcoming일 때 ended_at을
+    아예 안 보므로(오픈 전인데 "종료"라는 게 말이 안 됨), 여기서는 published만 내린다.
+    이 경우는 재입고 시 published만 되돌리면 된다(아래 clear_sold_out과 짝).
+
+    예전 방식(status='ready')으로 멈춰 있던 공구도 여기서 함께 정상화한다 — status를
+    'published'로 되돌리고 ended_at을 찍는다. 그래야 다음 재입고 점검 때도 정상 경로를
+    탄다."""
     if p.get("status") == "upcoming":
         p["published"] = False
-    else:
-        p["status"] = "ready"
-        p["published"] = False
-
-
-def restore_to_customers(p):
-    """hide_from_customers로 내렸던 걸 원래대로 되돌린다"""
+        return
     if p.get("status") == "ready":
         p["status"] = "published"
     p["published"] = True
+    if not p.get("ended_at"):
+        p["ended_at"] = datetime.now(timezone.utc).isoformat()
+
+
+def clear_sold_out(p):
+    """mark_sold_out으로 내렸던 걸 원래대로 되돌린다 — 예전 방식(status='ready')으로
+    멈춰 있던 것도 함께 정상화한다."""
+    if p.get("status") == "upcoming":
+        p["published"] = True
+        return
+    if p.get("status") == "ready":
+        p["status"] = "published"
+    p["published"] = True
+    p["ended_at"] = None
+
+
+def needs_recheck(p):
+    """점검 대상인지 — 지금 고객 화면에 보이거나, 이 스크립트가 품절로 숨겨 재입고를
+    기다리는 중이거나. 후자를 빼면 한 번 숨긴 공구는 재확인 기회 자체가 없어진다."""
+    if is_customer_visible(p):
+        return True
+    return SOLD_OUT_REASON in (p.get("review_reason") or [])
 
 
 def main():
     posts = load_posts()
-    targets = [p for p in posts if is_customer_visible(p) and (p.get("purchase_url") or p.get("url"))]
+    targets = [p for p in posts if needs_recheck(p) and (p.get("purchase_url") or p.get("url"))]
     print(f"점검 대상: {len(targets)}개")
 
     broken = 0
@@ -194,11 +229,11 @@ def main():
             broken += 1
             print(f"  ❌ 비공개 처리: {p['title'][:40]} ({reason})")
         elif result == "sold_out":
-            hide_from_customers(p)  # status도 함께 내려야 실제로 숨겨짐 (재입고 시 자동 복구 가능)
+            mark_sold_out(p)  # ended_at을 찍는다 — 기간종료와 같은 경로(D-068)
             if SOLD_OUT_REASON not in existing:
                 p["review_reason"] = existing + [SOLD_OUT_REASON]
             sold_out += 1
-            print(f"  📦 품절로 숨김: {p['title'][:40]} ({reason})")
+            print(f"  📦 품절로 종료 처리: {p['title'][:40]} ({reason})")
         elif result == "uncertain":
             if UNCERTAIN_REASON not in existing:
                 p["review_reason"] = existing + [UNCERTAIN_REASON]
@@ -207,7 +242,7 @@ def main():
         else:  # alive
             # 이 스크립트가 붙인 태그만 정리한다 — 관리자가 다른 이유로 비공개한 건 안 건드림
             if SOLD_OUT_REASON in existing:
-                restore_to_customers(p)
+                clear_sold_out(p)
                 restocked += 1
                 print(f"  ✅ 재입고 감지, 다시 공개: {p['title'][:40]}")
             if SOLD_OUT_REASON in existing or UNCERTAIN_REASON in existing:
