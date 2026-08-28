@@ -495,6 +495,16 @@ export default function AdminPage() {
     setPosts(prev => prev.filter(p => p.id !== id))
   }
 
+  // 여러 건을 한 번에 지울 때 건마다 확인창을 띄우면 오히려 실수로 계속 "확인"을 누르게
+  // 된다 — 처음에 몇 건인지 한 번만 묻고, 그 다음은 한 번에 처리한다
+  async function bulkDeletePosts(ids: number[]) {
+    if (ids.length === 0) return
+    if (!confirm(`${ids.length}건을 삭제하시겠습니까? 되돌릴 수 없습니다.`)) return
+    await Promise.all(ids.map(id => fetch(`/api/posts/${id}`, { method: 'DELETE' })))
+    const idSet = new Set(ids)
+    setPosts(prev => prev.filter(p => !idSet.has(p.id)))
+  }
+
   async function addPost(data: Omit<Post, 'id' | 'scraped_at' | 'source'>) {
     const r = await fetch('/api/posts', {
       method: 'POST',
@@ -645,7 +655,7 @@ export default function AdminPage() {
         {/* 공구 관리 탭 */}
         {adminTab === 'posts' && (
           <>
-            <DuplicateGroups posts={posts} onEdit={setEditingPost} onDelete={deletePost} />
+            <DuplicateGroups posts={posts} onEdit={setEditingPost} onDelete={deletePost} onBulkDelete={bulkDeletePosts} />
 
             {/* 전체 수집 */}
             <div style={{ background: '#fff', borderRadius: 12, padding: 20, marginBottom: 24, border: '1px solid #e2e8f0' }}>
@@ -832,7 +842,9 @@ export default function AdminPage() {
  * 수집기가 시작일 매칭이 어쩌다 실패하면 내용은 같은데 새 글로 다시 수집했다(D-070).
  * 자동으로 지우거나 고치지 않는다 — 사장님이 직접 보고 판단한다. 목록만 보여준다.
  */
-function DuplicateGroups({ posts, onEdit, onDelete }: { posts: Post[]; onEdit: (p: Post) => void; onDelete: (id: number) => void }) {
+function DuplicateGroups({ posts, onEdit, onDelete, onBulkDelete }: {
+  posts: Post[]; onEdit: (p: Post) => void; onDelete: (id: number) => void; onBulkDelete: (ids: number[]) => void
+}) {
   const groups = useMemo(() => {
     const byBlock: Record<string, Post[]> = {}
     for (const p of posts) {
@@ -861,10 +873,35 @@ function DuplicateGroups({ posts, onEdit, onDelete }: { posts: Post[]; onEdit: (
   const [open, setOpen] = useState(false)
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(10)
+  const [selected, setSelected] = useState<Set<number>>(new Set())
   if (groups.length === 0) return null
 
   const statusLabel: Record<string, string> = { published: '공개됨', needs_review: '검수 필요', ready: '공개 가능' }
   const pageGroups = groups.slice((page - 1) * pageSize, page * pageSize)
+  const pagePostIds = pageGroups.flatMap(g => g.posts.map(p => p.id))
+  const allPageSelected = pagePostIds.length > 0 && pagePostIds.every(id => selected.has(id))
+
+  function toggle(id: number) {
+    setSelected(prev => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id); else next.add(id)
+      return next
+    })
+  }
+
+  function toggleAllOnPage() {
+    setSelected(prev => {
+      const next = new Set(prev)
+      if (allPageSelected) pagePostIds.forEach(id => next.delete(id))
+      else pagePostIds.forEach(id => next.add(id))
+      return next
+    })
+  }
+
+  function bulkDelete() {
+    onBulkDelete(Array.from(selected))
+    setSelected(new Set())
+  }
 
   return (
     <div style={{ background: '#fffbeb', borderRadius: 12, padding: 16, marginBottom: 24, border: '1px solid #fde68a' }}>
@@ -883,13 +920,27 @@ function DuplicateGroups({ posts, onEdit, onDelete }: { posts: Post[]; onEdit: (
       )}
       {open && (
         <>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: 12 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 12 }}>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: '#92400e', cursor: 'pointer' }}>
+              <input type="checkbox" checked={allPageSelected} onChange={toggleAllOnPage} />
+              이 페이지 전체 선택
+            </label>
+            {selected.size > 0 && (
+              <button onClick={bulkDelete}
+                style={{ marginLeft: 'auto', padding: '5px 12px', borderRadius: 7, border: '1px solid #fecaca',
+                  background: '#fef2f2', cursor: 'pointer', fontSize: 12.5, fontWeight: 700, color: '#dc2626' }}>
+                선택 {selected.size}건 삭제
+              </button>
+            )}
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: 10 }}>
             {pageGroups.map(g => (
               <div key={g.key} style={{ background: '#fff', borderRadius: 8, padding: 10, border: '1px solid #fde68a' }}>
                 <div style={{ fontSize: 13, fontWeight: 700, color: '#1e293b', marginBottom: 6 }}>{g.title}</div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
                   {g.posts.map(p => (
                     <div key={p.id} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12.5 }}>
+                      <input type="checkbox" checked={selected.has(p.id)} onChange={() => toggle(p.id)} />
                       <span style={{ padding: '2px 8px', borderRadius: 10, fontWeight: 600, fontSize: 11,
                         background: p.status === 'published' ? '#dcfce7' : '#fef3c7',
                         color: p.status === 'published' ? '#15803d' : '#b45309' }}>
