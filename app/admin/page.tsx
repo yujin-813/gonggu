@@ -628,7 +628,7 @@ export default function AdminPage() {
         <AnalyticsSection data={analytics} topPosts={topPosts} topSharedPosts={topSharedPosts} sources={sources} />
 
         {/* 탭 메뉴 */}
-        <div id="admin-tabs" style={{ display: 'flex', gap: 4, marginBottom: 20, borderBottom: '2px solid #e2e8f0', paddingBottom: 0 }}>
+        <div id="admin-tabs" className="admin-tabs">
           {([
             { key: 'posts',       label: '공구 관리' },
             { key: 'influencers', label: '인플루언서 관리' },
@@ -641,11 +641,10 @@ export default function AdminPage() {
             { key: 'settings',    label: '통계 설정' },
           ] as const).map(({ key, label }) => (
             <button key={key} onClick={() => { setAdminTab(key); if (key === 'verdict') setVerdictMode('unchecked') }}
+              className="admin-tab-btn"
               style={{
-                padding: '10px 20px', border: 'none', background: 'none', cursor: 'pointer',
-                fontWeight: 700, fontSize: 14, color: adminTab === key ? '#6366f1' : '#64748b',
+                color: adminTab === key ? '#6366f1' : '#64748b',
                 borderBottom: adminTab === key ? '2px solid #6366f1' : '2px solid transparent',
-                marginBottom: -2,
               }}>
               {label}
             </button>

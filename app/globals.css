@@ -1614,6 +1614,29 @@ header {
 
 /* 상태 필터는 개수가 많아 줄바꿈하면 화면을 다 먹는다 — 한 줄로 두고 옆으로 민다.
    nowrap이 없으면 좁은 화면에서 "공 구 후 보" 처럼 글자가 세로로 쪼개진다. */
+/* 탭 9개가 좁은 화면에서 줄바꿈 없이 늘어서면 페이지 전체가 옆으로 밀렸다(뷰포트
+   어긋남, 사장님 지적) — 필터 칩과 같은 방식으로 이 줄만 가로 스크롤되게 뺀다 */
+.admin-tabs {
+  display: flex; gap: 4px;
+  margin-bottom: 20px;
+  border-bottom: 2px solid #e2e8f0;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.admin-tabs::-webkit-scrollbar { display: none; }
+.admin-tab-btn {
+  flex: none;
+  padding: 10px 20px;
+  border: none; background: none;
+  cursor: pointer;
+  font-weight: 700; font-size: 14px;
+  white-space: nowrap;
+  margin-bottom: -2px;
+}
+@media (max-width: 640px) {
+  .admin-tab-btn { padding: 9px 14px; font-size: 13px; }
+}
+
 .admin-filter-chips {
   display: flex;
   gap: 6px;
