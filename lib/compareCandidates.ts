@@ -28,6 +28,10 @@ export interface CompareCandidate {
   /** 왜 믿을 만한지 / 왜 의심스러운지 — 관리자가 고르기 전에 읽는다 */
   note?: string | null
   confidence: 'medium' | 'low'
+  /** sibling 후보(같은 상품으로 보이는 다른 공구)일 때만 채워지는 상대 공구 id.
+   * 이 값이 있어야 "같은 상품으로 묶기"(group_key 연결)를 할 수 있다 — storedMarketPrice
+   * 같은 다른 provider는 공구가 아니라 값 하나를 주는 것뿐이라 묶을 대상이 없다. */
+  otherPostId?: number
 }
 
 export interface CandidateContext {
@@ -133,6 +137,7 @@ const siblingDeals: CandidateProvider = {
           url: `/post/${other.id}`,
           note: '구성이 다를 수 있으니 상품을 확인하고 골라주세요',
           confidence: 'low',
+          otherPostId: other.id,
         },
       })
     }

@@ -3979,6 +3979,10 @@ function CompareFillRow({ post, allPosts, views, onSaved }: { post: Post; allPos
   const [marketUrl, setMarketUrl] = useState(post.market_url ?? '')
   const [cands, setCands]         = useState<CompareCandidate[] | null>(null)
   const [picked, setPicked]       = useState<number | null>(null)
+  // "같은 상품으로 보이는 다른 공구"(sibling) 후보를 가격만 참고할지, 실제로 상품
+  // 페이지에서도 묶을지는 확신 수준이 다르다 — 기본은 꺼둔다(D-074)
+  const [linkGroup, setLinkGroup] = useState(false)
+  const [groupLinkError, setGroupLinkError] = useState('')
   const [askNone, setAskNone]     = useState(false)
   const [reason, setReason]       = useState<CompareNoneReason>(post.compare_none_reason ?? 'not_found')
   const [note, setNote]           = useState(post.compare_none_note ?? '')
@@ -4028,14 +4032,44 @@ function CompareFillRow({ post, allPosts, views, onSaved }: { post: Post; allPos
   }
 
   const canSave = parseInt(orig) > 0 || parseInt(market) > 0 || parseInt(coupang) > 0
-  // 값이 실제로 붙었으면 "비교할 게 없다"는 더 이상 사실이 아니므로 표시를 함께 지운다
-  const savePrice = () => patch({
-    origPrice: parseInt(orig) || null,
-    market_price: parseInt(market) || null,
-    market_url: marketUrl.trim() || null,
-    purchase_links: mergedLinks(),
-    ...CLEAR_COMPARE_NONE,
-  })
+  const pickedCand = picked !== null ? cands?.[picked] ?? null : null
+  const otherPost = pickedCand?.otherPostId ? allPosts.find(p => p.id === pickedCand.otherPostId) ?? null : null
+
+  // 값이 실제로 붙었으면 "비교할 게 없다"는 더 이상 사실이 아니므로 표시를 함께 지운다.
+  // "같은 상품으로 묶기"가 켜져 있으면 group_key도 같이 맞춘다 — 상품 페이지에서
+  // 서로의 공구가가 함께 보이게 하는 연결이라 가격 저장과는 별개로 신중하게 다룬다.
+  async function savePrice() {
+    setGroupLinkError('')
+    const body: Record<string, unknown> = {
+      origPrice: parseInt(orig) || null,
+      market_price: parseInt(market) || null,
+      market_url: marketUrl.trim() || null,
+      purchase_links: mergedLinks(),
+      ...CLEAR_COMPARE_NONE,
+    }
+    let otherPatch: { id: number; group_key: string } | null = null
+    if (linkGroup && otherPost) {
+      const myKey = post.group_key
+      const otherKey = otherPost.group_key
+      if (myKey && otherKey && myKey !== otherKey) {
+        // 이미 각자 다른 그룹에 속해 있으면 자동으로 합치지 않는다 — 잘못 합치면 그룹
+        // 전체가 틀린 상품으로 묶인다. 가격 저장은 그대로 진행한다.
+        setGroupLinkError('이미 서로 다른 그룹에 속해 있어요 — 그룹은 안 묶고 가격만 저장했어요')
+      } else {
+        const sharedKey = myKey || otherKey || `group_${post.id}`
+        body.group_key = sharedKey
+        if (otherKey !== sharedKey) otherPatch = { id: otherPost.id, group_key: sharedKey }
+      }
+    }
+    await patch(body)
+    if (otherPatch) {
+      await fetch(`/api/posts/${otherPatch.id}`, {
+        method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ group_key: otherPatch.group_key }),
+      })
+      onSaved()
+    }
+  }
   const saveNone = () => patch({
     compare_none_at: new Date().toISOString(),
     compare_none_reason: reason,
@@ -4049,6 +4083,8 @@ function CompareFillRow({ post, allPosts, views, onSaved }: { post: Post; allPos
     setMarket(String(c.price))
     if (c.url) setMarketUrl(c.url)
     setDone(false)
+    setLinkGroup(false)
+    setGroupLinkError('')
   }
 
   return (
@@ -4112,6 +4148,22 @@ function CompareFillRow({ post, allPosts, views, onSaved }: { post: Post; allPos
                 )}
               </label>
             ))}
+          </div>
+        )}
+        {otherPost && (
+          <div style={{ marginTop: 10, paddingTop: 10, borderTop: '1px dashed #e2e8f0' }}>
+            <label style={{ display: 'flex', gap: 8, alignItems: 'flex-start', cursor: 'pointer', fontSize: 12, color: '#334155' }}>
+              <input type="checkbox" checked={linkGroup} onChange={e => { setLinkGroup(e.target.checked); setGroupLinkError('') }} style={{ marginTop: 2 }} />
+              <span>
+                <strong>이 공구도 같은 상품으로 묶기</strong>
+                <span style={{ display: 'block', color: '#94a3b8', marginTop: 2 }}>
+                  상품 페이지에서 서로의 공구가가 함께 보여요. 가격만 참고하고 싶으면 체크하지 않아도 돼요.
+                </span>
+              </span>
+            </label>
+            {groupLinkError && (
+              <p style={{ fontSize: 11.5, color: '#dc2626', margin: '6px 0 0' }}>{groupLinkError}</p>
+            )}
           </div>
         )}
       </div>

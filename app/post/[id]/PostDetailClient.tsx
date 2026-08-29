@@ -24,9 +24,13 @@ interface Props {
   categoryLabel?: string
   purchaseLinks?: PurchaseLink[]
   related?: Post[]
+  /** 같은 group_key로 묶인 다른 인플루언서의 같은 상품 공구 — PostCard의 "N개 가격 비교"
+   * 버튼·PriceCompareModal이 이미 이 데이터로 그리도록 돼 있다(홈 목록에서 쓰던 것과 동일) */
+  siblings?: Post[]
+  pastPrices?: { id: number; price: number; origPrice: number | null; date: string }[]
 }
 
-export default function PostDetailClient({ post, ended = false, upcoming = false, betterPrice = false, relatedKind = 'category', categoryLabel = '', purchaseLinks = [], related = [] }: Props) {
+export default function PostDetailClient({ post, ended = false, upcoming = false, betterPrice = false, relatedKind = 'category', categoryLabel = '', purchaseLinks = [], related = [], siblings = [], pastPrices = [] }: Props) {
   const [bookmarks, setBookmarks] = useState<Set<number>>(new Set())
   const [toast, setToast] = useState({ message: '', visible: false })
 
@@ -95,6 +99,8 @@ export default function PostDetailClient({ post, ended = false, upcoming = false
             track('share', { postId: id })
           }}
           endedCompact={ended}
+          siblings={siblings}
+          pastPrices={pastPrices}
         />
       </div>
 

@@ -25,6 +25,28 @@ function getPost(rawId: string) {
   return post
 }
 
+/**
+ * 같은 group_key로 묶인 다른 공구(다른 인플루언서의 같은 상품 공구가) — PostCard의
+ * "N개 가격 비교"·PriceCompareModal이 이미 이 데이터를 받아 그리도록 돼 있는데, 지금까지
+ * 상세 페이지엔 안 넘겨줘서 홈 목록에서만 보였다. loadPosts() 전체를 보므로 홈 화면
+ * 리스트엔 없는(다른 카테고리·스크롤 밖) 형제 공구도 놓치지 않는다.
+ */
+function getSiblings(post: Post) {
+  if (!post.group_key) return []
+  return loadPosts().filter(p => p.group_key === post.group_key && isCustomerVisible(p))
+}
+
+/** 같은 상품의 지난 공구가 — /api/posts/group-history와 같은 계산(published였던 것만,
+ * 최근 5건). 서버 컴포넌트라 API를 왕복할 필요 없이 loadPosts()로 바로 뽑는다. */
+function getPastPrices(post: Post) {
+  if (!post.group_key) return []
+  return loadPosts()
+    .filter(p => p.group_key === post.group_key && p.status === 'published' && p.price && p.id !== post.id)
+    .map(p => ({ id: p.id, price: p.price, origPrice: p.origPrice ?? null, date: p.start_date || (p.scraped_at || '').slice(0, 10) || '' }))
+    .sort((a, b) => b.date.localeCompare(a.date))
+    .slice(0, 5)
+}
+
 /** 종료 페이지 하단에 붙일 "비슷한 공구" — 같은 카테고리에서 진행 중인 것만 */
 function getRelated(post: Post) {
   return relatedPosts(post, loadPosts(), RELATED_LIMIT)
@@ -109,6 +131,10 @@ export default function PostPage({ params }: { params: { id: string } }) {
   const upcoming = getPeriodState(post).kind === 'upcoming'
   const betterPrice = !ended && getDealVerdict(post).display.key === 'meh'
   const related = ended ? getRelated(post) : { posts: [] as Post[], kind: 'category' as RelatedKind }
+  // 진행 중일 때만 "다른 인플루언서 공구가도 비교" — 마감 공구는 EndedDealNotice가 이미
+  // 별도의 비교(대체 구매처)를 보여주고 있어서 겹치지 않게 여기선 안 낸다
+  const siblings = ended ? [] : getSiblings(post)
+  const pastPrices = ended ? [] : getPastPrices(post)
   return (
     <>
       <JsonLd data={[
@@ -132,6 +158,8 @@ export default function PostPage({ params }: { params: { id: string } }) {
         related={toPublicPosts(related.posts)}
         relatedKind={related.kind}
         categoryLabel={CATEGORY_LABEL[post.cat]}
+        siblings={toPublicPosts(siblings)}
+        pastPrices={pastPrices}
       />
     </>
   )
