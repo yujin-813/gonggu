@@ -232,7 +232,11 @@ header {
 .category-dropdown-panel {
   position: absolute; top: 100%; left: 0; right: 0;
   z-index: 101;
-  max-width: 680px; margin: 0 auto;
+  max-width: 680px;
+  /* .hero-search-wrap의 아래쪽 여백(12px)만큼 검색창과 뜬 채로 떨어져 보였다 — 위에서
+     내려오는 느낌이 아니라 붕 뜬 카드처럼 보인다는 사장님 피드백. 그 여백만큼 끌어올려
+     검색창 바로 아래에 딱 붙인다 */
+  margin: -12px auto 0;
   background: #fff;
   border-radius: 0 0 16px 16px;
   box-shadow: 0 12px 24px rgba(0, 0, 0, .12);
