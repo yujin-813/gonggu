@@ -1,7 +1,7 @@
 'use client'
 import { useState } from 'react'
 import Link from 'next/link'
-import { Bell, BellOff, Star, Heart, Users, PackagePlus, Menu, Settings } from 'lucide-react'
+import { ChevronRight, Menu, Settings } from 'lucide-react'
 
 interface HeaderProps {
   onBookmarkView: () => void
@@ -55,21 +55,25 @@ export default function Header({
         <>
           <div className="header-menu-overlay" onClick={() => setMenuOpen(false)} />
           <div className="header-menu-panel" onClick={e => e.stopPropagation()}>
-            <Link href="/propose" className="header-menu-item" onClick={() => setMenuOpen(false)}>
-              <PackagePlus size={16} /> 제휴 문의하기
+            <Link href="/propose" className="header-menu-card" onClick={() => setMenuOpen(false)}>
+              <span className="header-menu-card-title">제휴 문의<ChevronRight size={15} /></span>
+              <span className="header-menu-card-sub">브랜드·인플루언서 제안</span>
             </Link>
-            <Link href="/influencers" className="header-menu-item" onClick={() => setMenuOpen(false)}>
-              <Users size={16} /> 인플루언서 목록
+            <Link href="/influencers" className="header-menu-card" onClick={() => setMenuOpen(false)}>
+              <span className="header-menu-card-title">인플루언서<ChevronRight size={15} /></span>
+              <span className="header-menu-card-sub">전체 목록 보기</span>
             </Link>
-            <button className="header-menu-item" onClick={closeAnd(onPushToggle)}>
-              {pushSubscribed ? <Bell size={16} /> : <BellOff size={16} />}
-              {pushSubscribed ? '마감 알림 끄기' : '찜한 공구 마감 알림 받기'}
+            <button className="header-menu-card" onClick={closeAnd(onPushToggle)}>
+              <span className="header-menu-card-title">마감 알림<ChevronRight size={15} /></span>
+              <span className="header-menu-card-sub">{pushSubscribed ? '알림 끄기' : '찜한 공구 알림 받기'}</span>
             </button>
-            <button className="header-menu-item" onClick={closeAnd(onFollowView)}>
-              <Star size={16} /> {viewingFollowed ? '전체 목록으로 돌아가기' : '팔로우한 인플루언서 보기'}
+            <button className="header-menu-card" onClick={closeAnd(onFollowView)}>
+              <span className="header-menu-card-title">팔로우<ChevronRight size={15} /></span>
+              <span className="header-menu-card-sub">{viewingFollowed ? '전체 목록으로 돌아가기' : '팔로우한 인플루언서'}</span>
             </button>
-            <button className="header-menu-item" onClick={closeAnd(onBookmarkView)}>
-              <Heart size={16} /> {viewingBookmarks ? '전체 목록으로 돌아가기' : '찜 목록 보기'}
+            <button className="header-menu-card" onClick={closeAnd(onBookmarkView)}>
+              <span className="header-menu-card-title">찜 목록<ChevronRight size={15} /></span>
+              <span className="header-menu-card-sub">{viewingBookmarks ? '전체 목록으로 돌아가기' : '찜한 공구 보기'}</span>
             </button>
           </div>
         </>

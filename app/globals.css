@@ -239,9 +239,9 @@ header {
   padding-bottom: 8px;
 }
 
-/* 헤더 오른쪽 설정 메뉴 — 아이콘 5개를 늘어놓던 것 대신 아이콘 하나 + 한글 목록
-   드롭다운. 위치 잡는 방식은 category-dropdown-panel과 같다(app-header가 sticky라
-   absolute의 기준이 된다). 카테고리 패널과 달리 폭이 좁고 오른쪽에 붙는다. */
+/* 헤더 오른쪽 설정 메뉴 — 아이콘 5개를 늘어놓던 것 대신 아이콘 하나 + 카드형 그리드
+   드롭다운(무신사 앱 햄버거 메뉴 참고, 사장님 요청). 위치 잡는 방식은
+   category-dropdown-panel과 같다(app-header가 sticky라 absolute의 기준이 된다). */
 .header-menu-overlay {
   position: fixed; inset: 0;
   background: rgba(15, 23, 42, .35);
@@ -250,24 +250,34 @@ header {
 .header-menu-panel {
   position: absolute; top: 100%; right: 20px;
   z-index: 101;
-  min-width: 220px;
+  width: 300px;
   background: #fff;
   border-radius: 14px;
   box-shadow: 0 12px 24px rgba(0, 0, 0, .12);
-  padding: 6px;
-  display: flex; flex-direction: column;
+  overflow: hidden;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
 }
-.header-menu-item {
-  display: flex; align-items: center; gap: 10px;
-  padding: 11px 12px;
-  border-radius: 9px;
-  border: none; background: none;
-  font-size: 13.5px; font-weight: 600; color: var(--text);
+.header-menu-card {
+  display: flex; flex-direction: column; gap: 4px;
+  padding: 16px 14px;
+  border: none; background: #fff;
+  border-right: 1px solid var(--gray-1);
+  border-bottom: 1px solid var(--gray-1);
   text-decoration: none;
   text-align: left; cursor: pointer;
-  white-space: nowrap;
 }
-.header-menu-item:hover { background: var(--gray-1); }
+.header-menu-card:nth-child(2n) { border-right: none; }
+.header-menu-card:last-child { grid-column: 1 / -1; border-right: none; border-bottom: none; }
+.header-menu-card:hover { background: var(--gray-1); }
+.header-menu-card-title {
+  display: flex; align-items: center; gap: 2px;
+  font-size: 14.5px; font-weight: 800; color: var(--text);
+}
+.header-menu-card-sub {
+  font-size: 11.5px; font-weight: 500; color: var(--gray-4);
+  line-height: 1.4;
+}
 
 .category-wrap {
   max-width: 680px;
