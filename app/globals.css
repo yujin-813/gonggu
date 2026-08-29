@@ -268,7 +268,13 @@ header {
   text-align: left; cursor: pointer;
 }
 .header-menu-card:nth-child(2n) { border-right: none; }
-.header-menu-card:last-child { grid-column: 1 / -1; border-right: none; border-bottom: none; }
+/* 항목 수가 홀수일 때만(=마지막이 왼쪽 칸 차례일 때만) 마지막 카드를 전체 너비로 편다.
+   짝수(카테고리 그리드는 8개)면 그냥 오른쪽 칸에 정상적으로 놓인다 */
+.header-menu-card:nth-child(odd):last-child { grid-column: 1 / -1; border-right: none; border-bottom: none; }
+.category-grid-panel {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+}
 .header-menu-card:hover { background: var(--gray-1); }
 .header-menu-card-title {
   display: flex; align-items: center; gap: 2px;

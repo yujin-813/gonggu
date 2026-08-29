@@ -328,7 +328,7 @@ export default function HomeClient({ sections, collectionBanners }: { sections?:
           <>
             <div className="category-dropdown-overlay" onClick={() => setCategoryMenuOpen(false)} />
             <div className="category-dropdown-panel" onClick={e => e.stopPropagation()}>
-              <CategoryFilter current={currentCat} onSelect={handleCategorySelect} />
+              <CategoryFilter current={currentCat} onSelect={handleCategorySelect} variant="grid" />
             </div>
           </>
         )}
