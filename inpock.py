@@ -331,12 +331,17 @@ def schedule_to_post(s, sc, ig_handle, profile_url, source_obj=None):
 
 
 def resolve_link(url):
-    """리다이렉트를 따라가 (최종 URL, 최종 도메인) 반환. 실패 시 (None, None)."""
+    """리다이렉트를 따라가 (최종 URL, 최종 도메인) 반환. 실패 시 (None, None).
+
+    중간 인증서를 빼먹은 자사몰(_get_with_cert_fallback 참고)은 리다이렉트를 따라가는
+    이 단계에서부터 막혀서 도메인 확인 자체가 실패하고, 그러면 fetch_product_info가
+    호출조차 안 돼 가격을 영영 못 가져온다(라라홈 130건에서 실제로 확인됨) —
+    fetch_product_info와 같은 인증서 완화 로직을 여기서도 쓴다.
+    """
     if not url or not url.startswith("http"):
         return None, None
     try:
-        r = requests.get(url, headers={"User-Agent": UA}, timeout=12,
-                         allow_redirects=True, stream=True)
+        r = _get_with_cert_fallback(url, timeout=12, allow_redirects=True, stream=True)
         final_url = r.url or ""
         r.close()
         host = final_url.split("/")[2] if "://" in final_url else ""
@@ -529,7 +534,7 @@ def _clean_brand(name):
     return n
 
 
-def _get_with_cert_fallback(url, timeout=10):
+def _get_with_cert_fallback(url, timeout=10, **kwargs):
     """국내 자사몰은 중간 인증서를 빼먹고 내려주는 곳이 흔하다(위즈 계열이 전부 그렇다).
 
     브라우저는 알아서 보정하지만 서버끼리는 검증에 실패해서, 그대로 두면 그 쇼핑몰의
@@ -538,11 +543,11 @@ def _get_with_cert_fallback(url, timeout=10):
     그 외의 오류(타임아웃·DNS 등)는 그대로 올려보낸다.
     """
     try:
-        return requests.get(url, headers={"User-Agent": UA}, timeout=timeout)
+        return requests.get(url, headers={"User-Agent": UA}, timeout=timeout, **kwargs)
     except requests.exceptions.SSLError:
         import urllib3
         urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
-        return requests.get(url, headers={"User-Agent": UA}, timeout=timeout, verify=False)
+        return requests.get(url, headers={"User-Agent": UA}, timeout=timeout, verify=False, **kwargs)
 
 
 # ── 세트 옵션 추출 ────────────────────────────────────────────────────────
