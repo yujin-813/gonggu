@@ -20,23 +20,29 @@ function isTrackingDisabled(): boolean {
 }
 
 // 관리자로 로그인된 브라우저(httpOnly 쿠키라 JS로 직접 못 읽어서 서버에 물어봄)는
-// 고객 방문으로 잡히면 통계가 왜곡되니 자동으로 트래킹 대상에서 뺀다 — 모듈 로드당 한 번만 확인.
+// 고객 방문으로 잡히면 통계가 왜곡되니 트래킹 대상에서 뺀다 — 모듈 로드당 한 번만 확인.
 // 한 번이라도 관리자로 확인되면 notrack 플래그를 남겨서, 로그인 세션이 만료된 뒤에도
 // 이 브라우저는 계속 제외된다 (관리자 세션은 12시간이라 그 뒤 방문이 고객으로 잡히던 문제).
 // 해제는 기존과 동일하게 ?notrack=0.
+//
+// 예전엔 이 확인이 끝날 때까지 track()이 기다렸다가 이벤트를 보냈다 — 클릭 한 번에
+// /api/auth 왕복 + /api/analytics 왕복 두 번을 순서대로 기다린 셈이다. 쿠팡 링크는
+// target="_blank"라 원래 탭이 백그라운드로 밀리는데, 모바일 브라우저는 백그라운드 탭의
+// 네트워크 요청을 바로 멈추거나 늦춘다 — 그 사이에 두 번째 왕복(진짜 클릭 기록)이 씹혀서
+// 우리 쪽 구매처 클릭수가 쿠팡 파트너스 자체 집계보다 적게 나오는 원인이었다. 이 확인은
+// 결과를 기다리지 않고 백그라운드로만 돌린다 — 관리자 여부의 최종 판정은 어차피
+// app/api/analytics/route.ts가 서버에서 쿠키·IP까지 다시 확인하므로(D-007) 여기서
+// 기다리지 않아도 관리자 트래픽이 새 나가지 않는다.
 let adminSessionCheck: Promise<boolean> | null = null
-function isAdminSession(): Promise<boolean> {
-  if (!adminSessionCheck) {
-    adminSessionCheck = fetch('/api/auth')
-      .then(r => r.json())
-      .then(d => {
-        const authed = !!d.authed
-        if (authed) localStorage.setItem('gonggu_no_track', '1')
-        return authed
-      })
-      .catch(() => false)
-  }
-  return adminSessionCheck
+function checkAdminSession() {
+  if (adminSessionCheck) return
+  adminSessionCheck = fetch('/api/auth')
+    .then(r => r.json())
+    .then(d => {
+      if (d.authed) localStorage.setItem('gonggu_no_track', '1')
+      return !!d.authed
+    })
+    .catch(() => false)
 }
 
 // 어떤 버튼을 눌렀는지 — 공구 링크와 대체 구매처(쿠팡/네이버) 클릭을 구분해야
@@ -67,13 +73,17 @@ function entryInfo(): { referrer: string | null; utmSource: string | null } {
   }
 }
 
-export async function track(type: string, extra?: { postId?: number; clickType?: ClickType }) {
+export function track(type: string, extra?: { postId?: number; clickType?: ClickType }) {
   if (isTrackingDisabled()) return
-  if (await isAdminSession()) return
+  checkAdminSession()
   const entry = entryInfo()
   fetch('/api/analytics', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
+    // 쿠팡·네이버 클릭은 target="_blank"로 새 탭을 열자마자 원래 탭이 백그라운드로
+    // 밀린다 — keepalive 없이는 브라우저가 이 요청을 그대로 취소할 수 있다(페이지 이동·
+    // 백그라운드 전환 중에도 요청이 살아남게 하는 옵션. 본문이 작아 제한(64KB)에 안 걸림).
+    keepalive: true,
     body: JSON.stringify({
       type,
       sessionId: getSession(),
