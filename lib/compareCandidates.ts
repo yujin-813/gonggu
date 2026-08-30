@@ -153,12 +153,17 @@ export async function findCompareCandidates(ctx: CandidateContext): Promise<Comp
   const results = await Promise.all(
     PROVIDERS.map(p => p.find(ctx).catch(() => [] as CompareCandidate[])),
   )
-  const seen = new Set<number>()
+  // 가격 숫자만으로 중복 제거하면(예전 방식) 서로 다른 후보가 우연히 같은 가격이면
+  // 뒤엣것이 통째로 사라졌다 — 한국 소매가가 9900/19900처럼 흔한 값에 몰려 있어 실제로
+  // 일어날 수 있다. sibling 후보는 otherPostId가 있어야 "같은 상품으로 묶기"를 할 수
+  // 있으므로, 이게 조용히 사라지면 그 기능 자체를 못 쓴다. provider·출처로 구분한다.
+  const seen = new Set<string>()
   return results
     .flat()
     .filter(c => {
-      if (seen.has(c.price)) return false
-      seen.add(c.price)
+      const key = `${c.providerId}:${c.otherPostId ?? c.url ?? c.price}`
+      if (seen.has(key)) return false
+      seen.add(key)
       return true
     })
     .sort((a, b) => {
