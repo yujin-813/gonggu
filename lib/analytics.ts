@@ -1,5 +1,6 @@
 import fs from 'fs'
 import path from 'path'
+import { kstToday, kstDateOffset } from './kst'
 
 const DATA_DIR = path.join(process.cwd(), 'data')
 const FILE = path.join(DATA_DIR, 'analytics.json')
@@ -165,7 +166,7 @@ export function classifySource(opts: {
 /** 최근 N일 유입 경로 집계 — 많은 순으로 */
 export function getSourceCounts(days = 14): { source: string; label: string; count: number }[] {
   const data = load()
-  const cutoff = new Date(Date.now() - days * 86400000).toISOString().split('T')[0]
+  const cutoff = kstDateOffset(days)
   const total: Record<string, number> = {}
   for (const [date, day] of Object.entries(data.daily)) {
     if (date < cutoff) continue
@@ -180,7 +181,7 @@ export function getSourceCounts(days = 14): { source: string; label: string; cou
 
 export function recordEvent(type: string, sessionId: string, opts?: { visitorId?: string; postId?: number; clickType?: ClickType; source?: string }) {
   const data = load()
-  const today = new Date().toISOString().split('T')[0]
+  const today = kstToday()
   if (!data.daily[today]) data.daily[today] = { visitors: 0, sessions: [], events: {} }
   const day = data.daily[today]
 
@@ -266,9 +267,7 @@ export function getSummary(days = 14) {
   const data = load()
   const result = []
   for (let i = days - 1; i >= 0; i--) {
-    const d = new Date()
-    d.setDate(d.getDate() - i)
-    const dateStr = d.toISOString().split('T')[0]
+    const dateStr = kstDateOffset(i)
     const day = data.daily[dateStr] || { visitors: 0, sessions: [], events: {} }
     result.push({
       date: dateStr,
@@ -307,9 +306,7 @@ export function getTopSharedPosts(limit = 10): { postId: number; count: number }
 export function getClickCounts(days = 7, types?: ClickType[]): Record<number, number> {
   const data = load()
   const clicks = data.postClicks || {}
-  const cutoff = new Date()
-  cutoff.setDate(cutoff.getDate() - (days - 1))
-  const cutoffStr = cutoff.toISOString().split('T')[0]
+  const cutoffStr = kstDateOffset(days - 1)
 
   const totals: Record<number, number> = {}
   for (const [date, byPost] of Object.entries(clicks)) {
@@ -329,9 +326,7 @@ export function getClickCounts(days = 7, types?: ClickType[]): Record<number, nu
 /** 최근 N일 상품별 클릭을 종류까지 나눠서 — 관리자 수익화 화면이 한 표로 보여주는 데 쓴다 */
 export function getClickBreakdown(days = 14): Record<number, Partial<Record<ClickType, number>>> {
   const data = load()
-  const cutoff = new Date()
-  cutoff.setDate(cutoff.getDate() - (days - 1))
-  const cutoffStr = cutoff.toISOString().split('T')[0]
+  const cutoffStr = kstDateOffset(days - 1)
 
   const out: Record<number, Partial<Record<ClickType, number>>> = {}
   for (const [date, byPost] of Object.entries(data.postClicks || {})) {
@@ -350,9 +345,7 @@ export function getClickBreakdown(days = 14): Record<number, Partial<Record<Clic
 /** 최근 N일 상품별 유입 경로 — postSources를 합산한다 */
 export function getPostSourceCounts(days = 14): Record<number, Record<string, number>> {
   const data = load()
-  const cutoff = new Date()
-  cutoff.setDate(cutoff.getDate() - (days - 1))
-  const cutoffStr = cutoff.toISOString().split('T')[0]
+  const cutoffStr = kstDateOffset(days - 1)
 
   const out: Record<number, Record<string, number>> = {}
   for (const [date, byPost] of Object.entries(data.postSources || {})) {

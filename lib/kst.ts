@@ -18,3 +18,9 @@ export function kstNow(): Date {
 export function kstToday(): string {
   return kstNow().toISOString().slice(0, 10)
 }
+
+/** N일 전의 KST 날짜(YYYY-MM-DD). analytics.ts의 "최근 N일" 집계가 전부 이걸 거쳐야
+ * UTC 새벽(KST 00:00~08:59)에 하루 밀려 집계되는 걸 피한다 — kstToday() 위 코멘트 참고. */
+export function kstDateOffset(daysAgo: number): string {
+  return new Date(kstNow().getTime() - daysAgo * 86400000).toISOString().slice(0, 10)
+}
