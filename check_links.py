@@ -80,6 +80,20 @@ SOLD_OUT_TAG_PATTERNS = (
     re.compile(r'alt=["\']품절["\']'),
 )
 
+# 카페24류 쇼핑몰은 "구매하기"·"품절" 버튼을 둘 다 항상 마크업에 넣어두고 재고에 따라
+# JS로 하나만 보여준다 — 실제로 안 보이는 품절 버튼도 class="... displaynone"이 그대로
+# 남아 있어서 태그 매칭에 걸린다("워터쥬시젤리" 공구가 진행 중인데 마감으로 잘못
+# 처리된 사례로 확인). 매칭된 태그 자체에 이 클래스가 있으면 품절로 안 본다.
+_HIDDEN_CLASS_RE = re.compile(r'class=["\'][^"\']*\b(?:displaynone|d-none|hidden|hide)\b')
+
+
+def _tag_is_hidden(text, match_start):
+    tag_start = text.rfind("<", 0, match_start)
+    tag_end = text.find(">", tag_start)
+    if tag_start == -1 or tag_end == -1:
+        return False
+    return bool(_HIDDEN_CLASS_RE.search(text[tag_start:tag_end + 1]))
+
 BROKEN_REASON = "구매링크 만료됨 (자동 비공개)"
 SOLD_OUT_REASON = "품절 감지 (자동 숨김 · 재입고 시 자동 복구)"
 UNCERTAIN_REASON = "구매링크 확인 필요"
@@ -158,8 +172,9 @@ def check_link(url):
         if pat.lower() in text_lower:
             return "sold_out", f"품절 문구 감지: {pat}"
     for pat in SOLD_OUT_TAG_PATTERNS:
-        if pat.search(text):
-            return "sold_out", "품절 문구 감지: 품절(버튼/배지)"
+        for m in pat.finditer(text):
+            if not _tag_is_hidden(text, m.start()):
+                return "sold_out", "품절 문구 감지: 품절(버튼/배지)"
 
     return "alive", "정상"
 
