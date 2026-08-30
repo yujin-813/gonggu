@@ -1404,18 +1404,23 @@ def collect(handles, source_obj=None, write_result=True):
 
             new_post = block_to_post(b, sc, ig_handle, price, domain, profile_url, purchase_url, deadline, product_info, debug_info, source_obj, start_date)
 
-            # 같은 슬롯(블록 ID)에서 나온 글 중 이미 제외됐거나 마감된 채로 남아있는 글과
-            # 제목이 같으면(=관리자가 이미 판단 끝낸 것과 사실상 동일 내용) 다시 검수 목록에
-            # 안 올린다 — 내용이 정말 바뀐 경우(새 공구)만 새로 올라가야 하므로 제목까지 비교
+            # 같은 슬롯(블록 ID)에서 나온 글 중 제목이 같으면(=같은 인플루언서가 같은 상품을
+            # 다시 올린 것) 다시 검수 목록에 안 올린다. 이미 제외/마감된 것과 같으면 가격이
+            # 달라도 스킵한다(관리자가 이미 판단 끝낸 것과 사실상 동일 내용). 아직 검수
+            # 대기·공개 중인 것과 같으면 가격까지 같을 때만 스킵한다 — 가격이 바뀌었으면
+            # 다시 검수할 이유가 있는 새 정보다. fingerprint(제목|가격|마감일)가 block_id
+            # 변경(인포크에서 슬롯을 지웠다 새로 만든 경우)까지는 못 잡아서 이 체크가 따로
+            # 필요하다 — 실제로 같은 인플루언서·같은 제목·같은 가격(0원, 미입력)인데 block_id만
+            # 달라 fingerprint가 달라지면서 검수 대기 중복이 계속 쌓이는 사례가 있었다.
             block_id_prefix = f"inpock_{b['id']}"
             new_title_norm = _normalize_title(new_post["title"])
             if any(
                 (p.get("shortcode") or "").startswith(block_id_prefix)
-                and _is_closed_or_excluded(p)
                 and _normalize_title(p.get("title")) == new_title_norm
+                and (_is_closed_or_excluded(p) or (p.get("price") or 0) == (price or 0))
                 for p in posts
             ):
-                print(f"  - (스킵: 이미 제외/마감된 것과 동일) {b['title'][:34]}")
+                print(f"  - (스킵: 같은 인플루언서·같은 상품과 동일) {b['title'][:34]}")
                 continue
 
             posts.insert(0, new_post)

@@ -847,7 +847,9 @@ function DuplicateGroups({ posts, onEdit, onDelete, onBulkDelete }: {
   const groups = useMemo(() => {
     const byBlock: Record<string, Post[]> = {}
     for (const p of posts) {
-      const m = /^inpock_(\d+)_/.exec(p.shortcode || '')
+      // 예전 형식(inpock_{블록id}, 지문 접미사 없음)도 잡아야 한다 — 안 그러면 그 글과
+      // 짝이 되는 새 지문 형식 중복이 목록에서 안 보인다
+      const m = /^inpock_(\d+)(?:_|$)/.exec(p.shortcode || '')
       if (!m) continue
       ;(byBlock[m[1]] ??= []).push(p)
     }
