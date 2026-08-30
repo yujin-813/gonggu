@@ -37,17 +37,19 @@ export const metadata: Metadata = {
   // 발급받은 코드를 .env.local 에 넣으면 아래에서 자동으로 메타태그에 반영됩니다.
   verification: {
     ...(process.env.GOOGLE_SITE_VERIFICATION ? { google: process.env.GOOGLE_SITE_VERIFICATION } : {}),
-    // 소유확인 코드는 쉼표로 여러 개를 넣을 수 있다. 서치어드바이저에 사이트를 다시
-    // 등록하면 새 코드가 나오는데, 기존 코드를 지우면 먼저 등록해 둔 쪽의 소유확인이
-    // 풀릴 수 있어서 둘 다 내보낸다.
-    ...(process.env.NAVER_SITE_VERIFICATION
-      ? {
-          other: {
+    other: {
+      // 소유확인 코드는 쉼표로 여러 개를 넣을 수 있다. 서치어드바이저에 사이트를 다시
+      // 등록하면 새 코드가 나오는데, 기존 코드를 지우면 먼저 등록해 둔 쪽의 소유확인이
+      // 풀릴 수 있어서 둘 다 내보낸다.
+      ...(process.env.NAVER_SITE_VERIFICATION
+        ? {
             'naver-site-verification': process.env.NAVER_SITE_VERIFICATION
               .split(',').map(v => v.trim()).filter(Boolean),
-          },
-        }
-      : {}),
+          }
+        : {}),
+      // 애드고(광고 매체) 소유확인 — 수익화 검토용
+      'adgo-site-verification': 'adgo-472fa36aa196dcffa75191fe',
+    },
   },
 }
 
