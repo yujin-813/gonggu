@@ -5,23 +5,28 @@ import { loadPosts } from '@/lib/store'
 import { isPagePublic, getPeriodState, fmtDate } from '@/lib/period'
 import { getDealVerdict, rateText } from '@/lib/dealGrade'
 
+// satori(next/og가 내부에서 쓰는 렌더러)가 실제로 그려낼 수 있는 형식만 넣는다.
+// 수집기가 받아두는 사진은 거의 다 webp·avif라(1,244/2,264건) 여기 없는 확장자를 넣으면
+// ImageResponse 자체가 예외를 던지고 응답이 통째로 끊긴다(빈 응답) — 원칙 1과 반대로
+// "판정 이미지 자체가 아예 안 나오는" 사고였다. png·jpg만 안전이 확인됐다.
 const MIME_BY_EXT: Record<string, string> = {
-  '.png': 'image/png', '.webp': 'image/webp', '.gif': 'image/gif',
-  '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg',
+  '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg',
 }
 
 /** 상품 이미지를 base64로 읽어 data URI로 만든다 — 우리가 올렸거나(uploads) 수집기가
- * 받아둔(scraped) 로컬 파일만. satori가 원격 URL을 직접 불러오게 하면 그 사이트가 느리거나
- * 막혀 있을 때 이미지 생성 자체가 실패한다(원칙 1 — 판정 이미지는 항상 나와야 한다).
- * 외부 URL(인스타 CDN 등)은 지금은 건너뛴다 — 텍스트만으로도 이미지는 이미 나가고 있었다. */
+ * 받아둔(scraped) 로컬 파일만, 그중에서도 satori가 그릴 수 있는 형식만. satori가 원격
+ * URL을 직접 불러오게 하면 그 사이트가 느리거나 막혀 있을 때 이미지 생성 자체가
+ * 실패한다(원칙 1 — 판정 이미지는 항상 나와야 한다). 외부 URL(인스타 CDN 등)은 지금은
+ * 건너뛴다 — 텍스트만으로도 이미지는 이미 나가고 있었다. */
 function loadLocalImageDataUri(imgPath: string | null | undefined): string | null {
   if (!imgPath || !imgPath.startsWith('/')) return null
+  const mime = MIME_BY_EXT[path.extname(imgPath).toLowerCase()]
+  if (!mime) return null
   const publicDir = path.join(process.cwd(), 'public')
   const full = path.join(publicDir, imgPath)
   if (!full.startsWith(publicDir + path.sep)) return null
   try {
     const buf = fs.readFileSync(full)
-    const mime = MIME_BY_EXT[path.extname(full).toLowerCase()] || 'image/jpeg'
     return `data:${mime};base64,${buf.toString('base64')}`
   } catch {
     return null
