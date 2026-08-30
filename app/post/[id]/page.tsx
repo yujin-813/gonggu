@@ -91,9 +91,16 @@ export async function generateMetadata({ params }: { params: { id: string } }): 
   // 비교가가 있을 때만 붙인다 — 판정 대기인데 비교했다고 써 붙이면 틀린 말이 된다(원칙 1).
   const hasComparison = getDealVerdict(post).display.key !== 'pending'
   const priceLabel = post.price ? ` ${post.price.toLocaleString()}원` : ''
+  // 인스타 캡션을 그대로 옮긴 제목이라 브랜드명이 안 들어간 경우가 있다("릴렉스틱/포인트링
+  // /마사지볼"처럼) — 그러면 "브랜드명 공구" 검색으로는 이 페이지가 아예 안 걸린다.
+  // 제목에 이미 있으면 중복으로 안 붙인다.
+  const brandPrefix = post.brand && !post.title.includes(post.brand) ? `[${post.brand}] ` : ''
+  // 마감 후에도 살 곳이 있으면 그 사실을 제목에서부터 말한다 — "OO 공구 지금 사도 될까"류
+  // 검색에 "마감 후 구매처"보다 더 정확히 맞물린다. 살 곳이 없으면 과장하지 않는다(원칙 1).
+  const hasBuyLink = ended && visiblePurchaseLinks(post).length > 0
   const pageTitle = ended
-    ? `${post.title} 공구${priceLabel} | 마감 후 구매처`
-    : `${post.title} 공구${priceLabel}${hasComparison ? ' | 가격비교' : ''}`
+    ? `${brandPrefix}${post.title} 공구${priceLabel} | ${hasBuyLink ? '지금 살 수 있는 곳' : '마감 후 구매처'}`
+    : `${brandPrefix}${post.title} 공구${priceLabel}${hasComparison ? ' | 가격비교' : ''}`
   const shareTitle = `${pageTitle} | 꿀공구`
   const description = buildDescription(post, ended)
   const url = `${SITE_URL}/post/${post.id}`
