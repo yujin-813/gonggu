@@ -169,8 +169,12 @@ def check_link(url):
 
     text_lower = text.lower()
     for pat in SOLD_OUT_TEXT_PATTERNS:
-        if pat.lower() in text_lower:
-            return "sold_out", f"품절 문구 감지: {pat}"
+        pat_lower = pat.lower()
+        idx = text_lower.find(pat_lower)
+        while idx != -1:
+            if not _tag_is_hidden(text, idx):
+                return "sold_out", f"품절 문구 감지: {pat}"
+            idx = text_lower.find(pat_lower, idx + 1)
     for pat in SOLD_OUT_TAG_PATTERNS:
         for m in pat.finditer(text):
             if not _tag_is_hidden(text, m.start()):
