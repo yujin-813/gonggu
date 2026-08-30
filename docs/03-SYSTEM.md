@@ -12,7 +12,7 @@
 | 단계 | 운영 중 · 실사용자 있음 (2026-08-19 기준 사람 방문 고유 IP 163명/2일) |
 | 스택 | Next.js 14 (App Router) · React 18 · TypeScript · 파이썬 수집기 |
 | 저장소 | **파일 기반** — `data/*.json`. DB 없음 |
-| 코드 규모 | `lib/` 3,450줄 · `app/admin` + `components/` 7,148줄 · 파이썬 3,064줄 |
+| 코드 규모 | `lib/` 3,522줄 · `app/admin` + `components/` 7,208줄 · 파이썬 3,064줄 |
 | 데이터 규모 | 게시물 2,524건 (공개 423건) · 인플루언서 소스 61개 · analytics 34일치 |
 | 배포 | EC2 `13.125.121.62`(t3.small) · PM2(fork) + nginx · `bash deploy.sh` — **무중단**(3002↔3003 슬롯 교대, `D-028`) |
 | 도메인 | https://gonggu.asknuggetdata.com |
@@ -48,9 +48,16 @@
   `?ratio=story`는 1080×1920(9:16, 인스타 스토리) — 「꿀딜 확산 후보」에서 셋 다 버튼으로 낸다 (`D-064`).
   로컬(`/uploads`·`/scraped`)에 있는 상품 사진은 같이 그려 넣는다. 외부 URL 이미지는 안 넣는다 —
   그 사이트가 막혀 있으면 이미지 생성 자체가 실패하기 때문 (`D-066`)
-- SEO — JSON-LD(WebSite/ItemList/Product·Offer/BreadcrumbList), sitemap.xml(430 URL), robots.txt,
+- SEO — JSON-LD(WebSite/ItemList/Product·Offer/BreadcrumbList/FAQPage), sitemap.xml(555 URL), robots.txt,
   네이버·구글 소유확인. sitemap `lastmod`는 `updated_at||scraped_at`, 가격·마감상태 변경 시
   IndexNow 통보(`lib/indexnow.ts`, `D-055`)
+- **브랜드 랜딩 페이지** `/brand/[brand]` — `post.brand`로 묶어 진행 중 공구(상품별 딜 판정 포함)와
+  최근 종료 공구·과거 가격을 나눠 보여준다. 상품 2건 이상인 브랜드만 페이지가 있다(1건은 개별
+  상품 페이지와 다를 게 없어 얇은 콘텐츠가 된다) — 현재 45개, `lib/brandPages.ts`. sitemap에도 포함 (`D-075`)
+- **상세페이지 롱테일 Q&A** — 인플루언서명·브랜드가 둘 다 있으면 "OO님이 진행한 OO 공구예요"
+  자연문으로 각 랜딩 페이지를 연결(브랜드 페이지가 실제 있을 때만 링크). "가격 괜찮나요?"/"언제까지
+  인가요?" Q&A는 실제 판정·마감일 데이터가 있을 때만 생성 — 판정 대기·마감일 미확인은 안 만든다.
+  화면과 FAQPage 구조화 데이터가 `lib/postLongtail.ts` 하나만 쓴다 (`D-075`)
 
 **관리자 `/admin`**
 - **첫 화면 = 「오늘 손보면 돈 되는 일」** — 상태 개수 카드 대신 우선순위를 먼저 보여준다(`D-032`).
