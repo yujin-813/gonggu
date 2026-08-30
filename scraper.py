@@ -17,6 +17,7 @@ Instagram 로그인이 필요합니다. 아래 순서로 설정하세요.
       python3 scraper.py
 """
 
+import hashlib
 import instaloader
 import json
 import re
@@ -428,7 +429,7 @@ def post_to_dict(post, shortcode):
     start_date, end_date = extract_date_range(caption)
 
     data = {
-        "id":         abs(hash(shortcode)) % (10**9),
+        "id":         int(hashlib.md5(shortcode.encode()).hexdigest(), 16) % (10**9),
         "shortcode":  shortcode,
         "title":      make_title(caption),
         "account":    f"@{post.owner_username}",
@@ -569,7 +570,7 @@ def _fetch_profile_posts_api(username, cookies, limit, seen, loader=None, config
         cat = categorize(caption_text)
 
         post_data = {
-            "id":          abs(hash(shortcode)) % (10**9),
+            "id":          int(hashlib.md5(shortcode.encode()).hexdigest(), 16) % (10**9),
             "shortcode":   shortcode,
             "title":       make_title(caption_text),
             "account":     f"@{username}",

@@ -297,7 +297,7 @@ def schedule_to_post(s, sc, ig_handle, profile_url, source_obj=None):
     """
     title = re.sub(r"\s*(구매하기|바로가기|구매링크|신청하기|주문하기|보러가기)\s*$", "", s["title"]).strip()
     return {
-        "id":              abs(hash(sc)) % (10 ** 9),
+        "id":              int(hashlib.md5(sc.encode()).hexdigest(), 16) % (10 ** 9),
         "shortcode":       sc,
         "title":           title,
         "account":         f"@{ig_handle}",
@@ -1003,7 +1003,9 @@ def fetch_product_info(url, domain):
 
 
 def _domain_matches(domain, domains):
-    return any(domain == b or domain.endswith("." + b) or domain.endswith(b) for b in domains)
+    # domain.endswith(b)(점 경계 없이)는 뺐다 — "myaladin.co.kr"이 "aladin.co.kr"에
+    # 매칭돼버려서, 그 문자열로 끝나기만 하면 전혀 다른 쇼핑몰까지 차단 목록에 걸린다
+    return any(domain == b or domain.endswith("." + b) for b in domains)
 
 
 def is_product(domain, price, title="", purchase_url=None):
@@ -1293,7 +1295,7 @@ def block_to_post(b, sc, ig_handle, price, domain, profile_url, purchase_url, de
         if "이미지 다운로드 실패" not in review_reason:
             review_reason = list(review_reason) + ["이미지 다운로드 실패"]
     return {
-        "id":              abs(hash(sc)) % (10 ** 9),
+        "id":              int(hashlib.md5(sc.encode()).hexdigest(), 16) % (10 ** 9),
         "shortcode":       sc,
         "title":           title,
         "account":         f"@{ig_handle}",
