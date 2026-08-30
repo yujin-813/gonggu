@@ -23,6 +23,7 @@ import unicodedata
 from datetime import datetime, date, timedelta, timezone
 from difflib import SequenceMatcher
 from pathlib import Path
+from urllib.parse import urlparse
 
 import requests
 
@@ -63,8 +64,14 @@ BLOCK_DOMAINS = (
 )
 # 상담/CS 도메인 — 가격 뱃지가 있어도 구매 페이지가 아니므로 무조건 제외
 # (네이버톡톡 상담 링크를 "구매하기" 버튼에 걸어둔 판매자가 있어 가격 예외를 두지 않는다)
+# 온라인 서점 — 인플루언서가 자기 책을 추천하는 글은 "판매처"만 여러 개일 뿐
+# 공동구매가 아니다(정가가 정찰제라 서점마다 값이 같다). "도림맘의 초간단 아이간식"이
+# 알라딘·예스24·교보문고 세 판매처로 각각 수집돼 같은 인플루언서 아래 중복으로 쌓였다.
+# 책은 가격이 항상 있어서(정가가 뱃지로 잡힘) BLOCK_DOMAINS로는 못 거른다 — 가격 유무와
+# 무관하게 막아야 해서 여기(HARD_BLOCK_DOMAINS)에 둔다.
 HARD_BLOCK_DOMAINS = (
     "talk.naver.com",
+    "aladin.co.kr", "yes24.com", "kyobobook.co.kr",
 )
 # 상시판매 신호 — 제목에 있으면 공구가 아님
 ALWAYS_ON_KW = ("상시판매", "상시 판매", "상시할인", "상시 할인", "상시구매", "상시 구매")
@@ -997,9 +1004,19 @@ def _domain_matches(domain, domains):
     return any(domain == b or domain.endswith("." + b) or domain.endswith(b) for b in domains)
 
 
-def is_product(domain, price, title=""):
+def is_product(domain, price, title="", purchase_url=None):
     """공구인지 판정. 가격 뱃지가 있으면 도메인 무관 공구. 상시판매·비커머스는 제외.
-    도메인을 못 구하면 보수적으로 공구로 간주(검수 대기에서 사람이 판단)."""
+    도메인을 못 구하면 보수적으로 공구로 간주(검수 대기에서 사람이 판단).
+
+    구매 링크가 쇼핑몰 홈(경로 없음)으로 끝나면 특정 상품이 아니라 "밥프몰"·
+    "OO 전체상품"처럼 몰 전체를 가리키는 링크다 — 가격을 매길 대상 자체가 없다
+    (실제로 라라홈·포유홈·마리에뜰·밥프로 계정에서 7건이 이렇게 needs_review에
+    쌓여 있었다). 가격 뱃지가 있으면 그래도 사람이 확인할 여지를 남긴다.
+    """
+    if not price and purchase_url:
+        path = urlparse(purchase_url).path
+        if path in ("", "/"):
+            return False
     if any(kw in title for kw in ALWAYS_ON_KW):
         return False
     if domain and _domain_matches(domain, HARD_BLOCK_DOMAINS):
@@ -1402,7 +1419,7 @@ def collect(handles, source_obj=None, write_result=True):
             if not deadline and product_info.get("deadline"):
                 deadline = product_info["deadline"]
 
-            if not is_product(domain, price, b.get("title", "")):
+            if not is_product(domain, price, b.get("title", ""), purchase_url):
                 skipped_count += 1
                 print(f"  - (제외) {b.get('title', '')[:34]} [{domain}]")
                 continue
