@@ -63,6 +63,10 @@ function isProtected(req: NextRequest): boolean {
   // 옵션 가져오기 — 임의 URL을 서버가 대신 요청해 주는 창구라 반드시 막아야 한다
   if (pathname === '/api/options') return true
 
+  // 인스타 단일 게시글 수집 — /api/options와 같은 위험(임의 URL을 서버가 인스타
+  // 계정 자격증명으로 대신 요청)이라 반드시 막아야 한다
+  if (pathname === '/api/instagram-post') return true
+
   return false
 }
 
@@ -108,5 +112,6 @@ export const config = {
     '/api/growth-goals',
     '/api/purchase-log',
     '/api/options',
+    '/api/instagram-post',
   ],
 }
