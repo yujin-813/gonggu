@@ -809,6 +809,19 @@ header {
 .kakao-banner-btn { background: #FEE500; color: #3C1E1E; border: none; }
 .kakao-banner-btn:hover { background: #F5DC00; }
 
+/* 찜하는 순간 뜨는 알림 구독 유도 — 위 배너는 페이지 상단 고정형이라 이건 화면 아래
+   토스트 자리 위에 떠서 "방금 한 행동"과 이어져 보이게 한다 */
+.notify-banner-float {
+  position: fixed;
+  bottom: 150px;
+  left: 0;
+  right: 0;
+  max-width: 420px;
+  margin: 0 auto;
+  padding: 0 16px;
+  z-index: 401;
+}
+
 /* ── Bookmark header ── */
 .section-header {
   max-width: 680px;

@@ -73,6 +73,10 @@ export default function HomeClient({ sections, collectionBanners }: { sections?:
   const [followedInfluencers, setFollowedInfluencers] = useState<Set<string>>(new Set())
   const [viewingFollowed, setViewingFollowed] = useState(false)
   const [pushSubscribed, setPushSubscribed] = useState(false)
+  // 헤더 메뉴 안에 있던 알림 구독 버튼은 관심이 없으면 아예 안 보이는 자리였다 — 구독자가
+  // 2명뿐이었던 이유. 실제로 관심을 보인 순간(찜)에 바로 물어보면 전환이 더 잘 될 것 같아서
+  // 첫 찜 직후 한 번만 띄운다(계속 찜할 때마다 뜨면 귀찮으니 수락·거절과 무관하게 한 번만)
+  const [showPushPrompt, setShowPushPrompt] = useState(false)
   // "이 상품 공구가 얼마였지?"를 찾는 사람에게는 마감된 공구도 답이 된다.
   // 평소 목록에는 안 넣고, 검색을 시작할 때 한 번만 따로 받아온다.
   const [endedPosts, setEndedPosts] = useState<Post[]>([])
@@ -225,10 +229,24 @@ export default function HomeClient({ sections, collectionBanners }: { sections?:
         next.add(id)
         showToast('찜 목록에 추가했어요!')
         track('bookmark')
+        if (pushSupported() && !pushSubscribed && localStorage.getItem('gonggu_push_prompt_seen') !== '1') {
+          setShowPushPrompt(true)
+        }
       }
       saveBookmarks(next)
       return next
     })
+  }
+
+  function acceptPushPrompt() {
+    localStorage.setItem('gonggu_push_prompt_seen', '1')
+    setShowPushPrompt(false)
+    subscribeToPush()
+  }
+
+  function dismissPushPrompt() {
+    localStorage.setItem('gonggu_push_prompt_seen', '1')
+    setShowPushPrompt(false)
   }
 
   const showToast = useCallback((message: string) => {
@@ -473,6 +491,20 @@ export default function HomeClient({ sections, collectionBanners }: { sections?:
                 {p.price > 0 && <p className="strip-price">당시 {p.price.toLocaleString()}원</p>}
               </Link>
             ))}
+          </div>
+        </div>
+      )}
+
+      {showPushPrompt && (
+        <div className="notify-banner notify-banner-float">
+          <div className="notify-inner">
+            <div className="notify-icon"><Bell size={18} /></div>
+            <div className="notify-text">
+              <p>이 공구 마감 임박하면 알려드릴까요?</p>
+              <p>찜한 공구만, 마감 하루 전에 한 번만 알려요</p>
+            </div>
+            <button className="notify-btn" onClick={acceptPushPrompt}>알림 받기</button>
+            <button className="notify-close" title="닫기" onClick={dismissPushPrompt}><X size={14} /></button>
           </div>
         </div>
       )}
