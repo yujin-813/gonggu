@@ -4,6 +4,7 @@ import Link from 'next/link'
 import type { Post, PurchaseLink } from '@/lib/types'
 import { ArrowLeft } from 'lucide-react'
 import PostCard from '@/components/PostCard'
+import PostLongtailInfo from '@/components/PostLongtailInfo'
 import Toast from '@/components/Toast'
 import EndedDealNotice from '@/components/EndedDealNotice'
 import BetterPriceNotice from '@/components/BetterPriceNotice'
@@ -28,9 +29,11 @@ interface Props {
    * 버튼·PriceCompareModal이 이미 이 데이터로 그리도록 돼 있다(홈 목록에서 쓰던 것과 동일) */
   siblings?: Post[]
   pastPrices?: { id: number; price: number; origPrice: number | null; date: string }[]
+  /** post.brand로 브랜드 랜딩 페이지가 실제로 있는지 — 서버가 미리 확인해 내려준다 */
+  brandPageExists?: boolean
 }
 
-export default function PostDetailClient({ post, ended = false, upcoming = false, betterPrice = false, relatedKind = 'category', categoryLabel = '', purchaseLinks = [], related = [], siblings = [], pastPrices = [] }: Props) {
+export default function PostDetailClient({ post, ended = false, upcoming = false, betterPrice = false, relatedKind = 'category', categoryLabel = '', purchaseLinks = [], related = [], siblings = [], pastPrices = [], brandPageExists = false }: Props) {
   const [bookmarks, setBookmarks] = useState<Set<number>>(new Set())
   const [toast, setToast] = useState({ message: '', visible: false })
 
@@ -103,6 +106,8 @@ export default function PostDetailClient({ post, ended = false, upcoming = false
           pastPrices={pastPrices}
         />
       </div>
+
+      <PostLongtailInfo post={post} brandPageExists={brandPageExists} />
 
       {ended && purchaseLinks.length > 0 && (
         <EndedDealNotice post={post} purchaseLinks={purchaseLinks} related={related}

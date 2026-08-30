@@ -7,7 +7,9 @@ import { CATEGORY_LABEL } from '@/lib/categoryIcons'
 import { visiblePurchaseLinks, sameProductLinks } from '@/lib/purchaseLinks'
 import { getDealVerdict } from '@/lib/dealGrade'
 import { relatedPosts, type RelatedKind } from '@/lib/relatedPosts'
-import JsonLd, { productSchema, breadcrumbSchema } from '@/components/JsonLd'
+import { allBrands } from '@/lib/brandPages'
+import { priceQA, periodQA } from '@/lib/postLongtail'
+import JsonLd, { productSchema, breadcrumbSchema, faqSchema } from '@/components/JsonLd'
 import type { Post } from '@/lib/types'
 import { toPublicPost, toPublicPosts, stripAdminMemo } from '@/lib/publicPost'
 import PostDetailClient from './PostDetailClient'
@@ -142,6 +144,8 @@ export default function PostPage({ params }: { params: { id: string } }) {
   // 별도의 비교(대체 구매처)를 보여주고 있어서 겹치지 않게 여기선 안 낸다
   const siblings = ended ? [] : getSiblings(post)
   const pastPrices = ended ? [] : getPastPrices(post)
+  const brandPageExists = !!post.brand && allBrands().includes(post.brand)
+  const qas = [priceQA(post), periodQA(post)].filter((qa): qa is NonNullable<typeof qa> => qa !== null)
   return (
     <>
       <JsonLd data={[
@@ -151,6 +155,7 @@ export default function PostPage({ params }: { params: { id: string } }) {
           { name: `${CATEGORY_LABEL[post.cat]} 공구`, path: `/category/${post.cat}` },
           { name: post.title, path: `/post/${post.id}` },
         ]),
+        ...(qas.length > 0 ? [faqSchema(qas)] : []),
       ]} />
       <PostDetailClient
         post={toPublicPost(post)}
@@ -167,6 +172,7 @@ export default function PostPage({ params }: { params: { id: string } }) {
         categoryLabel={CATEGORY_LABEL[post.cat]}
         siblings={toPublicPosts(siblings)}
         pastPrices={pastPrices}
+        brandPageExists={brandPageExists}
       />
     </>
   )

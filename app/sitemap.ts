@@ -1,6 +1,7 @@
 import type { MetadataRoute } from 'next'
 import { loadCollections, loadPosts } from '@/lib/store'
 import { influencerItems } from '@/lib/influencerItems'
+import { allBrands } from '@/lib/brandPages'
 import { SITE_URL, visiblePosts, routablePosts, LANDING_KEYS, CATEGORY_KEYS, landingCopy } from '@/lib/landing'
 
 // 컬렉션·공구는 재배포 없이 관리자가 수시로 바꾸므로 빌드 시점에 고정되지 않게 요청마다 새로 계산한다
@@ -66,6 +67,13 @@ export default function sitemap(): MetadataRoute.Sitemap {
     // 인플루언서별 — "OOO 공구"로 들어오는 검색
     ...accounts.map(account => ({
       url: `${SITE_URL}/influencer/${encodeURIComponent(account.replace('@', ''))}`,
+      lastModified: new Date(),
+      changeFrequency: 'daily' as const,
+      priority: 0.7,
+    })),
+    // 브랜드별 — "스타우브 공구", "스타우브 최저가"로 들어오는 검색
+    ...allBrands().map(brand => ({
+      url: `${SITE_URL}/brand/${encodeURIComponent(brand)}`,
       lastModified: new Date(),
       changeFrequency: 'daily' as const,
       priority: 0.7,

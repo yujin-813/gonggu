@@ -79,6 +79,20 @@ export function websiteSchema() {
   }
 }
 
+/** 상세페이지 롱테일 Q&A용 — 실제 데이터가 있는 질문만 lib/postLongtail.ts가 만들어
+ * 넘긴다. 빈 배열이면 호출하는 쪽에서 아예 JsonLd 목록에 넣지 않는다. */
+export function faqSchema(qas: { q: string; a: string }[]) {
+  return {
+    '@context': 'https://schema.org',
+    '@type': 'FAQPage',
+    mainEntity: qas.map(qa => ({
+      '@type': 'Question',
+      name: qa.q,
+      acceptedAnswer: { '@type': 'Answer', text: qa.a },
+    })),
+  }
+}
+
 /** 페이지 위치를 알려 검색결과에 경로가 표시되게 한다 */
 export function breadcrumbSchema(trail: { name: string; path: string }[]) {
   return {
