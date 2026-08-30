@@ -12,7 +12,7 @@
 | 단계 | 운영 중 · 실사용자 있음 (2026-08-19 기준 사람 방문 고유 IP 163명/2일) |
 | 스택 | Next.js 14 (App Router) · React 18 · TypeScript · 파이썬 수집기 |
 | 저장소 | **파일 기반** — `data/*.json`. DB 없음 |
-| 코드 규모 | `lib/` 3,420줄 · `app/admin` + `components/` 7,146줄 · 파이썬 3,059줄 |
+| 코드 규모 | `lib/` 3,420줄 · `app/admin` + `components/` 7,148줄 · 파이썬 3,064줄 |
 | 데이터 규모 | 게시물 2,524건 (공개 423건) · 인플루언서 소스 61개 · analytics 34일치 |
 | 배포 | EC2 `13.125.121.62`(t3.small) · PM2(fork) + nginx · `bash deploy.sh` — **무중단**(3002↔3003 슬롯 교대, `D-028`) |
 | 도메인 | https://gonggu.asknuggetdata.com |
