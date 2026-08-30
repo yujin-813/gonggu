@@ -1014,10 +1014,12 @@ def is_product(domain, price, title="", purchase_url=None):
 
     구매 링크가 쇼핑몰 홈(경로 없음)으로 끝나면 특정 상품이 아니라 "밥프몰"·
     "OO 전체상품"처럼 몰 전체를 가리키는 링크다 — 가격을 매길 대상 자체가 없다
-    (실제로 라라홈·포유홈·마리에뜰·밥프로 계정에서 7건이 이렇게 needs_review에
-    쌓여 있었다). 가격 뱃지가 있으면 그래도 사람이 확인할 여지를 남긴다.
+    (실제로 라라홈·포유홈·마리에뜰·밥프로 계정에서 여러 건 needs_review에 쌓여 있었다).
+    가격이 있어도 이건 그대로 막는다 — 몰 홈 페이지 텍스트에서 아무 숫자나 하나 걸려
+    "가격이 있으니 통과"가 되는 걸 실제로 확인했다(마리에뜰 전체상품이 48,900원으로,
+    밥프몰이 11,400원으로 들어옴). 몰 홈에서 뽑은 가격은 애초에 신뢰할 수 없는 숫자다.
     """
-    if not price and purchase_url:
+    if purchase_url:
         path = urlparse(purchase_url).path
         if path in ("", "/"):
             return False
