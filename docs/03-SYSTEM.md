@@ -183,7 +183,7 @@ extraction_debug, scraped_at, collection_status, collection_error
 | `excluded` | 제외됨 (비공구 등) | 1,020 |
 | `published` | 공개 중 | 369 |
 | `upcoming` | 오픈 예정 | 84 |
-| `ready` | 공개 가능 (검수 끝났지만 미공개) | 24 |
+| `ready` | 공개 가능 (검수 끝났지만 미공개) | 19 |
 | `candidate` | 공구 후보 | 0 |
 | (없음) | 옛 데이터 | 16 ⚠️ |
 
