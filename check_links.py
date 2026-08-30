@@ -114,11 +114,24 @@ def kst_today():
 
 
 def is_customer_visible(p):
-    """lib/period.ts의 isCustomerVisible과 같은 규칙 — 한쪽만 고치면 갈라진다."""
-    if p.get("status") == "upcoming":
+    """lib/period.ts의 isCustomerVisible과 같은 규칙 — 한쪽만 고치면 갈라진다.
+
+    빠졌던 두 가지를 맞췄다: (1) status='upcoming'이어도 start_date가 이미 지났으면
+    (D-036 — 실제 공구는 열렸는데 status만 안 바뀐 경우) 일반 공구로 취급해야 하는데
+    여기는 무조건 오픈예정으로 봤다. (2) 가격이 없으면 판정할 숫자가 없어 원칙 2에 따라
+    안 보여야 하는데(TS의 `if (!post.price) return false`) 그 가드가 없었다.
+    """
+    status = p.get("status")
+    start_date = p.get("start_date") or ""
+    still_upcoming = status == "upcoming" and (
+        not start_date or (date.fromisoformat(start_date[:10]) - kst_today()).days >= 0
+    )
+    if still_upcoming:
         return p.get("published") is not False
-    is_published = p.get("status") == "published" or (not p.get("status") and p.get("published") is not False)
-    if not is_published:
+    if not p.get("price"):
+        return False
+    is_published = status == "published" or status == "upcoming" or (not status and p.get("published") is not False)
+    if not is_published or p.get("published") is False:
         return False
     # 사람이 끝났다고 확인한 공구는 내린다
     if p.get("ended_at"):
