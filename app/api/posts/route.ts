@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { loadPosts, savePosts } from '@/lib/store'
 import type { Post } from '@/lib/types'
 import { daysLeft, isCustomerVisible, isPagePublic } from '@/lib/period'
-import { enforcePurchaseLinkRequirement, syncPriceWithOptions } from '@/lib/postGuards'
+import { enforcePurchaseLinkRequirement, syncPriceWithOptions, reconcileReviewReasons } from '@/lib/postGuards'
 import { toPublicPosts } from '@/lib/publicPost'
 import { pingIndexNow, postUrl } from '@/lib/indexnow'
 
@@ -124,7 +124,7 @@ export async function POST(request: NextRequest) {
     partners_visible:      Boolean(data.partners_visible),
   }
 
-  const guarded = syncPriceWithOptions(enforcePurchaseLinkRequirement(newPost))
+  const guarded = reconcileReviewReasons(syncPriceWithOptions(enforcePurchaseLinkRequirement(newPost)))
   posts.unshift(guarded)
   savePosts(posts)
   if (guarded.published) pingIndexNow([postUrl(guarded.id)])

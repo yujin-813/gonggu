@@ -20,6 +20,36 @@ export function enforcePurchaseLinkRequirement(post: Post): Post {
   }
 }
 
+// check_links.py가 스스로 붙이고 스스로 지우는 태그 — 여기서는 건드리지 않는다.
+// (품절·링크만료는 재확인해서 풀리면 파이썬이 직접 지운다)
+const SELF_MANAGED_REASONS = [
+  '품절 감지 (자동 숨김 · 재입고 시 자동 복구)',
+  '구매링크 확인 필요',
+  '구매링크 만료됨 (자동 비공개)',
+]
+
+// 나머지 review_reason은 수집기가 "사람이 한 번 봐야 한다"는 뜻으로 수집 시점에 붙인
+// 안내문이다. 지금 값 기준으로 다시 확인해서 여전히 맞으면 남기고, 아니면 지운다 — 필드로
+// 다시 확인할 수 없는 것(추출 데이터 확인 필요·비공구 등 1회성 판단)은, ready/published로
+// 넘어갔다는 것 자체가 이미 사람이 확인했다는 뜻이라 무조건 지운다.
+const STILL_TRUE: Record<string, (post: Post) => boolean> = {
+  '가격 미입력': post => !post.price,
+  '마감일 미확인': post => !post.deadline && !post.sale_until_sold_out && !post.is_evergreen_deal && !post.is_always_on,
+  '구매페이지 미확인': post => !post.purchase_url,
+  '구매 링크 없음': post => !post.purchase_url,
+  '이미지 다운로드 실패': post => !post.img,
+}
+
+// ready/published로 넘긴 뒤에도 수집 시점 안내문이 그대로 남아, 이미 값을 채워 넣은
+// 공구에 "가격 미입력" 같은 빨간 배지가 계속 떠 있는 문제가 있었다(관리자 화면 209건).
+export function reconcileReviewReasons(post: Post): Post {
+  if (post.status !== 'published' && post.status !== 'ready') return post
+  const reasons = post.review_reason || []
+  if (reasons.length === 0) return post
+  const next = reasons.filter(r => SELF_MANAGED_REASONS.includes(r) || (STILL_TRUE[r]?.(post) ?? false))
+  return next.length === reasons.length ? post : { ...post, review_reason: next }
+}
+
 /**
  * 세트 옵션이 있으면 게시물의 price를 가장 싼 옵션 가격에 맞춘다.
  *

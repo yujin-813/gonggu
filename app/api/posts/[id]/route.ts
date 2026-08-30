@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { loadPosts, savePosts } from '@/lib/store'
 import type { Post } from '@/lib/types'
-import { enforcePurchaseLinkRequirement, syncPriceWithOptions } from '@/lib/postGuards'
+import { enforcePurchaseLinkRequirement, syncPriceWithOptions, reconcileReviewReasons } from '@/lib/postGuards'
 import { isPagePublic } from '@/lib/period'
 import { pingIndexNow, postUrl } from '@/lib/indexnow'
 
@@ -38,7 +38,7 @@ export async function PATCH(request: NextRequest, { params }: Ctx) {
       (posts[idx] as unknown as Record<string, unknown>)[key] = body[key]
     }
   }
-  posts[idx] = syncPriceWithOptions(enforcePurchaseLinkRequirement(posts[idx]))
+  posts[idx] = reconcileReviewReasons(syncPriceWithOptions(enforcePurchaseLinkRequirement(posts[idx])))
   if (notifyChanged) posts[idx].updated_at = new Date().toISOString()
   savePosts(posts)
   if (notifyChanged && isPagePublic(posts[idx])) pingIndexNow([postUrl(id)])
@@ -62,7 +62,7 @@ export async function PUT(request: NextRequest, { params }: Ctx) {
       (patch as Record<string, unknown>)[key] = body[key]
     }
   }
-  posts[idx] = syncPriceWithOptions(enforcePurchaseLinkRequirement({ ...posts[idx], ...patch, id }))
+  posts[idx] = reconcileReviewReasons(syncPriceWithOptions(enforcePurchaseLinkRequirement({ ...posts[idx], ...patch, id })))
   if (notifyChanged) posts[idx].updated_at = new Date().toISOString()
   savePosts(posts)
   if (notifyChanged && isPagePublic(posts[idx])) pingIndexNow([postUrl(id)])
