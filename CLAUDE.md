@@ -187,7 +187,7 @@ node node_modules/.bin/next dev -p 3210           # 로컬 (3000·3100은 다른
 배포:
 ```bash
 git push origin main
-ssh -i ~/.ssh/gonggu_ec2 ubuntu@13.125.121.62 'cd ~/gonggu && bash deploy.sh'
+ssh -i ~/.ssh/gonggu_ec2 ubuntu@52.78.55.170 'cd ~/gonggu && bash deploy.sh'
 ```
 
 서버에서 파이썬은 `venv/bin/python`. 긴 작업은 `nohup ... &`로 분리 실행(SSH 끊기면 죽는다).

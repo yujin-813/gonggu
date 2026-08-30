@@ -14,7 +14,7 @@
 | 저장소 | **파일 기반** — `data/*.json`. DB 없음 |
 | 코드 규모 | `lib/` 3,532줄 · `app/admin` + `components/` 7,208줄 · 파이썬 3,064줄 |
 | 데이터 규모 | 게시물 2,524건 (공개 423건) · 인플루언서 소스 61개 · analytics 34일치 |
-| 배포 | EC2 `13.125.121.62`(t3.small) · PM2(fork) + nginx · `bash deploy.sh` — **무중단**(3002↔3003 슬롯 교대, `D-028`) |
+| 배포 | EC2 `52.78.55.170`(t3.small) · PM2(fork) + nginx · `bash deploy.sh` — **무중단**(3002↔3003 슬롯 교대, `D-028`) |
 | 도메인 | https://gonggu.asknuggetdata.com |
 
 ---
@@ -476,7 +476,7 @@ TypeScript(`lib/postGuards.ts`)와 파이썬(`inpock.py`의 `classify_status()`)
 ```bash
 # 배포 (로컬에서)
 git push origin main
-ssh -i ~/.ssh/gonggu_ec2 ubuntu@13.125.121.62 'cd ~/gonggu && bash deploy.sh'
+ssh -i ~/.ssh/gonggu_ec2 ubuntu@52.78.55.170 'cd ~/gonggu && bash deploy.sh'
 
 # 로컬 개발
 node node_modules/.bin/next dev -p 3210     # 3000·3100은 다른 프로젝트가 쓸 수 있음
