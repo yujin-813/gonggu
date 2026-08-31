@@ -3779,6 +3779,10 @@ const fillInput: React.CSSProperties = {
   padding: '7px 10px', borderRadius: 8, border: '1.5px solid #e2e8f0',
   outline: 'none', width: '100%', boxSizing: 'border-box',
 }
+/** 저장하려면 채워야 하는데 아직 안 채워진 칸 — 빨간 테두리로 눈에 띄게 한다 */
+const fillRequired: React.CSSProperties = {
+  border: '1.5px solid #fca5a5', background: '#fef2f2',
+}
 
 /** 동일 상품/같은 브랜드/비슷한 상품 세 단계 선택. EndedFillRow·PurchaseLinkModal 둘 다 쓴다.
  * relation을 고르면 kind(same/alternative, 판정 가드레일)가 같이 정해지고, reason이 비어
@@ -4170,11 +4174,20 @@ function CompareFillRow({ post, allPosts, views, onSaved }: { post: Post; allPos
         )}
       </div>
 
+      {/* 세 칸 중 뭘 채워야 저장되는지 몰라 헤매던 게 실제 문의였다 — 필수 조건을 문장으로
+          박고, 아직 하나도 안 채워졌으면(canSave가 false) 두 칸에 빨간 테두리를 준다.
+          셋 다 필수인 게 아니라 "이 중 하나"라서, 하나라도 채우면 즉시 빨간 테두리가
+          풀린다(정가는 근거가 약해 강조 대상에서 뺀다 — 접혀 있는 칸이기도 하고). */}
+      <p style={{ fontSize: 11.5, margin: '0 0 6px', fontWeight: 700, color: canSave ? '#16a34a' : '#dc2626' }}>
+        {canSave ? '✓ 저장할 수 있어요' : '필수 — 네이버가·쿠팡가 중 최소 하나는 입력해야 저장돼요'}
+      </p>
       <div className="admin-2col" style={{ gap: 8 }}>
         <input type="number" value={market} onChange={e => { setMarket(e.target.value); setPicked(null); setDone(false) }}
-          placeholder="네이버에서 찾은 가격" style={{ ...fillInput, fontSize: 13 }} />
+          placeholder="네이버에서 찾은 가격"
+          style={{ ...fillInput, fontSize: 13, ...(!canSave ? fillRequired : null) }} />
         <input type="number" value={coupang} onChange={e => { setCoupang(e.target.value); setDone(false) }}
-          placeholder="쿠팡에서 찾은 가격" style={{ ...fillInput, fontSize: 13 }} />
+          placeholder="쿠팡에서 찾은 가격"
+          style={{ ...fillInput, fontSize: 13, ...(!canSave ? fillRequired : null) }} />
       </div>
       <input type="url" value={marketUrl} onChange={e => setMarketUrl(e.target.value)}
         placeholder="네이버쇼핑 링크 (선택 — 근거로 보여줄 때만)" style={{ ...fillInput, fontSize: 12, marginTop: 6 }} />
@@ -4371,11 +4384,14 @@ function EndedFillRow({ post, views, onSaved }: { post: Post; views: number; onS
         </p>
       )}
       <FillTools post={post} />
+      <p style={{ fontSize: 11.5, margin: '0 0 6px', fontWeight: 700, color: canSave ? '#16a34a' : '#dc2626' }}>
+        {canSave ? '✓ 저장할 수 있어요' : '필수 — 쿠팡·네이버 링크 중 최소 하나는 입력해야 저장돼요'}
+      </p>
       <div className="admin-2col" style={{ gap: 8 }}>
         <input type="url" value={coupangUrl} onChange={e => { setCoupangUrl(e.target.value); setDone(false) }}
-          placeholder="쿠팡 파트너스 링크 (동일 상품)" style={{ ...fillInput, fontSize: 13 }} />
+          placeholder="쿠팡 파트너스 링크 (동일 상품)" style={{ ...fillInput, fontSize: 13, ...(!canSave ? fillRequired : null) }} />
         <input type="url" value={naverUrl} onChange={e => { setNaverUrl(e.target.value); setDone(false) }}
-          placeholder="네이버 제휴 링크 (동일 상품)" style={{ ...fillInput, fontSize: 13 }} />
+          placeholder="네이버 제휴 링크 (동일 상품)" style={{ ...fillInput, fontSize: 13, ...(!canSave ? fillRequired : null) }} />
       </div>
       <div className="admin-2col" style={{ gap: 8, marginTop: 6 }}>
         <input type="number" value={coupang} onChange={e => setCoupang(e.target.value)}
