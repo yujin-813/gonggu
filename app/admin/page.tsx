@@ -4340,32 +4340,39 @@ function EndedFillRow({ post, views, onSaved }: { post: Post; views: number; onS
   // 브랜드는 쿠팡 파트너스에 동일 상품 자체가 없는 경우가 실제로 있었다(D-030에서 예상했던
   // 신호). 접어 두는 이유는 같은 상품 링크가 있으면 이 칸을 볼 일이 없어서다.
   const [showAlt, setShowAlt] = useState(altExisting.length > 0)
-  // 예전엔 여기 항상 쿠팡으로만 저장돼서, 네이버 브랜드커넥트 링크를 붙여도 쿠팡 파트너스
-  // 고지 문구가 나갔다 — 안 받은 수수료를 받는다고 말하는 셈이라 공정위 고지 문제다(D-003).
-  const [altPlatform, setAltPlatform] = useState<'coupang' | 'naver'>(altExisting[0]?.platform === 'naver' ? 'naver' : 'coupang')
-  const [altUrl, setAltUrl] = useState(altExisting[0]?.url ?? '')
-  const [altPrice, setAltPrice] = useState(String(altExisting[0]?.price ?? ''))
-  const [altRelation, setAltRelation] = useState<PurchaseLinkRelation>(altExisting[0]?.relation ?? 'similar')
-  const [altProductName, setAltProductName] = useState(altExisting[0]?.productName ?? '')
-  const [altReason, setAltReason] = useState(altExisting[0]?.reason ?? RELATION_DEFAULT_REASON[altExisting[0]?.relation ?? 'similar'])
-  const [altMemo, setAltMemo] = useState(altExisting[0]?.adminMemo ?? '')
+  const altCoupangExisting = altExisting.find(l => l.platform === 'coupang')
+  const altNaverExisting = altExisting.find(l => l.platform === 'naver')
+  // 동일 상품 칸처럼 쿠팡·네이버 둘 다 동시에 받는다 — 같은 대체 상품을 두 플랫폼
+  // 다 판다면 둘 다 붙여야 한다(하나만 고르는 토글이 아니다). 예전엔 이 칸이 저장할 때
+  // platform을 무조건 'coupang'으로 박아서, 네이버 링크를 붙여도 쿠팡 파트너스 고지
+  // 문구가 나갔다 — 안 받은 수수료를 받는다고 말하는 셈이라 공정위 고지 문제다(D-003).
+  const [altCoupangUrl, setAltCoupangUrl] = useState(altCoupangExisting?.url ?? '')
+  const [altCoupangPrice, setAltCoupangPrice] = useState(String(altCoupangExisting?.price ?? ''))
+  const [altNaverUrl, setAltNaverUrl] = useState(altNaverExisting?.url ?? '')
+  const [altNaverPrice, setAltNaverPrice] = useState(String(altNaverExisting?.price ?? ''))
+  const altFirstExisting = altCoupangExisting ?? altNaverExisting
+  const [altRelation, setAltRelation] = useState<PurchaseLinkRelation>(altFirstExisting?.relation ?? 'similar')
+  const [altProductName, setAltProductName] = useState(altFirstExisting?.productName ?? '')
+  const [altReason, setAltReason] = useState(altFirstExisting?.reason ?? RELATION_DEFAULT_REASON[altFirstExisting?.relation ?? 'similar'])
+  const [altMemo, setAltMemo] = useState(altFirstExisting?.adminMemo ?? '')
 
   const [saving, setSaving] = useState(false)
   const [done, setDone] = useState(false)
 
-  const canSave = !!(coupangUrl.trim() || naverUrl.trim() || altUrl.trim())
+  const canSave = !!(coupangUrl.trim() || naverUrl.trim() || altCoupangUrl.trim() || altNaverUrl.trim())
   async function save() {
     setSaving(true)
     const now = new Date().toISOString()
     const links = []
     if (coupangUrl.trim()) links.push({ platform: 'coupang' as const, kind: 'same' as const, relation: 'same' as const, url: coupangUrl.trim(), price: parseInt(coupang) || null, visible: true, checked_at: now })
     if (naverUrl.trim())   links.push({ platform: 'naver' as const, kind: 'same' as const, relation: 'same' as const, url: naverUrl.trim(), price: parseInt(naver) || null, visible: true, checked_at: now })
-    if (altUrl.trim())     links.push({
-      platform: altPlatform, kind: 'alternative' as const, relation: altRelation,
-      url: altUrl.trim(), price: parseInt(altPrice) || null,
+    const altBase = {
+      kind: 'alternative' as const, relation: altRelation,
       productName: altProductName.trim() || null, reason: altReason.trim() || null, adminMemo: altMemo.trim() || null,
       visible: true, checked_at: now,
-    })
+    }
+    if (altCoupangUrl.trim()) links.push({ ...altBase, platform: 'coupang' as const, url: altCoupangUrl.trim(), price: parseInt(altCoupangPrice) || null })
+    if (altNaverUrl.trim())   links.push({ ...altBase, platform: 'naver' as const, url: altNaverUrl.trim(), price: parseInt(altNaverPrice) || null })
     await fetch(`/api/posts/${post.id}`, {
       method: 'PATCH', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ purchase_links: links }),
@@ -4414,26 +4421,22 @@ function EndedFillRow({ post, views, onSaved }: { post: Post; views: number; onS
           </div>
           <RelationPicker relation={altRelation} reason={altReason}
             onChange={(rel, reason) => { setAltRelation(rel); setAltReason(reason); setDone(false) }} />
-          <div style={{ display: 'flex', gap: 6, marginTop: 6 }}>
-            {(['coupang', 'naver'] as const).map(p => (
-              <button key={p} type="button" onClick={() => { setAltPlatform(p); setDone(false) }}
-                style={{ padding: '5px 12px', borderRadius: 7, border: '1.5px solid', cursor: 'pointer',
-                  fontSize: 12, fontWeight: 700,
-                  borderColor: altPlatform === p ? '#6366f1' : '#e2e8f0',
-                  background: altPlatform === p ? '#eef2ff' : '#fff',
-                  color: altPlatform === p ? '#4338ca' : '#94a3b8' }}>
-                {PLATFORM_LABEL[p]} 파트너스
-              </button>
-            ))}
-          </div>
-          <input type="url" value={altUrl} onChange={e => { setAltUrl(e.target.value); setDone(false) }}
-            placeholder={`${PLATFORM_LABEL[altPlatform]} 파트너스 링크 (다른 상품)`} style={{ ...fillInput, fontSize: 13, marginTop: 6 }} />
+          {/* 동일 상품 칸과 같은 구조 — 같은 대체 상품을 쿠팡·네이버 둘 다 팔면 둘 다 붙인다.
+              하나만 고르는 토글이 아니다 */}
           <div className="admin-2col" style={{ gap: 8, marginTop: 6 }}>
-            <input type="number" value={altPrice} onChange={e => setAltPrice(e.target.value)}
-              placeholder="가격 (선택)" style={{ ...fillInput, fontSize: 12 }} />
-            <input value={altProductName} onChange={e => setAltProductName(e.target.value)}
-              placeholder="상품명 (고객 화면에 노출)" style={{ ...fillInput, fontSize: 12 }} />
+            <input type="url" value={altCoupangUrl} onChange={e => { setAltCoupangUrl(e.target.value); setDone(false) }}
+              placeholder="쿠팡 파트너스 링크 (다른 상품)" style={{ ...fillInput, fontSize: 13 }} />
+            <input type="url" value={altNaverUrl} onChange={e => { setAltNaverUrl(e.target.value); setDone(false) }}
+              placeholder="네이버 제휴 링크 (다른 상품)" style={{ ...fillInput, fontSize: 13 }} />
           </div>
+          <div className="admin-2col" style={{ gap: 8, marginTop: 6 }}>
+            <input type="number" value={altCoupangPrice} onChange={e => setAltCoupangPrice(e.target.value)}
+              placeholder="쿠팡 가격 (선택)" style={{ ...fillInput, fontSize: 12 }} />
+            <input type="number" value={altNaverPrice} onChange={e => setAltNaverPrice(e.target.value)}
+              placeholder="네이버 가격 (선택)" style={{ ...fillInput, fontSize: 12 }} />
+          </div>
+          <input value={altProductName} onChange={e => setAltProductName(e.target.value)}
+            placeholder="상품명 (고객 화면에 노출)" style={{ ...fillInput, fontSize: 12, marginTop: 6 }} />
           <input value={altReason} onChange={e => setAltReason(e.target.value)}
             placeholder="추천 이유 (고객 화면 문구)" style={{ ...fillInput, fontSize: 12, marginTop: 6 }} />
           <textarea value={altMemo} onChange={e => setAltMemo(e.target.value)}
@@ -4444,7 +4447,7 @@ function EndedFillRow({ post, views, onSaved }: { post: Post; views: number; onS
             안 쓰여요. 다른 상품을 같은 상품으로 속이지 않기 위해서예요.
           </p>
           {!altExisting.length && (
-            <button onClick={() => { setShowAlt(false); setAltUrl(''); setAltPrice(''); setAltProductName(''); setAltReason(RELATION_DEFAULT_REASON.similar); setAltMemo(''); setAltRelation('similar') }}
+            <button onClick={() => { setShowAlt(false); setAltCoupangUrl(''); setAltCoupangPrice(''); setAltNaverUrl(''); setAltNaverPrice(''); setAltProductName(''); setAltReason(RELATION_DEFAULT_REASON.similar); setAltMemo(''); setAltRelation('similar') }}
               style={{ marginTop: 8, padding: 0, border: 'none', background: 'none', cursor: 'pointer',
                 fontSize: 11.5, color: '#94a3b8', fontWeight: 600 }}>
               접기
