@@ -4340,6 +4340,9 @@ function EndedFillRow({ post, views, onSaved }: { post: Post; views: number; onS
   // 브랜드는 쿠팡 파트너스에 동일 상품 자체가 없는 경우가 실제로 있었다(D-030에서 예상했던
   // 신호). 접어 두는 이유는 같은 상품 링크가 있으면 이 칸을 볼 일이 없어서다.
   const [showAlt, setShowAlt] = useState(altExisting.length > 0)
+  // 예전엔 여기 항상 쿠팡으로만 저장돼서, 네이버 브랜드커넥트 링크를 붙여도 쿠팡 파트너스
+  // 고지 문구가 나갔다 — 안 받은 수수료를 받는다고 말하는 셈이라 공정위 고지 문제다(D-003).
+  const [altPlatform, setAltPlatform] = useState<'coupang' | 'naver'>(altExisting[0]?.platform === 'naver' ? 'naver' : 'coupang')
   const [altUrl, setAltUrl] = useState(altExisting[0]?.url ?? '')
   const [altPrice, setAltPrice] = useState(String(altExisting[0]?.price ?? ''))
   const [altRelation, setAltRelation] = useState<PurchaseLinkRelation>(altExisting[0]?.relation ?? 'similar')
@@ -4358,7 +4361,7 @@ function EndedFillRow({ post, views, onSaved }: { post: Post; views: number; onS
     if (coupangUrl.trim()) links.push({ platform: 'coupang' as const, kind: 'same' as const, relation: 'same' as const, url: coupangUrl.trim(), price: parseInt(coupang) || null, visible: true, checked_at: now })
     if (naverUrl.trim())   links.push({ platform: 'naver' as const, kind: 'same' as const, relation: 'same' as const, url: naverUrl.trim(), price: parseInt(naver) || null, visible: true, checked_at: now })
     if (altUrl.trim())     links.push({
-      platform: 'coupang' as const, kind: 'alternative' as const, relation: altRelation,
+      platform: altPlatform, kind: 'alternative' as const, relation: altRelation,
       url: altUrl.trim(), price: parseInt(altPrice) || null,
       productName: altProductName.trim() || null, reason: altReason.trim() || null, adminMemo: altMemo.trim() || null,
       visible: true, checked_at: now,
@@ -4411,8 +4414,20 @@ function EndedFillRow({ post, views, onSaved }: { post: Post; views: number; onS
           </div>
           <RelationPicker relation={altRelation} reason={altReason}
             onChange={(rel, reason) => { setAltRelation(rel); setAltReason(reason); setDone(false) }} />
+          <div style={{ display: 'flex', gap: 6, marginTop: 6 }}>
+            {(['coupang', 'naver'] as const).map(p => (
+              <button key={p} type="button" onClick={() => { setAltPlatform(p); setDone(false) }}
+                style={{ padding: '5px 12px', borderRadius: 7, border: '1.5px solid', cursor: 'pointer',
+                  fontSize: 12, fontWeight: 700,
+                  borderColor: altPlatform === p ? '#6366f1' : '#e2e8f0',
+                  background: altPlatform === p ? '#eef2ff' : '#fff',
+                  color: altPlatform === p ? '#4338ca' : '#94a3b8' }}>
+                {PLATFORM_LABEL[p]} 파트너스
+              </button>
+            ))}
+          </div>
           <input type="url" value={altUrl} onChange={e => { setAltUrl(e.target.value); setDone(false) }}
-            placeholder="쿠팡 파트너스 링크 (다른 상품)" style={{ ...fillInput, fontSize: 13, marginTop: 6 }} />
+            placeholder={`${PLATFORM_LABEL[altPlatform]} 파트너스 링크 (다른 상품)`} style={{ ...fillInput, fontSize: 13, marginTop: 6 }} />
           <div className="admin-2col" style={{ gap: 8, marginTop: 6 }}>
             <input type="number" value={altPrice} onChange={e => setAltPrice(e.target.value)}
               placeholder="가격 (선택)" style={{ ...fillInput, fontSize: 12 }} />
