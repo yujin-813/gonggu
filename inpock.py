@@ -1440,12 +1440,21 @@ def collect(handles, source_obj=None, write_result=True):
             # 변경(인포크에서 슬롯을 지웠다 새로 만든 경우)까지는 못 잡아서 이 체크가 따로
             # 필요하다 — 실제로 같은 인플루언서·같은 제목·같은 가격(0원, 미입력)인데 block_id만
             # 달라 fingerprint가 달라지면서 검수 대기 중복이 계속 쌓이는 사례가 있었다.
+            #
+            # "가격이 달라졌다"와 "이번엔 가격을 못 찾았다"는 다르다 — 후자는 새 정보가
+            # 아니라 이번 시도의 추출 실패일 뿐이다("트위보 양면필통"이 26,500원으로 이미
+            # 공개돼 있는데 가격 0원으로 다시 검수 대기에 쌓인 사례). 이번 가격이 0인데
+            # 기존 글에 이미 진짜 가격이 있으면(0보다 크면) 그것도 스킵한다.
             block_id_prefix = f"inpock_{b['id']}"
             new_title_norm = _normalize_title(new_post["title"])
             if any(
                 (p.get("shortcode") or "").startswith(block_id_prefix)
                 and _normalize_title(p.get("title")) == new_title_norm
-                and (_is_closed_or_excluded(p) or (p.get("price") or 0) == (price or 0))
+                and (
+                    _is_closed_or_excluded(p)
+                    or (p.get("price") or 0) == (price or 0)
+                    or (not price and (p.get("price") or 0) > 0)
+                )
                 for p in posts
             ):
                 print(f"  - (스킵: 같은 인플루언서·같은 상품과 동일) {b['title'][:34]}")
