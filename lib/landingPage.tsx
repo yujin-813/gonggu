@@ -35,17 +35,24 @@ export function landingMetadata(copy: LandingCopy, posts: Post[]): Metadata {
   }
 }
 
-/** 현재 페이지를 뺀 나머지 모아보기 링크 — 크롤러가 페이지 사이를 옮겨다닐 수 있게 한다 */
+/** 현재 페이지를 뺀 나머지 모아보기 링크 — 크롤러가 페이지 사이를 옮겨다닐 수 있게 한다.
+ * 성격이 다른 링크(시간·인기 기준 모음 vs 카테고리)를 한 줄에 섞어 나열하면 뭐가 뭔지
+ * 안 읽혀서 두 그룹으로 나눈다 — 링크 자체는 그대로라 SEO엔 영향 없다. */
 function relatedLinks(currentPath: string) {
-  const all = [
+  const timely = [
     ...LANDING_KEYS.map(k => {
       const c = landingCopy(k, 0)
       return { href: c.path, label: c.h1.replace(/\s*\(.*\)$/, '') }
     }),
-    ...CATEGORY_KEYS.map(cat => ({ href: `/category/${cat}`, label: `${CATEGORY_LABEL[cat]} 공구` })),
     { href: '/influencers', label: '인플루언서별 공구' },
-  ]
-  return all.filter(l => l.href !== currentPath)
+  ].filter(l => l.href !== currentPath)
+  const category = CATEGORY_KEYS
+    .map(cat => ({ href: `/category/${cat}`, label: `${CATEGORY_LABEL[cat]} 공구` }))
+    .filter(l => l.href !== currentPath)
+  return [
+    { title: '모아보기', links: timely },
+    { title: '카테고리', links: category },
+  ].filter(g => g.links.length > 0)
 }
 
 export function LandingPage({ copy, posts }: { copy: LandingCopy; posts: Post[] }) {

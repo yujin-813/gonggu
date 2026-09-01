@@ -16,8 +16,9 @@ interface Props {
   description: string
   empty: string
   posts: Post[]
-  /** 상단에 함께 노출할 다른 모아보기 링크 — 내부 링크를 늘려 색인에 도움을 준다 */
-  related?: { href: string; label: string }[]
+  /** 상단에 함께 노출할 다른 모아보기 링크 — 내부 링크를 늘려 색인에 도움을 준다.
+   * 성격이 다른 링크를 구분해 보여주려고 그룹으로 받는다(모아보기 vs 카테고리) */
+  related?: { title: string; links: { href: string; label: string }[] }[]
 }
 
 export default function DealListClient({ h1, description, empty, posts, related = [] }: Props) {
@@ -65,8 +66,15 @@ export default function DealListClient({ h1, description, empty, posts, related 
 
       {related.length > 0 && (
         <nav className="landing-links" aria-label="다른 모아보기">
-          {related.map(r => (
-            <Link key={r.href} href={r.href} className="landing-link">{r.label}</Link>
+          {related.map(group => (
+            <div key={group.title} className="landing-link-group">
+              <span className="landing-link-group-title">{group.title}</span>
+              <div className="landing-link-row">
+                {group.links.map(r => (
+                  <Link key={r.href} href={r.href} className="landing-link">{r.label}</Link>
+                ))}
+              </div>
+            </div>
           ))}
         </nav>
       )}
