@@ -5,4 +5,4 @@
  * 컴포넌트가 SITE_URL 하나 때문에 landing을 import하면 전 페이지가 500이 난다.
  * landing.ts는 여기서 다시 내보내므로 기존 import는 그대로 동작한다.
  */
-export const SITE_URL = 'https://gonggu.asknuggetdata.com'
+export const SITE_URL = 'https://xn--ob0bwir5d.shop'

@@ -1325,7 +1325,7 @@ function AdminPostRow({ post: p, onToggle, onDelete, onEdit, onToggleAlwaysOn, o
             {/* 인스타에 올릴 링크. utm_source가 붙어 있어야 인스타 유입이 "직접 방문"에
                 섞이지 않는다 — 인앱 브라우저는 리퍼러를 안 보내기 때문이다. */}
             <button onClick={() => {
-                const url = `https://gonggu.asknuggetdata.com/post/${p.id}?utm_source=instagram&utm_medium=bio`
+                const url = `https://xn--ob0bwir5d.shop/post/${p.id}?utm_source=instagram&utm_medium=bio`
                 navigator.clipboard.writeText(url)
                   .then(() => setCopied(true))
                   .catch(() => {})

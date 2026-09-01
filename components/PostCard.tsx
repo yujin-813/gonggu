@@ -16,7 +16,7 @@ import DealVerdictBox from './DealVerdictBox'
 import GradeIcon from './GradeIcon'
 import { getDealVerdict, shareLabel } from '@/lib/dealGrade'
 
-const SITE_URL = 'https://gonggu.asknuggetdata.com'
+const SITE_URL = 'https://xn--ob0bwir5d.shop'
 
 const BADGE_ICON: Record<BadgeIcon, typeof Calendar> = {
   'calendar-clock': CalendarClock, package: Package, flame: Flame, lock: Lock, timer: Timer,

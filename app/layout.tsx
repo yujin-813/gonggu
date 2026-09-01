@@ -3,7 +3,7 @@ import Script from 'next/script'
 import './globals.css'
 import Footer from '@/components/Footer'
 
-const SITE_URL = 'https://gonggu.asknuggetdata.com'
+const SITE_URL = 'https://xn--ob0bwir5d.shop'
 
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),

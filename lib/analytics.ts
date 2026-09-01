@@ -144,7 +144,7 @@ export function classifySource(opts: {
   if (ref) {
     try { host = new URL(ref).hostname.replace(/^www\./, '') } catch { host = '' }
   }
-  if (host && !host.endsWith('asknuggetdata.com')) {
+  if (host && !host.endsWith('asknuggetdata.com') && !host.endsWith('xn--ob0bwir5d.shop')) {
     if (/instagram|cdninstagram|l\.facebook|fb\./.test(host)) return { source: 'instagram', detail: host }
     if (/kakao|daum/.test(host)) return { source: 'kakao', detail: host }
     if (/naver/.test(host)) return { source: 'naver_search', detail: host }

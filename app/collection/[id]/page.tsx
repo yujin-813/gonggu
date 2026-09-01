@@ -5,7 +5,7 @@ import { isCustomerVisible } from '@/lib/period'
 import { toPublicPosts } from '@/lib/publicPost'
 import CollectionDetailClient from './CollectionDetailClient'
 
-const SITE_URL = 'https://gonggu.asknuggetdata.com'
+const SITE_URL = 'https://xn--ob0bwir5d.shop'
 
 function getCollectionAndPosts(rawId: string) {
   const id = decodeURIComponent(rawId)

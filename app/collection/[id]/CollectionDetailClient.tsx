@@ -9,7 +9,7 @@ import Toast from '@/components/Toast'
 import { shareContent } from '@/lib/share'
 import { track } from '@/lib/track'
 
-const SITE_URL = 'https://gonggu.asknuggetdata.com'
+const SITE_URL = 'https://xn--ob0bwir5d.shop'
 
 interface Props {
   collection: Collection
