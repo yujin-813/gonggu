@@ -1283,10 +1283,20 @@ def block_to_post(b, sc, ig_handle, price, domain, profile_url, purchase_url, de
     # 추출 실패가 아니라 원래 마감일이 없는 판매 방식으로 본다
     sold_out_only = bool(pi.get("sold_out_only")) or (not deadline and bool(_SOLD_OUT_PATTERN.search(block_title)))
     status, review_reason = classify_status(title, purchase_url, price, deadline, confidence, sold_out_only, block_title, domain)
+    # 가격·구매링크가 이미 다 갖춰진 상품 페이지라도 오픈일(start_date)이 아직 안 지났으면
+    # 아직 살 수 있는 게 아니다 — "판매 준비가 끝난 페이지"와 "지금 파는 것"은 다르다.
+    # 놓치면 고객 화면에 아직 안 열린 공구가 지금 진행 중인 것처럼 보인다("점보 감자탕데이"가
+    # 9/7 오픈인데 9/1에 이미 공개된 사례로 확인됨). 이미 판단 끝난 상태(excluded 등)는 안 건드린다.
+    if start_date and status in ("ready", "needs_review"):
+        try:
+            if date.fromisoformat(start_date) > datetime.now(KST).date():
+                status, review_reason = "upcoming", []
+        except ValueError:
+            pass
     # 신뢰도 낮은 매칭(판매가의 30% 미만)은 fetch_naver_market_price 내부에서 이미 걸러진다
     market = fetch_naver_market_price(title, price) if title else {}
     mp = market.get("market_price")
-    if mp and price and price >= mp:
+    if mp and price and price >= mp and status != "upcoming":
         status, review_reason = "excluded", ["시장 최저가 이상"]
     # 구매 페이지 JSON-LD brand 우선, 없으면 네이버쇼핑 매칭 결과의 brand/maker,
     # 그래도 없으면 제목 첫 단어를 최후 수단으로 추정
