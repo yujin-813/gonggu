@@ -206,9 +206,13 @@ export default function PostCard({
           >
             더보기
           </Link>
-          <span className="cat-tag">
+          {/* 상세 페이지엔 카테고리 이름이 텍스트로만 있어서 카테고리 모음 페이지로
+              가는 길이 없었다 — 카테고리 페이지 → 상품은 이미 이어지는데 반대 방향이
+              비어 있었다(SEO 모음 페이지 상호 링크) */}
+          <Link href={`/category/${post.cat}`} className="cat-tag"
+            onClick={e => e.stopPropagation()} style={{ textDecoration: 'none' }}>
             {CATEGORY_LABEL[post.cat] || post.cat}
-          </span>
+          </Link>
         </div>
 
         {/* 브랜드명은 상품을 찾는 단서지 강조 대상이 아니다. 보라색을 쓰면 목록에

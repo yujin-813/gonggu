@@ -14,7 +14,7 @@ export { SITE_URL }
 // 없어서 홈 하나로만 색인되고 있었다. 검색어별로 전용 페이지를 두고 제목·설명을 그 검색어에
 // 맞춰 붙인다 — 페이지마다 다루는 공구 목록이 실제로 다르므로 중복 콘텐츠도 아니다.
 
-export type LandingKey = 'today' | 'deadline' | 'monthly' | 'upcoming' | 'evergreen'
+export type LandingKey = 'today' | 'deadline' | 'deadline_today' | 'monthly' | 'upcoming' | 'evergreen' | 'popular'
 
 export interface LandingCopy {
   path: string
@@ -126,6 +126,16 @@ export function deadlinePosts(posts: Post[]): Post[] {
     .sort((a, b) => daysLeft(a.deadline) - daysLeft(b.deadline))
 }
 
+/** 마감일이 정확히 오늘인 공구 — "오늘마감" 검색어는 "마감 임박"(3일 이내)과
+ * 검색 의도가 달라서 따로 둔다. 오늘이 지나면 자동으로 빠진다(daysLeft===0만 본다) */
+export function todayDeadlinePosts(posts: Post[]): Post[] {
+  return posts.filter(p => {
+    const state = getPeriodState(p)
+    if (state.kind !== 'range' && state.kind !== 'deadline_only') return false
+    return state.daysLeft === 0
+  })
+}
+
 /** 이번 달에 진행 중이거나 진행됐던 공구 — "이달의 공구" */
 export function monthlyPosts(posts: Post[]): Post[] {
   const month = kstToday().slice(0, 7)   // YYYY-MM
@@ -187,10 +197,26 @@ export function landingCopy(key: LandingKey, count: number): LandingCopy {
         description: `마감일 없이 계속 진행되는 인스타 인플루언서 공동구매(상시딜) ${count}건을 모았어요.`,
         empty: '상시딜로 확인된 공구가 없어요',
       }
+    case 'deadline_today':
+      return {
+        path: '/deadline-today',
+        h1: `오늘 마감 공구 (${kstTodayLabel()})`,
+        title: `오늘 마감하는 공동구매 모아보기 (${kstTodayLabel()})`,
+        description: `오늘(${kstTodayLabel()}) 마감되는 인스타 인플루언서 공동구매 ${count}건을 모았어요. 오늘 안에 놓치면 못 사는 공구부터 확인하세요.`,
+        empty: '오늘 마감되는 공구가 없어요',
+      }
+    case 'popular':
+      return {
+        path: '/popular',
+        h1: '인기 공구',
+        title: '요즘 인기 있는 공동구매 — 많이 본 공구 모아보기',
+        description: `최근 7일간 가장 많이 본 인스타 인플루언서 공동구매 ${count}건을 모았어요. 다른 사람들이 지금 뭘 보고 있는지 확인하세요.`,
+        empty: '아직 조회 데이터가 쌓이지 않았어요',
+      }
   }
 }
 
-export const LANDING_KEYS: LandingKey[] = ['today', 'deadline', 'monthly', 'upcoming', 'evergreen']
+export const LANDING_KEYS: LandingKey[] = ['today', 'deadline', 'deadline_today', 'monthly', 'upcoming', 'evergreen', 'popular']
 
 import { CATEGORY_KEYS } from './types'
 export { CATEGORY_KEYS }
