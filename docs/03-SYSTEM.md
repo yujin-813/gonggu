@@ -12,8 +12,8 @@
 | 단계 | 운영 중 · 실사용자 있음 (2026-08-19 기준 사람 방문 고유 IP 163명/2일) |
 | 스택 | Next.js 14 (App Router) · React 18 · TypeScript · 파이썬 수집기 |
 | 저장소 | **파일 기반** — `data/*.json`. DB 없음 |
-| 코드 규모 | `lib/` 3,536줄 · `app/admin` + `components/` 7,242줄 · 파이썬 3,134줄 |
-| 데이터 규모 | 게시물 2,524건 (공개 423건) · 인플루언서 소스 61개 · analytics 35일치 |
+| 코드 규모 | `lib/` 3,562줄 · `app/admin` + `components/` 7,246줄 · 파이썬 3,134줄 |
+| 데이터 규모 | 게시물 2,524건 (공개 423건) · 인플루언서 소스 63개 · analytics 36일치 |
 | 배포 | EC2 `52.78.55.170`(t3.small) · PM2(fork) + nginx · `bash deploy.sh` — **무중단**(3002↔3003 슬롯 교대, `D-028`) |
 | 도메인 | https://gonggu.asknuggetdata.com |
 
@@ -32,9 +32,13 @@
   `group_key`로 묶인 공구끼리 공구가를 순위로 보여준다. 관리자가 채우기 화면에서 "같은
   상품으로 보이는 다른 공구" 후보를 고르고 "같은 상품으로 묶기"를 체크해야 묶인다(자동
   일괄 매칭 안 함). 홈 목록·상세 페이지 둘 다에서 뜬다(`D-074`)
-- 랜딩 페이지 — `/today`, `/deadline`, `/monthly`, `/upcoming`, `/evergreen`, `/category/[cat]`, `/influencer/[account]`, `/influencers`, `/collection/[id]`.
+- 랜딩 페이지 — `/today`, `/deadline`, `/deadline-today`(마감이 정확히 오늘, `/deadline`의
+  3일 이내와 검색 의도가 달라 별도), `/monthly`, `/upcoming`, `/evergreen`, `/popular`(최근
+  7일 클릭 많은 순, 홈 "지금 많이 보는 공구"와 같은 집계), `/category/[cat]`,
+  `/influencer/[account]`, `/influencers`, `/collection/[id]`.
   카테고리 필터 칩(전체 제외)은 전부 이 전용 페이지로 이동하는 `Link` — 페이지 이동 없이
-  제자리에서 목록만 갈아끼우면 눌러도 반응이 없는 것처럼 느껴진다 (`D-041`)
+  제자리에서 목록만 갈아끼우면 눌러도 반응이 없는 것처럼 느껴진다 (`D-041`). 상품 카드의
+  카테고리 표시도 `/category/[cat]`로 가는 링크다(예전엔 텍스트만)
 - 검색 (마감 공구 포함), 찜, 공유(카카오/네이티브/복사 — utm 자동 부착)
 - 홈 **「곧 열려요」** 영역 + `/upcoming` 페이지 — 오픈 전 공구를 모아 본다.
   「오늘의 공구」와는 **가격 유무**로 가른다 — `status`는 수집기가 실제 내용을 채워도 그대로라
