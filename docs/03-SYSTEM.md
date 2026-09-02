@@ -12,8 +12,8 @@
 | 단계 | 운영 중 · 실사용자 있음 (2026-08-19 기준 사람 방문 고유 IP 163명/2일) |
 | 스택 | Next.js 14 (App Router) · React 18 · TypeScript · 파이썬 수집기 |
 | 저장소 | **파일 기반** — `data/*.json`. DB 없음 |
-| 코드 규모 | `lib/` 3,569줄 · `app/admin` + `components/` 7,254줄 · 파이썬 3,144줄 |
-| 데이터 규모 | 게시물 2,475건 (공개 436건) · 인플루언서 소스 63개 · analytics 37일치 |
+| 코드 규모 | `lib/` 3,573줄 · `app/admin` + `components/` 7,254줄 · 파이썬 3,265줄 |
+| 데이터 규모 | 게시물 2,349건 (공개 448건) · 인플루언서 소스 63개 · analytics 38일치 |
 | 배포 | EC2 `52.78.55.170`(t3.small) · PM2(fork) + nginx · `bash deploy.sh` — **무중단**(3002↔3003 슬롯 교대, `D-028`) |
 | 도메인 | https://xn--ob0bwir5d.shop (꿀공구.shop, 정식) · https://gonggu.asknuggetdata.com (구 도메인, 트래픽 유지용 병행) |
 
@@ -183,11 +183,11 @@ extraction_debug, scraped_at, collection_status, collection_error
 **`Post.status`** — 관리 상태
 | 값 | 의미 | 현재 건수 |
 |---|---|---|
-| `needs_review` | 검수 필요 | 1,011 |
-| `excluded` | 제외됨 (비공구 등) | 1,020 |
-| `published` | 공개 중 | 369 |
-| `upcoming` | 오픈 예정 | 84 |
-| `ready` | 공개 가능 (검수 끝났지만 미공개) | 23 |
+| `needs_review` | 검수 필요 | 791 |
+| `excluded` | 제외됨 (비공구 등) | 1,037 |
+| `published` | 공개 중 | 393 |
+| `upcoming` | 오픈 예정 | 99 |
+| `ready` | 공개 가능 (검수 끝났지만 미공개) | 13 |
 | `candidate` | 공구 후보 | 0 |
 | (없음) | 옛 데이터 | 16 ⚠️ |
 
@@ -439,7 +439,7 @@ TypeScript(`lib/postGuards.ts`)와 파이썬(`inpock.py`의 `classify_status()`)
 
 `published: true`인데 `status`가 `published`가 아니거나 아예 없는 건이 있다.
 
-**근거:** 운영 데이터 집계 — `status: None` 16건, `published: true` 423건 vs `status: 'published'` 369건
+**근거:** 운영 데이터 집계 — `status: None` 16건, `published: true` 448건 vs `status: 'published'` 393건
 
 ### 7. 색 원칙을 강제하는 장치가 없다
 
