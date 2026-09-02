@@ -48,8 +48,8 @@ export const metadata: Metadata = {
           }
         : {}),
       // 애드고(광고 매체) 소유확인 — 수익화 검토용. 네이버처럼 재등록하면 새 코드가
-      // 나오는데, 기존 코드를 지우면 먼저 등록해 둔 쪽 소유확인이 풀릴 수 있어 둘 다 낸다
-      'adgo-site-verification': ['adgo-472fa36aa196dcffa75191fe', 'adgo-d09b8f539157321e262000c0'],
+      // 나오는데, 기존 코드를 지우면 먼저 등록해 둔 쪽 소유확인이 풀릴 수 있어 다 낸다
+      'adgo-site-verification': ['adgo-472fa36aa196dcffa75191fe', 'adgo-d09b8f539157321e262000c0', 'adgo-ed4dffff0272e20ceba894bb'],
     },
   },
 }
