@@ -62,6 +62,20 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         {process.env.NEXT_PUBLIC_KAKAO_JS_KEY && (
           <Script src="https://t1.kakaocdn.net/kakao_js_sdk/2.7.2/kakao.min.js" strategy="afterInteractive" />
         )}
+        <Script id="aia-chat-loader" strategy="afterInteractive">
+          {`
+            (function (w, d) {
+              if (w.AIA) return;
+              w.AIA = function () { (w.AIA.q = w.AIA.q || []).push(arguments); };
+              var s = d.createElement('script'); s.async = 1;
+              s.src = 'https://chat.asknuggetdata.com/loader.js';
+              d.head.appendChild(s);
+            })(window, document);
+
+            AIA('init', { key: 'ws_live_ufzpdy' });
+            AIA('product', { id: 'CT2167G' });
+          `}
+        </Script>
         {children}
         <Footer />
       </body>

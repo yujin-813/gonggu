@@ -1,13 +1,16 @@
 #!/usr/bin/env python3
-"""이미 공개/공개가능 상태인데 market_price(네이버 최저가)가 없는 공구에
-값을 채워 넣는 일회성/재실행 가능한 백필 스크립트.
+"""이미 공개/공개가능 상태인데 market_price(비교가)가 없는 공구에
+값을 채워 넣는 일회성/재실행 가능한 백필 스크립트. 네이버를 우선 조회하고
+(D-019로 지금은 크리덴셜이 없어 사실상 항상 빈 결과), 없으면 쿠팡 파트너스
+Open API로 넘어간다 — inpock.fetch_market_price와 같은 우선순위.
 
 상태(status/published)는 건드리지 않는다 — 이미 검수·승인된 공구가
 가격 비교 결과 때문에 갑자기 화면에서 사라지면 안 되므로, market_price/
 market_source만 보강하고 판단은 프론트엔드 dealJudgment에 맡긴다.
 
-사용법: python3 backfill_market_price.py
+사용법: python3 backfill_market_price.py [--dry-run]
 """
+import argparse
 import os
 import time
 from pathlib import Path
@@ -22,10 +25,14 @@ if _env_file.exists():
             _k, _v = _line.split("=", 1)
             os.environ.setdefault(_k.strip(), _v.strip())
 
-from inpock import load_posts, save_posts, fetch_naver_market_price  # noqa: E402
+from inpock import load_posts, save_posts, fetch_market_price  # noqa: E402
 
 
 def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--dry-run", action="store_true", help="조회만 하고 저장하지 않는다")
+    args = parser.parse_args()
+
     posts = load_posts()
     targets = [
         p for p in posts
@@ -37,9 +44,9 @@ def main():
 
     updated = 0
     for p in targets:
-        # 신뢰도 낮은 매칭(판매가의 30% 미만)은 fetch_naver_market_price가 알아서
+        # 신뢰도 낮은 매칭(판매가의 30% 미만)은 fetch_market_price가 알아서
         # 건너뛰고 다음 검색어 후보를 시도하므로, 여기선 결과만 받으면 된다
-        market = fetch_naver_market_price(p["title"], p.get("price") or None)
+        market = fetch_market_price(p["title"], p.get("price") or None)
         mp = market.get("market_price")
         if not mp:
             print(f"  · {p['title'][:40]} → 매칭 없음")
@@ -52,7 +59,10 @@ def main():
         print(f"  ✓ {p['title'][:40]} → {mp}원")
         time.sleep(0.2)
 
-    save_posts(posts)
+    if args.dry_run:
+        print(f"[dry-run] 저장 건너뜀 — 실제 반영하려면 --dry-run 없이 다시 실행")
+    else:
+        save_posts(posts)
     print(f"완료: {updated}개 갱신")
 
 

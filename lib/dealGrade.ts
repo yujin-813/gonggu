@@ -201,8 +201,12 @@ export function getDealVerdict(post: Post): DealVerdict {
   if (post.origPrice && post.origPrice > 0) {
     verified.push({ label: '정가', price: post.origPrice })
   }
-  if (post.market_price && post.market_price > 0 && !verified.some(c => c.label === '네이버')) {
-    auto.push({ label: '네이버 최저가', price: post.market_price })
+  // 라벨은 실제 출처를 따른다 — market_source가 없으면(옛 데이터) 네이버로 본다.
+  // 틀린 출처를 보여주면 원칙 1 위반이다(예: 쿠팡에서 긁어온 값을 "네이버 최저가"로 표시)
+  const autoLabel = post.market_source === 'coupang_partners' ? '쿠팡 최저가' : '네이버 최저가'
+  const autoPlatformLabel = post.market_source === 'coupang_partners' ? '쿠팡' : '네이버'
+  if (post.market_price && post.market_price > 0 && !verified.some(c => c.label === autoPlatformLabel)) {
+    auto.push({ label: autoLabel, price: post.market_price })
   }
 
   // 믿기 어려운 자동 매칭은 기준에서도 화면에서도 뺀다. 관리자가 값을 고치면 다시 들어온다.

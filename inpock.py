@@ -27,7 +27,13 @@ from urllib.parse import urlparse
 
 import requests
 
+import coupang_client
+
 # ── 네이버 쇼핑 API ────────────────────────────────────────────────────────────
+# 네이버가 쇼핑 검색 API를 폐지해서(D-019) 지금은 크리덴셜도 없고 호출해도 항상
+# {} 를 반환한다. 되살아날 일은 없지만(API 자체가 없어짐), 우선순위상 기본
+# 조회처 자리는 그대로 두고 — 결과가 없을 때만 fetch_coupang_market_price로
+# 넘어가는 fallback 구조로 쓴다(fetch_market_price 참고).
 _NAVER_CLIENT_ID     = os.environ.get("NAVER_CLIENT_ID", "")
 _NAVER_CLIENT_SECRET = os.environ.get("NAVER_CLIENT_SECRET", "")
 try:
@@ -1222,6 +1228,45 @@ def fetch_naver_market_price(title, price=None):
     return {}
 
 
+def fetch_coupang_market_price(title, price=None):
+    """쿠팡 파트너스 Open API로 현재 시장 최저가를 조회한다. fetch_naver_market_price와
+    같은 검색어 후보 순서, 같은 30% 문턱을 쓴다 — 네이버 API 폐지(D-019) 이후 이 함수가
+    실제 비교가 자동수집 출처다.
+    반환: {market_price: int|None, market_source: str|None}
+    크리덴셜 미설정이거나 실패하면 빈 dict 반환."""
+    for query in _query_variants(title):
+        items = coupang_client.search_products(query[:50], limit=5)
+        cheapest = None
+        for item in items:
+            price_val = item.get("productPrice")
+            if not price_val:
+                continue
+            try:
+                val = int(price_val)
+            except (TypeError, ValueError):
+                continue
+            if cheapest is None or val < cheapest:
+                cheapest = val
+        if cheapest is None:
+            continue
+        if price and cheapest < price * 0.3:
+            continue
+        return {"market_price": cheapest, "market_source": "coupang_partners"}
+    return {}
+
+
+def fetch_market_price(title, price=None):
+    """비교가 조회의 실제 진입점. 네이버를 기본(우선) 조회처로 두고, 결과가 없을
+    때만 쿠팡으로 넘어간다. 지금은 네이버 크리덴셜이 없어(D-019) 사실상 항상 쿠팡
+    값이 쓰이지만, 네이버 쪽 코드/우선순위는 그대로 둔다 — 나중에 두 값을 같이
+    저장해서 비교하고 싶어지면, 여기서 두 dict를 각각 받아 둘 다 담아 반환하도록만
+    바꾸면 된다(현재는 먼저 성공한 쪽 하나만 반환)."""
+    naver = fetch_naver_market_price(title, price)
+    if naver.get("market_price"):
+        return naver
+    return fetch_coupang_market_price(title, price)
+
+
 def classify_status(title, purchase_url, price, deadline, extraction_confidence=None, sold_out_only=False, block_title="", domain=None):
     if not title:
         return "excluded", ["상품명 없음"]
@@ -1293,12 +1338,13 @@ def block_to_post(b, sc, ig_handle, price, domain, profile_url, purchase_url, de
                 status, review_reason = "upcoming", []
         except ValueError:
             pass
-    # 신뢰도 낮은 매칭(판매가의 30% 미만)은 fetch_naver_market_price 내부에서 이미 걸러진다
-    market = fetch_naver_market_price(title, price) if title else {}
+    # 신뢰도 낮은 매칭(판매가의 30% 미만)은 fetch_market_price 내부에서 이미 걸러진다
+    market = fetch_market_price(title, price) if title else {}
     mp = market.get("market_price")
     if mp and price and price >= mp and status != "upcoming":
         status, review_reason = "excluded", ["시장 최저가 이상"]
-    # 구매 페이지 JSON-LD brand 우선, 없으면 네이버쇼핑 매칭 결과의 brand/maker,
+    # 구매 페이지 JSON-LD brand 우선, 없으면 네이버쇼핑 매칭 결과의 brand/maker
+    # (네이버가 매칭됐을 때만 있음 — 쿠팡 상품 검색 API는 브랜드 필드를 안 줌),
     # 그래도 없으면 제목 첫 단어를 최후 수단으로 추정
     brand = pi.get("brand") or market.get("brand") or _guess_brand_from_title(title)
     if not img_ok and status != "excluded":
