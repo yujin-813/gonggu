@@ -89,9 +89,6 @@ export async function generateMetadata({ params }: { params: { id: string } }): 
   // 페이지 <title>은 루트 레이아웃의 template("%s | 꿀공구")을 타므로 접미사를 붙이지 않는다.
   // OG/Twitter 태그는 템플릿을 타지 않으므로 완결된 문자열을 직접 넣어야 한다.
   const ended = isExpired(post)
-  // 가격을 제목에 그대로 넣어 "상품명 가격" 검색과 맞물리게 한다. "가격비교"는 실제로
-  // 비교가가 있을 때만 붙인다 — 판정 대기인데 비교했다고 써 붙이면 틀린 말이 된다(원칙 1).
-  const hasComparison = getDealVerdict(post).display.key !== 'pending'
   const priceLabel = post.price ? ` ${post.price.toLocaleString()}원` : ''
   // 인스타 캡션을 그대로 옮긴 제목이라 브랜드명이 안 들어간 경우가 있다("릴렉스틱/포인트링
   // /마사지볼"처럼) — 그러면 "브랜드명 공구" 검색으로는 이 페이지가 아예 안 걸린다.
@@ -100,9 +97,13 @@ export async function generateMetadata({ params }: { params: { id: string } }): 
   // 마감 후에도 살 곳이 있으면 그 사실을 제목에서부터 말한다 — "OO 공구 지금 사도 될까"류
   // 검색에 "마감 후 구매처"보다 더 정확히 맞물린다. 살 곳이 없으면 과장하지 않는다(원칙 1).
   const hasBuyLink = ended && visiblePurchaseLinks(post).length > 0
+  // "브랜드 상품명 공구 가격 일정" 형태로 실제 네이버 검색에 들어오는 문구와 맞춘다.
+  // 가격이 없는 상품(아직 안 열린 공구 등)에서는 "가격"을 붙이지 않는다 — 없는 걸
+  // 있다고 말하면 원칙 1 위반이다.
+  const priceScheduleSuffix = post.price ? ' 가격·일정' : ''
   const pageTitle = ended
     ? `${brandPrefix}${post.title} 공구${priceLabel} | ${hasBuyLink ? '지금 살 수 있는 곳' : '마감 후 구매처'}`
-    : `${brandPrefix}${post.title} 공구${priceLabel}${hasComparison ? ' | 가격비교' : ''}`
+    : `${brandPrefix}${post.title} 공구${priceScheduleSuffix}`
   const shareTitle = `${pageTitle} | 꿀공구`
   const description = buildDescription(post, ended)
   const url = `${SITE_URL}/post/${post.id}`
