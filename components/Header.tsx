@@ -63,6 +63,10 @@ export default function Header({
               <span className="header-menu-card-title">인플루언서<ChevronRight size={15} /></span>
               <span className="header-menu-card-sub">전체 목록 보기</span>
             </Link>
+            <Link href="/pick" className="header-menu-card" onClick={() => setMenuOpen(false)}>
+              <span className="header-menu-card-title">공구 모음<ChevronRight size={15} /></span>
+              <span className="header-menu-card-sub">브랜드·셀러별로 모아보기</span>
+            </Link>
             <button className="header-menu-card" onClick={closeAnd(onPushToggle)}>
               <span className="header-menu-card-title">마감 알림<ChevronRight size={15} /></span>
               <span className="header-menu-card-sub">{pushSubscribed ? '알림 끄기' : '찜한 공구 알림 받기'}</span>

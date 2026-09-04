@@ -45,6 +45,7 @@ function relatedLinks(currentPath: string) {
       return { href: c.path, label: c.h1.replace(/\s*\(.*\)$/, '') }
     }),
     { href: '/influencers', label: '인플루언서별 공구' },
+    { href: '/pick', label: '브랜드·셀러 공구 모음' },
   ].filter(l => l.href !== currentPath)
   const category = CATEGORY_KEYS
     .map(cat => ({ href: `/category/${cat}`, label: `${CATEGORY_LABEL[cat]} 공구` }))

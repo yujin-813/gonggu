@@ -265,6 +265,19 @@ export interface Collection {
   createdAt: string
 }
 
+/** 관리자가 고른 브랜드/인플루언서/셀러 공구 모음 페이지(/pick/:slug). 상품 목록을
+ * 직접 고르지 않는다 — matchField/matchValue로 매번 자동 계산된다(그래서 새 공구가
+ * 들어오면 페이지에 자동으로 반영된다). 관리자가 고르는 건 "이 대상을 페이지로 열지"뿐. */
+export interface CuratedSubject {
+  slug: string
+  label: string
+  kind: 'brand' | 'influencer' | 'seller'
+  matchField: 'brand' | 'account'
+  matchValue: string
+  enabled: boolean
+  added_at: string
+}
+
 export interface ScraperStatus {
   running: boolean
   last_run?: string | null

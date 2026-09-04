@@ -1,6 +1,6 @@
 import fs from 'fs'
 import path from 'path'
-import type { Post, ScraperStatus, InfluencerSource, Collection, PurchaseRecord } from './types'
+import type { Post, ScraperStatus, InfluencerSource, Collection, CuratedSubject, PurchaseRecord } from './types'
 
 // 배포 환경에서 git pull로 덮어쓰이지 않도록 data/ 디렉토리 사용
 const DATA_DIR    = path.join(process.cwd(), 'data')
@@ -8,6 +8,7 @@ const POSTS_FILE  = path.join(DATA_DIR, 'posts.json')
 const STATUS_FILE = path.join(DATA_DIR, 'scraper_status.json')
 const PROFILES_FILE = path.join(DATA_DIR, 'tracked_profiles.json')
 const COLLECTIONS_FILE = path.join(DATA_DIR, 'collections.json')
+const CURATED_SUBJECTS_FILE = path.join(DATA_DIR, 'curated_subjects.json')
 const GROWTH_GOALS_FILE = path.join(DATA_DIR, 'growth_goals.json')
 const PURCHASE_LOG_FILE = path.join(DATA_DIR, 'purchase_log.json')
 
@@ -148,6 +149,20 @@ export function loadCollections(): Collection[] {
 export function saveCollections(collections: Collection[]): void {
   ensureDir()
   atomicWrite(COLLECTIONS_FILE, JSON.stringify(collections, null, 2))
+}
+
+// 공구 모음 페이지(/pick/:slug) 대상 — 관리자가 고른 브랜드/인플루언서/셀러 목록.
+// 상품 목록 자체는 저장하지 않는다(lib/curatedSubjects.ts가 매번 계산).
+export function loadCuratedSubjects(): CuratedSubject[] {
+  ensureDir()
+  if (!fs.existsSync(CURATED_SUBJECTS_FILE)) return []
+  try { return JSON.parse(fs.readFileSync(CURATED_SUBJECTS_FILE, 'utf-8')) }
+  catch { return [] }
+}
+
+export function saveCuratedSubjects(subjects: CuratedSubject[]): void {
+  ensureDir()
+  atomicWrite(CURATED_SUBJECTS_FILE, JSON.stringify(subjects, null, 2))
 }
 
 export function loadGrowthGoals(): { stages: number[] } {

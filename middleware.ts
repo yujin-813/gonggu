@@ -33,6 +33,12 @@ function isProtected(req: NextRequest): boolean {
     return method !== 'GET' || searchParams.get('admin') === '1'
   }
 
+  // 공구 모음 대상(/pick/:slug) — 컬렉션과 같은 규칙
+  if (pathname === '/api/curated-subjects') {
+    return method !== 'GET' || searchParams.get('admin') === '1'
+  }
+  if (pathname.startsWith('/api/curated-subjects/')) return true // PATCH/DELETE만 있음
+
   // 스크래퍼 실행/상태
   if (pathname.startsWith('/api/scrape')) return true
 
@@ -97,6 +103,8 @@ export const config = {
     '/api/inquiries',
     '/api/collections',
     '/api/collections/:path*',
+    '/api/curated-subjects',
+    '/api/curated-subjects/:path*',
     '/api/scrape',
     '/api/scrape/:path*',
     '/api/profiles',

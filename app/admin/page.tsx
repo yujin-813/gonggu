@@ -1,6 +1,6 @@
 'use client'
 import { useState, useEffect, useMemo, useCallback } from 'react'
-import type { Post, ScraperStatus, InfluencerSource, Collection, PurchaseLink, PurchaseLinkRelation, PurchaseRecord } from '@/lib/types'
+import type { Post, ScraperStatus, InfluencerSource, Collection, CuratedSubject, PurchaseLink, PurchaseLinkRelation, PurchaseRecord } from '@/lib/types'
 import { RELATION_DEFAULT_REASON } from '@/lib/types'
 import { daysLeft, periodLabel, isExpired, isCustomerVisible, isPagePublic, fmtDate, getPeriodState, DEADLINE_UNKNOWN_DAYS } from '@/lib/period'
 import { hasPurchaseLink, normalizePurchaseLinks, brokenPurchaseLinks, isAffiliateLink, isSameProduct, alternativeLinks, sameProductLinks, PLATFORM_LABEL } from '@/lib/purchaseLinks'
@@ -196,6 +196,7 @@ export default function AdminPage() {
   const [instPostMsg, setInstPostMsg] = useState('')
   const [adminTab, setAdminTab] = useState<'posts' | 'influencers' | 'collections' | 'verdict' | 'revenue' | 'outreach' | 'data' | 'inquiries' | 'settings'>('posts')
   const [collections, setCollections] = useState<Collection[]>([])
+  const [curatedSubjects, setCuratedSubjects] = useState<CuratedSubject[]>([])
   const [editingInfluencer, setEditingInfluencer] = useState<string | null>(null)
   const [editInfluencerDraft, setEditInfluencerDraft] = useState<Partial<InfluencerSource>>({})
   const [influencerBusy, setInfluencerBusy] = useState<string | null>(null)
@@ -300,6 +301,41 @@ export default function AdminPage() {
     await fetchCollections()
   }
 
+  const fetchCuratedSubjects = useCallback(async () => {
+    const r = await fetch('/api/curated-subjects?admin=1')
+    if (r.ok) { const d = await r.json(); setCuratedSubjects(d.subjects || []) }
+  }, [])
+
+  async function createCuratedSubject(data: Partial<CuratedSubject>) {
+    const r = await fetch('/api/curated-subjects', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    })
+    if (r.ok) { await fetchCuratedSubjects(); return true }
+    const d = await r.json().catch(() => ({}))
+    alert(d.error || '공구 모음 추가 실패')
+    return false
+  }
+
+  async function updateCuratedSubject(slug: string, patch: Partial<CuratedSubject>) {
+    const r = await fetch(`/api/curated-subjects/${encodeURIComponent(slug)}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(patch),
+    })
+    if (r.ok) { await fetchCuratedSubjects(); return true }
+    const d = await r.json().catch(() => ({}))
+    alert(d.error || '공구 모음 수정 실패')
+    return false
+  }
+
+  async function deleteCuratedSubject(slug: string, label: string) {
+    if (!confirm(`'${label}' 공구 모음을 삭제할까요?`)) return
+    await fetch(`/api/curated-subjects/${encodeURIComponent(slug)}`, { method: 'DELETE' })
+    await fetchCuratedSubjects()
+  }
+
   async function addInfluencerSource() {
     const url = newSourceUrl.trim()
     if (!url) return
@@ -385,9 +421,10 @@ export default function AdminPage() {
     fetchInfluencerSources()
     fetchInpockStatus()
     fetchCollections()
+    fetchCuratedSubjects()
     const iv = setInterval(() => { fetchInpockStatus() }, 5000)
     return () => clearInterval(iv)
-  }, [fetchPosts, fetchAnalytics, fetchGrowthGoals, fetchPurchaseLog, fetchInquiries, fetchInfluencerSources, fetchInpockStatus, fetchCollections])
+  }, [fetchPosts, fetchAnalytics, fetchGrowthGoals, fetchPurchaseLog, fetchInquiries, fetchInfluencerSources, fetchInpockStatus, fetchCollections, fetchCuratedSubjects])
 
   async function togglePublished(p: Post) {
     const isPublished = p.status === 'published' || (!p.status && p.published !== false)
@@ -804,13 +841,24 @@ export default function AdminPage() {
 
         {/* 컬렉션 관리 탭 */}
         {adminTab === 'collections' && (
-          <CollectionManager
-            collections={collections}
-            posts={posts}
-            onCreate={createCollection}
-            onUpdate={updateCollection}
-            onDelete={deleteCollection}
-          />
+          <>
+            <CollectionManager
+              collections={collections}
+              posts={posts}
+              onCreate={createCollection}
+              onUpdate={updateCollection}
+              onDelete={deleteCollection}
+            />
+            <div style={{ marginTop: 32, paddingTop: 24, borderTop: '1px solid #e2e8f0' }}>
+              <CuratedSubjectManager
+                subjects={curatedSubjects}
+                influencerSources={influencerSources}
+                onCreate={createCuratedSubject}
+                onUpdate={updateCuratedSubject}
+                onDelete={deleteCuratedSubject}
+              />
+            </div>
+          </>
         )}
       </div>
 
@@ -1949,6 +1997,149 @@ function CollectionManager({
                   수정
                 </button>
                 <button onClick={() => onDelete(c.id, c.title)}
+                  style={{ background: '#fef2f2', color: '#dc2626', border: 'none', borderRadius: 8, padding: '6px 12px', fontWeight: 600, fontSize: 12, cursor: 'pointer' }}>
+                  삭제
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+const emptyCuratedSubjectForm = { label: '', kind: 'brand' as CuratedSubject['kind'], matchValue: '' }
+
+// 공구 모음(/pick/:slug) 관리 — 컬렉션과 달리 상품을 직접 고르지 않는다. 관리자는
+// "이 브랜드/인플루언서/셀러를 페이지로 열지"만 고르고, 상품 목록은 brand/account
+// 매칭으로 매번 자동 계산된다(lib/curatedSubjects.ts).
+function CuratedSubjectManager({
+  subjects, influencerSources, onCreate, onUpdate, onDelete,
+}: {
+  subjects: CuratedSubject[]
+  influencerSources: InfluencerSource[]
+  onCreate: (data: Partial<CuratedSubject>) => Promise<boolean>
+  onUpdate: (slug: string, patch: Partial<CuratedSubject>) => Promise<boolean>
+  onDelete: (slug: string, label: string) => void
+}) {
+  const [showForm, setShowForm] = useState(false)
+  const [form, setForm] = useState(emptyCuratedSubjectForm)
+  const [saving, setSaving] = useState(false)
+
+  const inputStyle: React.CSSProperties = {
+    padding: '8px 12px', borderRadius: 8, border: '1.5px solid #e2e8f0', fontSize: 13, outline: 'none', width: '100%', boxSizing: 'border-box',
+  }
+
+  function startCreate() {
+    setForm(emptyCuratedSubjectForm)
+    setShowForm(true)
+  }
+
+  async function submit() {
+    if (!form.label.trim()) { alert('이름을 입력하세요'); return }
+    if (!form.matchValue.trim()) { alert(form.kind === 'brand' ? '브랜드명을 입력하세요' : '계정을 선택하세요'); return }
+    setSaving(true)
+    const ok = await onCreate({ label: form.label.trim(), kind: form.kind, matchValue: form.matchValue.trim() })
+    setSaving(false)
+    if (ok) setShowForm(false)
+  }
+
+  return (
+    <div>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+        <p style={{ margin: 0, fontSize: 13, color: '#64748b' }}>
+          /pick/:slug 공구 모음 페이지예요. 대상만 고르면 그 브랜드·인플루언서·셀러의 공구가
+          자동으로 모여요(진행중·오픈예정·최근마감). 상품을 직접 고르는 게 아니에요.
+        </p>
+        <button onClick={startCreate}
+          style={{ background: '#0ea5e9', color: '#fff', border: 'none', borderRadius: 8, padding: '9px 18px', fontWeight: 700, fontSize: 13, cursor: 'pointer', flexShrink: 0, marginLeft: 12 }}>
+          ＋ 공구 모음 추가
+        </button>
+      </div>
+
+      {showForm && (
+        <div style={{ background: '#fff', borderRadius: 12, padding: 20, marginBottom: 20, border: '1.5px solid #0ea5e9' }}>
+          <h3 style={{ margin: '0 0 14px', fontSize: 15, fontWeight: 700, color: '#1e293b' }}>새 공구 모음</h3>
+          <div style={{ marginBottom: 10 }}>
+            <label style={{ fontSize: 12, fontWeight: 600, color: '#475569', display: 'block', marginBottom: 4 }}>종류</label>
+            <div style={{ display: 'flex', gap: 6 }}>
+              {(['brand', 'influencer', 'seller'] as const).map(k => (
+                <button key={k} onClick={() => setForm(f => ({ ...f, kind: k, matchValue: '' }))}
+                  style={{
+                    padding: '7px 14px', borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: 'pointer',
+                    border: form.kind === k ? '1.5px solid #0ea5e9' : '1.5px solid #e2e8f0',
+                    background: form.kind === k ? '#f0f9ff' : '#fff', color: form.kind === k ? '#0369a1' : '#475569',
+                  }}>
+                  {{ brand: '브랜드', influencer: '인플루언서', seller: '셀러' }[k]}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div style={{ marginBottom: 10 }}>
+            <label style={{ fontSize: 12, fontWeight: 600, color: '#475569', display: 'block', marginBottom: 4 }}>이름 (화면에 보일 이름 · URL에도 쓰여요)</label>
+            <input value={form.label} onChange={e => setForm(f => ({ ...f, label: e.target.value }))}
+              placeholder="예: 데코아르" style={inputStyle} />
+          </div>
+          <div style={{ marginBottom: 14 }}>
+            {form.kind === 'brand' ? (
+              <>
+                <label style={{ fontSize: 12, fontWeight: 600, color: '#475569', display: 'block', marginBottom: 4 }}>
+                  브랜드명 (post.brand와 정확히 일치해야 해요)
+                </label>
+                <input value={form.matchValue} onChange={e => setForm(f => ({ ...f, matchValue: e.target.value }))}
+                  placeholder="예: 데코아르" style={inputStyle} />
+              </>
+            ) : (
+              <>
+                <label style={{ fontSize: 12, fontWeight: 600, color: '#475569', display: 'block', marginBottom: 4 }}>계정</label>
+                <select value={form.matchValue} onChange={e => setForm(f => ({ ...f, matchValue: e.target.value }))} style={inputStyle}>
+                  <option value="">계정을 선택하세요</option>
+                  {influencerSources.map(s => (
+                    <option key={s.id} value={s.handle}>{s.influencer_name} ({s.handle})</option>
+                  ))}
+                </select>
+              </>
+            )}
+          </div>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button onClick={submit} disabled={saving}
+              style={{ background: saving ? '#94a3b8' : '#0ea5e9', color: '#fff', border: 'none', borderRadius: 8, padding: '9px 20px', fontWeight: 700, fontSize: 13, cursor: saving ? 'wait' : 'pointer' }}>
+              {saving ? '저장 중...' : '만들기'}
+            </button>
+            <button onClick={() => setShowForm(false)}
+              style={{ background: '#f1f5f9', color: '#475569', border: 'none', borderRadius: 8, padding: '9px 20px', fontWeight: 600, fontSize: 13, cursor: 'pointer' }}>
+              취소
+            </button>
+          </div>
+        </div>
+      )}
+
+      {subjects.length === 0 ? (
+        <p style={{ color: '#94a3b8', fontSize: 13, textAlign: 'center', padding: '32px 0' }}>아직 만든 공구 모음이 없어요</p>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+          {subjects.map(s => (
+            <div key={s.slug} className="admin-row" style={{ background: '#fff', borderRadius: 12, padding: 16, border: '1px solid #e2e8f0' }}>
+              <div className="admin-row-info">
+                <div style={{ fontWeight: 700, fontSize: 14, color: '#1e293b' }}>
+                  {s.label}
+                  {!s.enabled && <span style={{ color: '#f97316', fontWeight: 600, fontSize: 12 }}> · 비활성화됨</span>}
+                </div>
+                <div style={{ fontSize: 12, color: '#64748b', marginTop: 2 }}>
+                  {{ brand: '브랜드', influencer: '인플루언서', seller: '셀러' }[s.kind]} · {s.matchField}: {s.matchValue}
+                </div>
+              </div>
+              <div className="admin-row-actions">
+                <a href={`/pick/${encodeURIComponent(s.slug)}`} target="_blank" rel="noreferrer"
+                  style={{ fontSize: 12, fontWeight: 600, color: '#0ea5e9', textDecoration: 'none', padding: '6px 10px' }}>
+                  보기
+                </a>
+                <button onClick={() => onUpdate(s.slug, { enabled: !s.enabled })}
+                  style={{ background: '#f1f5f9', color: '#475569', border: 'none', borderRadius: 8, padding: '6px 12px', fontWeight: 600, fontSize: 12, cursor: 'pointer' }}>
+                  {s.enabled ? '비활성화' : '활성화'}
+                </button>
+                <button onClick={() => onDelete(s.slug, s.label)}
                   style={{ background: '#fef2f2', color: '#dc2626', border: 'none', borderRadius: 8, padding: '6px 12px', fontWeight: 600, fontSize: 12, cursor: 'pointer' }}>
                   삭제
                 </button>

@@ -2,6 +2,7 @@ import type { MetadataRoute } from 'next'
 import { loadCollections, loadPosts } from '@/lib/store'
 import { influencerItems } from '@/lib/influencerItems'
 import { allBrands } from '@/lib/brandPages'
+import { listCuratedSubjects } from '@/lib/curatedSubjects'
 import { SITE_URL, visiblePosts, routablePosts, LANDING_KEYS, CATEGORY_KEYS, landingCopy } from '@/lib/landing'
 
 // 컬렉션·공구는 재배포 없이 관리자가 수시로 바꾸므로 빌드 시점에 고정되지 않게 요청마다 새로 계산한다
@@ -74,6 +75,19 @@ export default function sitemap(): MetadataRoute.Sitemap {
     // 브랜드별 — "스타우브 공구", "스타우브 최저가"로 들어오는 검색
     ...allBrands().map(brand => ({
       url: `${SITE_URL}/brand/${encodeURIComponent(brand)}`,
+      lastModified: new Date(),
+      changeFrequency: 'daily' as const,
+      priority: 0.7,
+    })),
+    // 관리자가 고른 공구 모음(/pick) — 자동 생성되는 브랜드 페이지와 별개
+    {
+      url: `${SITE_URL}/pick`,
+      lastModified: new Date(),
+      changeFrequency: 'daily',
+      priority: 0.7,
+    },
+    ...listCuratedSubjects().map(s => ({
+      url: `${SITE_URL}/pick/${encodeURIComponent(s.slug)}`,
       lastModified: new Date(),
       changeFrequency: 'daily' as const,
       priority: 0.7,
