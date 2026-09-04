@@ -207,7 +207,12 @@ export default function PostCard({
         </button>
       </div>
 
-      <div className="card-body" onClick={cardClick} style={{ cursor: linkToDetail || canOpenPurchase ? 'pointer' : undefined }}>
+      {/* 가운데 텍스트(상품명·가격·판정) 클릭은 메인 피드에서만 상세로 보낸다.
+          상세 페이지 자신이 이 카드를 그릴 때(linkToDetail=false)는 이미 상세 페이지
+          안이라 텍스트를 눌러도 갈 곳이 없다 — 예전엔 여기를 누르면 외부 구매처로
+          바로 나가버려서, 그냥 읽어보려던 사람이 의도치 않게 새 탭이 열렸다(사장님 지적).
+          구매는 이제 아래 "공구 구매하러 가기" 버튼에서만 한다. */}
+      <div className="card-body" onClick={linkToDetail ? goToDetail : undefined} style={{ cursor: linkToDetail ? 'pointer' : undefined }}>
         <div className="card-top">
           <div className="avatar"><CatIcon size={15} strokeWidth={2} /></div>
           <span className="account-name">

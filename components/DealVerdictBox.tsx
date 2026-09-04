@@ -96,27 +96,23 @@ export default function DealVerdictBox({ post }: { post: Post }) {
 
       {/* 비교가가 아직 없는 구성 목록. 수집기가 상세페이지에서 가격만 긁어온 경우인데,
           등급 근거는 위 비교표가 대고 여기서는 "구성이 여러 개"라는 사실만 알린다.
-          "일반 구매가 —"가 줄줄이 늘어선 4열 표를 대신 보여주면 아직 못 채운 값이
-          없는 값처럼 읽힌다. 비교가 있는 구성이 하나라도 있으면(위 표에 이미 나왔으면)
-          여기 제목을 "비교가 없는 구성"으로 바꿔 위 표와 구분한다. */}
+          구성이 많으면(예: 베르만 캐리어 11개) 표로는 줄이 길게 늘어나 모바일에서
+          가로 스크롤이 생기고 화면이 깨진다 — 표 대신 드롭다운으로 접어서 화면
+          크기와 무관하게 안 깨지게 한다(사장님 확인). 비교가 있는 구성이 하나라도
+          있으면(위 표에 이미 나왔으면) 라벨을 "비교가 없는 구성"으로 바꿔 구분한다. */}
       {v.options.filter(o => !o.option.comparePrice).length > 0 && (
-        <div className="scroller">
-          <table className="verdict-table option-table">
-            <thead>
-              <tr>
-                <th>{v.options.some(o => o.option.comparePrice) ? '비교가 없는 구성' : `구성 ${v.options.length}개`}</th>
-                <th className="num">공구가</th>
-              </tr>
-            </thead>
-            <tbody>
-              {v.options.filter(o => !o.option.comparePrice).map((o, i) => (
-                <tr key={i}>
-                  <td className="option-name">{o.option.name || `구성 ${i + 1}`}</td>
-                  <td className="num option-price">{o.option.price.toLocaleString()}원</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+        <div className="option-select-wrap">
+          <label className="option-select-label">
+            {v.options.some(o => o.option.comparePrice) ? '비교가 없는 구성' : `구성 ${v.options.length}개`}
+          </label>
+          <select className="option-select" defaultValue="">
+            <option value="" disabled>구성을 선택해 공구가를 확인하세요</option>
+            {v.options.filter(o => !o.option.comparePrice).map((o, i) => (
+              <option key={i} value={i}>
+                {(o.option.name || `구성 ${i + 1}`)} · {o.option.price.toLocaleString()}원
+              </option>
+            ))}
+          </select>
         </div>
       )}
 

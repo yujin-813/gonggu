@@ -1768,6 +1768,24 @@ header {
 .past-deals .strip-card { opacity: .85; }
 .past-deals .strip-price { color: var(--gray-4); font-weight: 700; }
 
+/* ── 비교가 없는 구성 드롭다운 ─────────────────────────────────────────────── */
+/* 표로 늘어놓으면 구성이 많을 때(예: 11개) 가로 스크롤이 생겨 모바일에서 깨진다 —
+   드롭다운은 폭이 화면을 넘지 않아 개수와 무관하게 안전하다. */
+.option-select-wrap { margin-bottom: 10px; }
+.option-select-label { display: block; font-size: 11px; color: var(--gray-3); margin-bottom: 4px; }
+.option-select {
+  width: 100%;
+  box-sizing: border-box;
+  border: 1.5px solid var(--gray-2);
+  border-radius: 8px;
+  padding: 8px 10px;
+  font-size: 12.5px;
+  color: var(--text);
+  background: white;
+  cursor: pointer;
+  outline: none;
+}
+
 /* ── 세트 옵션 표 ────────────────────────────────────────────────────────── */
 /* 게시물 하나에 세트가 여러 개인 공구 — 어느 구성이 얼마나 싼지가 알고 싶은 정보다 */
 .option-table { min-width: 380px; font-size: 12.5px; }
