@@ -2038,7 +2038,7 @@ function CuratedSubjectManager({
 
   async function submit() {
     if (!form.label.trim()) { alert('이름을 입력하세요'); return }
-    if (!form.matchValue.trim()) { alert(form.kind === 'brand' ? '브랜드명을 입력하세요' : '계정을 선택하세요'); return }
+    if (!form.matchValue.trim()) { alert(form.kind === 'brand' ? '브랜드명을 입력하세요' : '인플루언서를 선택하세요'); return }
     setSaving(true)
     const ok = await onCreate({ label: form.label.trim(), kind: form.kind, matchValue: form.matchValue.trim() })
     setSaving(false)
@@ -2092,11 +2092,11 @@ function CuratedSubjectManager({
               </>
             ) : (
               <>
-                <label style={{ fontSize: 12, fontWeight: 600, color: '#475569', display: 'block', marginBottom: 4 }}>계정</label>
+                <label style={{ fontSize: 12, fontWeight: 600, color: '#475569', display: 'block', marginBottom: 4 }}>인플루언서</label>
                 <select value={form.matchValue} onChange={e => setForm(f => ({ ...f, matchValue: e.target.value }))} style={inputStyle}>
-                  <option value="">계정을 선택하세요</option>
+                  <option value="">인플루언서를 선택하세요</option>
                   {influencerSources.map(s => (
-                    <option key={s.id} value={s.handle}>{s.influencer_name} ({s.handle})</option>
+                    <option key={s.id} value={s.influencer_name}>{s.influencer_name} ({s.handle})</option>
                   ))}
                 </select>
               </>

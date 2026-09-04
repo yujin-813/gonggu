@@ -19,7 +19,7 @@ export function listCuratedSubjects(): CuratedSubject[] {
 
 export function subjectPosts(subject: CuratedSubject): { active: Post[]; upcoming: Post[]; ended: Post[] } {
   const all = loadPosts().filter(p =>
-    (subject.matchField === 'brand' ? p.brand === subject.matchValue : p.account === subject.matchValue)
+    (subject.matchField === 'brand' ? p.brand === subject.matchValue : p.influencer_name === subject.matchValue)
     && isPagePublic(p)
   )
   // isCustomerVisible이 이미 오픈일이 실제로 지났는지까지 확인해주므로, 그 위에서

@@ -272,7 +272,10 @@ export interface CuratedSubject {
   slug: string
   label: string
   kind: 'brand' | 'influencer' | 'seller'
-  matchField: 'brand' | 'account'
+  // 인플루언서/셀러는 post.account가 아니라 influencer_name으로 묶는다 — 같은 사람이
+  // 인스타 핸들을 바꾸면 account 값이 갈리는데(실측: 마마홈이 @mama__home_/@mamahome
+  // 두 값으로 흩어져 있었다), influencer_name은 사람이 정리해 둔 값이라 안정적이다.
+  matchField: 'brand' | 'influencer_name'
   matchValue: string
   enabled: boolean
   added_at: string

@@ -30,7 +30,7 @@ export async function POST(request: NextRequest) {
     slug,
     label: data.label.trim(),
     kind: data.kind,
-    matchField: data.kind === 'brand' ? 'brand' : 'account',
+    matchField: data.kind === 'brand' ? 'brand' : 'influencer_name',
     matchValue: data.matchValue.trim(),
     enabled: true,
     added_at: new Date().toISOString(),
