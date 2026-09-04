@@ -12,7 +12,7 @@
 | 단계 | 운영 중 · 실사용자 있음 (2026-08-19 기준 사람 방문 고유 IP 163명/2일) |
 | 스택 | Next.js 14 (App Router) · React 18 · TypeScript · 파이썬 수집기 |
 | 저장소 | **파일 기반** — `data/*.json`. DB 없음 |
-| 코드 규모 | `lib/` 3,604줄 · `app/admin` + `components/` 7,280줄 · 파이썬 3,265줄 |
+| 코드 규모 | `lib/` 3,673줄 · `app/admin` + `components/` 7,475줄 · 파이썬 3,265줄 |
 | 데이터 규모 | 게시물 2,399건 (공개 477건) · 인플루언서 소스 63개 · analytics 39일치 |
 | 배포 | EC2 `52.78.55.170`(t3.small) · PM2(fork) + nginx · `bash deploy.sh` — **무중단**(3002↔3003 슬롯 교대, `D-028`) |
 | 도메인 | https://xn--ob0bwir5d.shop (꿀공구.shop, 정식) · https://gonggu.asknuggetdata.com (구 도메인, 트래픽 유지용 병행) |
