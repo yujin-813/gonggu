@@ -1,7 +1,7 @@
 # 03 · 시스템 — 지금 상태
 
 > **"지금"만 쓴다.** 변경 이력과 "예전에는 ○○였다"는 여기 쓰지 않는다. 과거는 `02-DECISIONS.md`에 있다.
-> 마지막 갱신: 2026-09-02
+> 마지막 갱신: 2026-09-04
 
 ---
 
@@ -12,8 +12,8 @@
 | 단계 | 운영 중 · 실사용자 있음 (2026-08-19 기준 사람 방문 고유 IP 163명/2일) |
 | 스택 | Next.js 14 (App Router) · React 18 · TypeScript · 파이썬 수집기 |
 | 저장소 | **파일 기반** — `data/*.json`. DB 없음 |
-| 코드 규모 | `lib/` 3,573줄 · `app/admin` + `components/` 7,254줄 · 파이썬 3,265줄 |
-| 데이터 규모 | 게시물 2,349건 (공개 448건) · 인플루언서 소스 63개 · analytics 38일치 |
+| 코드 규모 | `lib/` 3,604줄 · `app/admin` + `components/` 7,280줄 · 파이썬 3,265줄 |
+| 데이터 규모 | 게시물 2,399건 (공개 477건) · 인플루언서 소스 63개 · analytics 39일치 |
 | 배포 | EC2 `52.78.55.170`(t3.small) · PM2(fork) + nginx · `bash deploy.sh` — **무중단**(3002↔3003 슬롯 교대, `D-028`) |
 | 도메인 | https://xn--ob0bwir5d.shop (꿀공구.shop, 정식) · https://gonggu.asknuggetdata.com (구 도메인, 트래픽 유지용 병행) |
 
@@ -183,11 +183,11 @@ extraction_debug, scraped_at, collection_status, collection_error
 **`Post.status`** — 관리 상태
 | 값 | 의미 | 현재 건수 |
 |---|---|---|
-| `needs_review` | 검수 필요 | 791 |
-| `excluded` | 제외됨 (비공구 등) | 1,037 |
-| `published` | 공개 중 | 393 |
-| `upcoming` | 오픈 예정 | 99 |
-| `ready` | 공개 가능 (검수 끝났지만 미공개) | 13 |
+| `needs_review` | 검수 필요 | 806 |
+| `excluded` | 제외됨 (비공구 등) | 1,036 |
+| `published` | 공개 중 | 420 |
+| `upcoming` | 오픈 예정 | 103 |
+| `ready` | 공개 가능 (검수 끝났지만 미공개) | 18 |
 | `candidate` | 공구 후보 | 0 |
 | (없음) | 옛 데이터 | 16 ⚠️ |
 
@@ -407,14 +407,14 @@ getDealVerdict(post)
 
 **근거:** `lib/store.ts` · `backfill_options.py`가 끝에서 `save_posts(posts)` 한 번 호출 · cron이 하루 2회 수집 실행
 
-### 3. 판정 대기가 31% ⚠️ (오픈 예정을 빼면 11%)
+### 3. 판정 대기가 26% ⚠️ (오픈 예정을 빼면 11%)
 
-고객에게 보이는 공구의 3분의 1 가까이가 판정을 못 받는다. 다만 이 숫자는 그대로 읽으면 안 된다 —
+고객에게 보이는 공구의 4분의 1 가까이가 판정을 못 받는다. 다만 이 숫자는 그대로 읽으면 안 된다 —
 오픈 예정 공구는 아직 안 열려서 가격이 없는 게 정상이고, 관리자 작업 목록(채우기 「미확인」·수익화
 경고)에서는 빼고 센다. 문제 1(비교가 수집 중단)이 고객 화면에서 드러나는 자리다.
 
-**근거:** 2026-09-02 측정(`scripts/check-docs.js`) — 보이는 공구 139건 중 pending 43건, 그중
-28건이 오픈 예정(`status === 'upcoming'`)이라 실제로 채워야 할 것은 111건 중 15건.
+**근거:** 2026-09-04 측정(`scripts/check-docs.js`) — 보이는 공구 167건 중 pending 43건, 그중
+27건이 오픈 예정(`status === 'upcoming'`)이라 실제로 채워야 할 것은 140건 중 16건.
 
 **실제 유입으로 다시 보면 더 나쁘다** — 지금 방문은 사실상 전부 네이버 검색이고 대부분 공구 상세로 바로
 착지한다. 검색 유입이 많은 상세 페이지 40개를 세어 보니 **146명 중 64명(44%)이 판정 없는 페이지에
@@ -439,7 +439,7 @@ TypeScript(`lib/postGuards.ts`)와 파이썬(`inpock.py`의 `classify_status()`)
 
 `published: true`인데 `status`가 `published`가 아니거나 아예 없는 건이 있다.
 
-**근거:** 운영 데이터 집계 — `status: None` 16건, `published: true` 448건 vs `status: 'published'` 393건
+**근거:** 운영 데이터 집계 — `status: None` 16건, `published: true` 477건 vs `status: 'published'` 420건
 
 ### 7. 색 원칙을 강제하는 장치가 없다
 
