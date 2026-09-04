@@ -166,6 +166,7 @@ export default function AdminPage() {
   const [topSharedPosts, setTopSharedPosts] = useState<TopPost[]>([])
   const [sources, setSources] = useState<{ source: string; label: string; count: number }[]>([])
   const [topSearchQueries, setTopSearchQueries] = useState<{ query: string; count: number }[]>([])
+  const [naverPageComparison, setNaverPageComparison] = useState<{ id: number; title: string; yesterday: number; today: number }[]>([])
   // 상품별 상세 조회수(최근 14일) — 채우기 목록을 실제 유입 순으로 세우는 데 쓴다
   const [detailViews, setDetailViews] = useState<Record<string, number>>({})
   // 상품별 클릭(종류별)과 유입 경로 — 수익화 현황 표
@@ -230,6 +231,7 @@ export default function AdminPage() {
       setTopSharedPosts(d.topSharedPosts || [])
       setSources(d.sources || [])
       setTopSearchQueries(d.topSearchQueries || [])
+      setNaverPageComparison(d.naverPageComparison || [])
       setDetailViews(d.detailViews || {})
       setClickBreakdown(d.clickBreakdown || {})
       setPostSources(d.postSources || {})
@@ -664,7 +666,7 @@ export default function AdminPage() {
           }} />
 
         {/* 방문자 분석 */}
-        <AnalyticsSection data={analytics} topPosts={topPosts} topSharedPosts={topSharedPosts} sources={sources} topSearchQueries={topSearchQueries} />
+        <AnalyticsSection data={analytics} topPosts={topPosts} topSharedPosts={topSharedPosts} sources={sources} topSearchQueries={topSearchQueries} naverPageComparison={naverPageComparison} />
 
         {/* 탭 메뉴 */}
         <div id="admin-tabs" className="admin-tabs">
@@ -1025,7 +1027,7 @@ function DuplicateGroups({ posts, onEdit, onDelete, onBulkDelete }: {
   )
 }
 
-function AnalyticsSection({ data, topPosts, topSharedPosts, sources, topSearchQueries }: { data: DayStat[]; topPosts: TopPost[]; topSharedPosts: TopPost[]; sources: { source: string; label: string; count: number }[]; topSearchQueries: { query: string; count: number }[] }) {
+function AnalyticsSection({ data, topPosts, topSharedPosts, sources, topSearchQueries, naverPageComparison }: { data: DayStat[]; topPosts: TopPost[]; topSharedPosts: TopPost[]; sources: { source: string; label: string; count: number }[]; topSearchQueries: { query: string; count: number }[]; naverPageComparison: { id: number; title: string; yesterday: number; today: number }[] }) {
   const last7 = data.slice(-7)
   const today = last7[last7.length - 1]
   const total7 = last7.reduce((s, d) => s + d.visitors, 0)
@@ -1144,6 +1146,28 @@ function AnalyticsSection({ data, topPosts, topSharedPosts, sources, topSearchQu
                 </div>
               ))
             })()}
+          </div>
+        </div>
+      )}
+
+      {/* 어제 vs 오늘 네이버 유입 상위 상품 — 전체 네이버 유입이 갑자기 줄었을 때
+          "어느 상품 페이지에서 줄었는지" 바로 찾기 위한 표(사장님 요청). */}
+      {naverPageComparison.length > 0 && (
+        <div style={{ marginTop: 20, paddingTop: 16, borderTop: '1px solid #f1f5f9' }}>
+          <h4 style={{ margin: '0 0 10px', fontSize: 13, fontWeight: 700, color: '#1e293b' }}>어제 vs 오늘 네이버 유입 TOP 10</h4>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            {naverPageComparison.map(p => {
+              const diff = p.today - p.yesterday
+              return (
+                <div key={p.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '6px 8px', background: '#f8fafc', borderRadius: 8 }}>
+                  <span style={{ fontSize: 12, color: '#0f172a', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.title}</span>
+                  <span style={{ fontSize: 12, color: '#64748b', flexShrink: 0 }}>어제 {p.yesterday} → 오늘 {p.today}</span>
+                  <span style={{ fontSize: 12, fontWeight: 700, flexShrink: 0, minWidth: 40, textAlign: 'right', color: diff < 0 ? '#dc2626' : diff > 0 ? '#16a34a' : '#94a3b8' }}>
+                    {diff > 0 ? `+${diff}` : diff}
+                  </span>
+                </div>
+              )
+            })}
           </div>
         </div>
       )}

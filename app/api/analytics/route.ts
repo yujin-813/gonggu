@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { recordEvent, getSummary, getTopPosts, getTopSharedPosts, getSourceCounts, getClickCounts, getClickBreakdown, getPostSourceCounts, getRecentSessions, getTopSearchQueries, classifySource, CLICK_TYPES } from '@/lib/analytics'
+import { recordEvent, getSummary, getTopPosts, getTopSharedPosts, getSourceCounts, getClickCounts, getClickBreakdown, getPostSourceCounts, getRecentSessions, getTopSearchQueries, getYesterdayTodaySourceComparison, classifySource, CLICK_TYPES } from '@/lib/analytics'
 import { loadPosts } from '@/lib/store'
 import { isPagePublic } from '@/lib/period'
 import { visiblePurchaseLinks } from '@/lib/purchaseLinks'
@@ -64,6 +64,13 @@ export async function GET() {
   const topSharedPosts = withPostInfo(topShared)
   const sources = getSourceCounts(14)
   const topSearchQueries = getTopSearchQueries(14)
+  // 네이버 유입이 갑자기 줄었을 때 "어느 상품 페이지에서 줄었는지" 바로 찾기 위한 표
+  const naverPageComparison = getYesterdayTodaySourceComparison('naver_search', 10)
+    .map(r => {
+      const post = posts.find(p => p.id === r.postId)
+      return post ? { id: r.postId, title: post.title, yesterday: r.yesterday, today: r.today } : null
+    })
+    .filter((r): r is { id: number; title: string; yesterday: number; today: number } => !!r)
   // 상품별 상세 조회수. 상세 페이지는 열릴 때 clickType 'detail'을 찍으므로 이게 곧 조회수다.
   // 관리자 채우기 목록을 "사람이 실제로 보고 있는 순"으로 세우는 데 쓴다 — 판정이 없는 공구가
   // 2,300건이라 어디부터 채울지가 실제 손실을 가른다.
@@ -95,7 +102,7 @@ export async function GET() {
   )
   const affiliateDetailViews7 = sumIds(getClickCounts(7, ['detail']), affiliateExposedIds)
   return NextResponse.json({
-    summary, topPosts, topSharedPosts, sources, topSearchQueries, detailViews, clickBreakdown, postSources, recentSessions,
+    summary, topPosts, topSharedPosts, sources, topSearchQueries, naverPageComparison, detailViews, clickBreakdown, postSources, recentSessions,
     detailViews7, groupbuyClicks7, moneyClicks7, affiliateDetailViews7,
   })
 }

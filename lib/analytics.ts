@@ -389,6 +389,27 @@ export function getPostSourceCounts(days = 14): Record<number, Record<string, nu
   return out
 }
 
+/** 어제 vs 오늘, 상품별 특정 유입 경로 비교 — 전체 유입이 갑자기 줄었을 때(예: 286→208)
+ * "어느 상품 페이지에서 줄었는지" 바로 찾기 위한 것. 두 날 중 하나라도 값이 있는 상품만,
+ * (어제+오늘) 합이 큰 순으로 상위 limit개 — 원래 트래픽이 있던 자리라야 줄어든 게 보인다. */
+export function getYesterdayTodaySourceComparison(source: string, limit = 10): { postId: number; yesterday: number; today: number }[] {
+  const data = load()
+  const today = kstToday()
+  const yesterday = kstDateOffset(1)
+  const todayData = data.postSources?.[today] || {}
+  const yesterdayData = data.postSources?.[yesterday] || {}
+  const ids = new Set([...Object.keys(todayData), ...Object.keys(yesterdayData)])
+  return [...ids]
+    .map(id => ({
+      postId: Number(id),
+      today: todayData[id]?.[source] || 0,
+      yesterday: yesterdayData[id]?.[source] || 0,
+    }))
+    .filter(r => r.today > 0 || r.yesterday > 0)
+    .sort((a, b) => (b.today + b.yesterday) - (a.today + a.yesterday))
+    .slice(0, limit)
+}
+
 /**
  * 최근 방문을 세션 단위로 묶어 돌려준다 — 관리자 「데이터」 화면용.
  *
