@@ -186,6 +186,16 @@ export default function HomeClient({ sections, collectionBanners }: { sections?:
       .catch(() => {})
   }, [searchQuery, endedLoaded])
 
+  // 검색창에 실제로 뭘 치는지 기록한다 — 타이핑 중간중간(한 글자씩)을 다 보내면 노이즈만
+  // 쌓이므로, 입력이 멈추고 0.8초 지난 뒤의 값만 하나 보낸다. 너무 짧은 검색어(한 글자)는
+  // 의미 있는 신호가 아니라서 뺀다.
+  useEffect(() => {
+    const q = searchQuery.trim()
+    if (q.length < 2) return
+    const timer = setTimeout(() => track('search', { query: q }), 800)
+    return () => clearTimeout(timer)
+  }, [searchQuery])
+
   async function fetchPosts() {
     setLoading(true)
     try {

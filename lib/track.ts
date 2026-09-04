@@ -73,7 +73,7 @@ function entryInfo(): { referrer: string | null; utmSource: string | null } {
   }
 }
 
-export function track(type: string, extra?: { postId?: number; clickType?: ClickType }) {
+export function track(type: string, extra?: { postId?: number; clickType?: ClickType; query?: string }) {
   if (isTrackingDisabled()) return
   checkAdminSession()
   const entry = entryInfo()
@@ -90,6 +90,7 @@ export function track(type: string, extra?: { postId?: number; clickType?: Click
       visitorId: getVisitorId(),
       postId: extra?.postId,
       clickType: extra?.clickType,
+      query: extra?.query,
       referrer: entry.referrer,
       utmSource: entry.utmSource,
     }),

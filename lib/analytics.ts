@@ -56,6 +56,10 @@ interface AnalyticsData {
    * at=시각 · s=세션 · v=방문자 · t=종류 · p=상품 · c=클릭종류 · src=유입경로
    */
   recent?: RecentEvent[]
+  // 사이트 안 검색창에 실제로 뭘 치는지 — searchQueries[YYYY-MM-DD][정규화된 검색어] = 횟수.
+  // 지금까지는 검색창이 완전히 클라이언트 안에서만 필터링해서 아무 기록도 안 남았다.
+  // 정규화(trim+소문자)해서 "스타우브"/"스타우브 " 같은 걸 같은 검색어로 합친다.
+  searchQueries?: Record<string, Record<string, number>>
 }
 
 export interface RecentEvent {
@@ -179,11 +183,37 @@ export function getSourceCounts(days = 14): { source: string; label: string; cou
     .sort((a, b) => b.count - a.count)
 }
 
-export function recordEvent(type: string, sessionId: string, opts?: { visitorId?: string; postId?: number; clickType?: ClickType; source?: string }) {
+/** 최근 N일 사이트 안 검색창 입력어 — 많은 순으로 */
+export function getTopSearchQueries(days = 14, limit = 15): { query: string; count: number }[] {
+  const data = load()
+  const cutoff = kstDateOffset(days)
+  const total: Record<string, number> = {}
+  for (const [date, queries] of Object.entries(data.searchQueries || {})) {
+    if (date < cutoff) continue
+    for (const [q, n] of Object.entries(queries)) {
+      total[q] = (total[q] || 0) + n
+    }
+  }
+  return Object.entries(total)
+    .map(([query, count]) => ({ query, count }))
+    .sort((a, b) => b.count - a.count)
+    .slice(0, limit)
+}
+
+export function recordEvent(type: string, sessionId: string, opts?: { visitorId?: string; postId?: number; clickType?: ClickType; source?: string; query?: string }) {
   const data = load()
   const today = kstToday()
   if (!data.daily[today]) data.daily[today] = { visitors: 0, sessions: [], events: {} }
   const day = data.daily[today]
+
+  if (type === 'search' && opts?.query) {
+    const q = opts.query.trim().toLowerCase().slice(0, 40)
+    if (q) {
+      if (!data.searchQueries) data.searchQueries = {}
+      if (!data.searchQueries[today]) data.searchQueries[today] = {}
+      data.searchQueries[today][q] = (data.searchQueries[today][q] || 0) + 1
+    }
+  }
 
   if (type === 'view' && !day.sessions.includes(sessionId)) {
     day.sessions.push(sessionId)

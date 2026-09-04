@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { recordEvent, getSummary, getTopPosts, getTopSharedPosts, getSourceCounts, getClickCounts, getClickBreakdown, getPostSourceCounts, getRecentSessions, classifySource, CLICK_TYPES } from '@/lib/analytics'
+import { recordEvent, getSummary, getTopPosts, getTopSharedPosts, getSourceCounts, getClickCounts, getClickBreakdown, getPostSourceCounts, getRecentSessions, getTopSearchQueries, classifySource, CLICK_TYPES } from '@/lib/analytics'
 import { loadPosts } from '@/lib/store'
 import { isPagePublic } from '@/lib/period'
 import { visiblePurchaseLinks } from '@/lib/purchaseLinks'
@@ -23,11 +23,12 @@ async function isAdminRequest(request: NextRequest): Promise<boolean> {
 
 export async function POST(request: NextRequest) {
   try {
-    const { type, sessionId, visitorId, postId, clickType, referrer, utmSource } = await request.json()
+    const { type, sessionId, visitorId, postId, clickType, referrer, utmSource, query } = await request.json()
     if (!type || !sessionId) return NextResponse.json({ error: 'missing' }, { status: 400 })
     const allowed = new Set(['view', 'bookmark', 'join', 'category', 'search', 'share', 'click'])
     if (!allowed.has(type)) return NextResponse.json({ error: 'invalid type' }, { status: 400 })
     const safeClickType = CLICK_TYPES.includes(clickType) ? clickType : undefined
+    const safeQuery = type === 'search' && typeof query === 'string' ? query.slice(0, 60) : undefined
     // 관리자 브라우저의 이벤트는 조용히 버린다 — 클라이언트에는 성공으로 응답해서
     // 통계 제외 여부가 화면 동작에 영향을 주지 않도록 한다
     // 크롤러가 JS를 실행해 찍는 이벤트를 걸러낸다 — 안 걸러내면 방문자 수가 봇으로 채워진다
@@ -40,7 +41,7 @@ export async function POST(request: NextRequest) {
       referrer: typeof referrer === 'string' ? referrer.slice(0, 300) : null,
       userAgent: request.headers.get('user-agent'),
     })
-    recordEvent(type, sessionId, { visitorId, postId, clickType: safeClickType, source })
+    recordEvent(type, sessionId, { visitorId, postId, clickType: safeClickType, source, query: safeQuery })
     return NextResponse.json({ ok: true })
   } catch {
     return NextResponse.json({ error: 'server error' }, { status: 500 })
@@ -62,6 +63,7 @@ export async function GET() {
   const topPosts = withPostInfo(top)
   const topSharedPosts = withPostInfo(topShared)
   const sources = getSourceCounts(14)
+  const topSearchQueries = getTopSearchQueries(14)
   // 상품별 상세 조회수. 상세 페이지는 열릴 때 clickType 'detail'을 찍으므로 이게 곧 조회수다.
   // 관리자 채우기 목록을 "사람이 실제로 보고 있는 순"으로 세우는 데 쓴다 — 판정이 없는 공구가
   // 2,300건이라 어디부터 채울지가 실제 손실을 가른다.
@@ -93,7 +95,7 @@ export async function GET() {
   )
   const affiliateDetailViews7 = sumIds(getClickCounts(7, ['detail']), affiliateExposedIds)
   return NextResponse.json({
-    summary, topPosts, topSharedPosts, sources, detailViews, clickBreakdown, postSources, recentSessions,
+    summary, topPosts, topSharedPosts, sources, topSearchQueries, detailViews, clickBreakdown, postSources, recentSessions,
     detailViews7, groupbuyClicks7, moneyClicks7, affiliateDetailViews7,
   })
 }
