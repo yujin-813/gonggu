@@ -60,6 +60,13 @@ interface AnalyticsData {
   // 지금까지는 검색창이 완전히 클라이언트 안에서만 필터링해서 아무 기록도 안 남았다.
   // 정규화(trim+소문자)해서 "스타우브"/"스타우브 " 같은 걸 같은 검색어로 합친다.
   searchQueries?: Record<string, Record<string, number>>
+  // 헤더 ⚙️ 메뉴 패널 클릭 — menuClicks[YYYY-MM-DD][메뉴 라벨] = 횟수.
+  // 제휴 문의·인플루언서·공구 모음·마감 알림·팔로우·찜 목록, 지금까지 하나도 안 잡혔다.
+  menuClicks?: Record<string, Record<string, number>>
+  // 홈 피드 스크롤 깊이 — scrollDepth[YYYY-MM-DD][마일스톤] = 그 마일스톤에 도달한
+  // 세션 수. 세션당 마일스톤 하나는 한 번만 센다(track.ts가 sessionStorage로 막는다) —
+  // 안 그러면 스크롤할 때마다 이벤트가 쏟아진다.
+  scrollDepth?: Record<string, Record<string, number>>
 }
 
 export interface RecentEvent {
@@ -200,7 +207,37 @@ export function getTopSearchQueries(days = 14, limit = 15): { query: string; cou
     .slice(0, limit)
 }
 
-export function recordEvent(type: string, sessionId: string, opts?: { visitorId?: string; postId?: number; clickType?: ClickType; source?: string; query?: string }) {
+/** 최근 N일 헤더 메뉴 클릭 — 많은 순으로 */
+export function getTopMenuClicks(days = 14): { label: string; count: number }[] {
+  const data = load()
+  const cutoff = kstDateOffset(days)
+  const total: Record<string, number> = {}
+  for (const [date, clicks] of Object.entries(data.menuClicks || {})) {
+    if (date < cutoff) continue
+    for (const [label, n] of Object.entries(clicks)) {
+      total[label] = (total[label] || 0) + n
+    }
+  }
+  return Object.entries(total)
+    .map(([label, count]) => ({ label, count }))
+    .sort((a, b) => b.count - a.count)
+}
+
+/** 최근 N일 홈 피드 스크롤 깊이 — 마일스톤별 도달 세션 수 */
+export function getScrollDepthSummary(days = 14): { depth: string; count: number }[] {
+  const data = load()
+  const cutoff = kstDateOffset(days)
+  const total: Record<string, number> = { '25': 0, '50': 0, '75': 0, '100': 0 }
+  for (const [date, depths] of Object.entries(data.scrollDepth || {})) {
+    if (date < cutoff) continue
+    for (const [depth, n] of Object.entries(depths)) {
+      total[depth] = (total[depth] || 0) + n
+    }
+  }
+  return ['25', '50', '75', '100'].map(depth => ({ depth, count: total[depth] || 0 }))
+}
+
+export function recordEvent(type: string, sessionId: string, opts?: { visitorId?: string; postId?: number; clickType?: ClickType; source?: string; query?: string; label?: string }) {
   const data = load()
   const today = kstToday()
   if (!data.daily[today]) data.daily[today] = { visitors: 0, sessions: [], events: {} }
@@ -213,6 +250,20 @@ export function recordEvent(type: string, sessionId: string, opts?: { visitorId?
       if (!data.searchQueries[today]) data.searchQueries[today] = {}
       data.searchQueries[today][q] = (data.searchQueries[today][q] || 0) + 1
     }
+  }
+
+  if (type === 'menu' && opts?.label) {
+    if (!data.menuClicks) data.menuClicks = {}
+    if (!data.menuClicks[today]) data.menuClicks[today] = {}
+    data.menuClicks[today][opts.label] = (data.menuClicks[today][opts.label] || 0) + 1
+  }
+
+  // 스크롤 마일스톤은 클라이언트(track.ts)가 세션당 한 번만 보내므로 여기서 또 걸러낼
+  // 필요는 없다 — 그래도 라벨이 25/50/75/100 넷 중 하나가 아니면 무시한다(오염 방지)
+  if (type === 'scroll' && opts?.label && ['25', '50', '75', '100'].includes(opts.label)) {
+    if (!data.scrollDepth) data.scrollDepth = {}
+    if (!data.scrollDepth[today]) data.scrollDepth[today] = {}
+    data.scrollDepth[today][opts.label] = (data.scrollDepth[today][opts.label] || 0) + 1
   }
 
   if (type === 'view' && !day.sessions.includes(sessionId)) {

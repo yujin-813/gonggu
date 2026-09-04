@@ -167,6 +167,8 @@ export default function AdminPage() {
   const [sources, setSources] = useState<{ source: string; label: string; count: number }[]>([])
   const [topSearchQueries, setTopSearchQueries] = useState<{ query: string; count: number }[]>([])
   const [naverPageComparison, setNaverPageComparison] = useState<{ id: number; title: string; yesterday: number; today: number }[]>([])
+  const [topMenuClicks, setTopMenuClicks] = useState<{ label: string; count: number }[]>([])
+  const [scrollDepth, setScrollDepth] = useState<{ depth: string; count: number }[]>([])
   // 상품별 상세 조회수(최근 14일) — 채우기 목록을 실제 유입 순으로 세우는 데 쓴다
   const [detailViews, setDetailViews] = useState<Record<string, number>>({})
   // 상품별 클릭(종류별)과 유입 경로 — 수익화 현황 표
@@ -232,6 +234,8 @@ export default function AdminPage() {
       setSources(d.sources || [])
       setTopSearchQueries(d.topSearchQueries || [])
       setNaverPageComparison(d.naverPageComparison || [])
+      setTopMenuClicks(d.topMenuClicks || [])
+      setScrollDepth(d.scrollDepth || [])
       setDetailViews(d.detailViews || {})
       setClickBreakdown(d.clickBreakdown || {})
       setPostSources(d.postSources || {})
@@ -666,7 +670,7 @@ export default function AdminPage() {
           }} />
 
         {/* 방문자 분석 */}
-        <AnalyticsSection data={analytics} topPosts={topPosts} topSharedPosts={topSharedPosts} sources={sources} topSearchQueries={topSearchQueries} naverPageComparison={naverPageComparison} />
+        <AnalyticsSection data={analytics} topPosts={topPosts} topSharedPosts={topSharedPosts} sources={sources} topSearchQueries={topSearchQueries} naverPageComparison={naverPageComparison} topMenuClicks={topMenuClicks} scrollDepth={scrollDepth} />
 
         {/* 탭 메뉴 */}
         <div id="admin-tabs" className="admin-tabs">
@@ -1027,7 +1031,7 @@ function DuplicateGroups({ posts, onEdit, onDelete, onBulkDelete }: {
   )
 }
 
-function AnalyticsSection({ data, topPosts, topSharedPosts, sources, topSearchQueries, naverPageComparison }: { data: DayStat[]; topPosts: TopPost[]; topSharedPosts: TopPost[]; sources: { source: string; label: string; count: number }[]; topSearchQueries: { query: string; count: number }[]; naverPageComparison: { id: number; title: string; yesterday: number; today: number }[] }) {
+function AnalyticsSection({ data, topPosts, topSharedPosts, sources, topSearchQueries, naverPageComparison, topMenuClicks, scrollDepth }: { data: DayStat[]; topPosts: TopPost[]; topSharedPosts: TopPost[]; sources: { source: string; label: string; count: number }[]; topSearchQueries: { query: string; count: number }[]; naverPageComparison: { id: number; title: string; yesterday: number; today: number }[]; topMenuClicks: { label: string; count: number }[]; scrollDepth: { depth: string; count: number }[] }) {
   const last7 = data.slice(-7)
   const today = last7[last7.length - 1]
   const total7 = last7.reduce((s, d) => s + d.visitors, 0)
@@ -1142,6 +1146,53 @@ function AnalyticsSection({ data, topPosts, topSharedPosts, sources, topSearchQu
                   </span>
                   <span style={{ fontSize: 12, fontWeight: 700, color: '#a855f7', flexShrink: 0, minWidth: 40, textAlign: 'right' }}>
                     {s.count}회
+                  </span>
+                </div>
+              ))
+            })()}
+          </div>
+        </div>
+      )}
+
+      {/* 헤더 ⚙️ 메뉴 클릭 — 2026-09-04부터 기록 시작. 그 전엔 하나도 안 잡혔다. */}
+      {topMenuClicks.length > 0 && (
+        <div style={{ marginTop: 20, paddingTop: 16, borderTop: '1px solid #f1f5f9' }}>
+          <h4 style={{ margin: '0 0 10px', fontSize: 13, fontWeight: 700, color: '#1e293b' }}>메뉴 클릭 (최근 14일)</h4>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            {(() => {
+              const total = topMenuClicks.reduce((sum, s) => sum + s.count, 0) || 1
+              return topMenuClicks.map((s, i) => (
+                <div key={s.label} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '6px 8px', background: i === 0 ? '#eff6ff' : '#f8fafc', borderRadius: 8 }}>
+                  <span style={{ fontSize: 12, color: '#0f172a', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{s.label}</span>
+                  <span style={{ position: 'relative', width: 90, height: 6, background: '#e2e8f0', borderRadius: 3, flexShrink: 0 }}>
+                    <span style={{ position: 'absolute', inset: 0, width: `${Math.round((s.count / total) * 100)}%`, background: '#3b82f6', borderRadius: 3 }} />
+                  </span>
+                  <span style={{ fontSize: 12, fontWeight: 700, color: '#3b82f6', flexShrink: 0, minWidth: 40, textAlign: 'right' }}>
+                    {s.count}회
+                  </span>
+                </div>
+              ))
+            })()}
+          </div>
+        </div>
+      )}
+
+      {/* 홈 피드 스크롤 깊이 — 25/50/75/100% 지점까지 내린 세션 수. 100까지 온 사람이
+          적으면 그 위쪽 섹션(예: 카테고리별 공구)이 거의 안 보인다는 뜻이다. */}
+      {scrollDepth.some(d => d.count > 0) && (
+        <div style={{ marginTop: 20, paddingTop: 16, borderTop: '1px solid #f1f5f9' }}>
+          <h4 style={{ margin: '0 0 10px', fontSize: 13, fontWeight: 700, color: '#1e293b' }}>홈 피드 스크롤 깊이 (최근 14일)</h4>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            {(() => {
+              const max = Math.max(...scrollDepth.map(d => d.count), 1)
+              return scrollDepth.map(d => (
+                <div key={d.depth} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '6px 8px', background: '#f8fafc', borderRadius: 8 }}>
+                  <span style={{ fontSize: 12, color: '#0f172a', width: 40, flexShrink: 0 }}>{d.depth}%</span>
+                  <span style={{ position: 'relative', width: 140, height: 6, background: '#e2e8f0', borderRadius: 3, flexShrink: 0 }}>
+                    <span style={{ position: 'absolute', inset: 0, width: `${Math.round((d.count / max) * 100)}%`, background: '#f59e0b', borderRadius: 3 }} />
+                  </span>
+                  <span style={{ fontSize: 12, fontWeight: 700, color: '#f59e0b', flexShrink: 0, minWidth: 50, textAlign: 'right' }}>
+                    {d.count}명
                   </span>
                 </div>
               ))

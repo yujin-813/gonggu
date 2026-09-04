@@ -73,7 +73,7 @@ function entryInfo(): { referrer: string | null; utmSource: string | null } {
   }
 }
 
-export function track(type: string, extra?: { postId?: number; clickType?: ClickType; query?: string }) {
+export function track(type: string, extra?: { postId?: number; clickType?: ClickType; query?: string; label?: string }) {
   if (isTrackingDisabled()) return
   checkAdminSession()
   const entry = entryInfo()
@@ -91,8 +91,19 @@ export function track(type: string, extra?: { postId?: number; clickType?: Click
       postId: extra?.postId,
       clickType: extra?.clickType,
       query: extra?.query,
+      label: extra?.label,
       referrer: entry.referrer,
       utmSource: entry.utmSource,
     }),
   }).catch(() => {})
+}
+
+// 스크롤 마일스톤은 스크롤 이벤트마다 한 번씩 지나가므로, sessionStorage로 "이 마일스톤은
+// 이 세션에서 이미 보냈다"를 기억해 세션당 한 번만 보낸다 — 안 그러면 스크롤할 때마다
+// 25/50/75/100을 반복해서 쏘게 된다.
+export function trackScrollDepth(depth: '25' | '50' | '75' | '100') {
+  const key = `_dj_scroll_${depth}`
+  if (sessionStorage.getItem(key)) return
+  sessionStorage.setItem(key, '1')
+  track('scroll', { label: depth })
 }

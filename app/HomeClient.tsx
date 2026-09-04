@@ -10,7 +10,7 @@ import Toast from '@/components/Toast'
 import type { Post, Category, SortOrder } from '@/lib/types'
 import { categoryIcon } from '@/lib/categoryIcons'
 import { isExpired } from '@/lib/period'
-import { getVisitorId, track } from '@/lib/track'
+import { getVisitorId, track, trackScrollDepth } from '@/lib/track'
 import { Bell, ArrowLeft, Heart, Star, Clock, Loader2, Search, MessageCircle, X } from 'lucide-react'
 
 function daysLeft(deadline?: string): number {
@@ -195,6 +195,29 @@ export default function HomeClient({ sections, collectionBanners }: { sections?:
     const timer = setTimeout(() => track('search', { query: q }), 800)
     return () => clearTimeout(timer)
   }, [searchQuery])
+
+  // 홈 피드를 얼마나 내려서 보는지 — 25/50/75/100% 지점을 지날 때만 기록한다(스크롤
+  // 이벤트마다 보내면 초당 수십 번씩 쏟아진다). 세션당 마일스톤 하나는 한 번만
+  // 보내지는 건 trackScrollDepth 안에서 sessionStorage로 막는다.
+  useEffect(() => {
+    let ticking = false
+    function onScroll() {
+      if (ticking) return
+      ticking = true
+      requestAnimationFrame(() => {
+        ticking = false
+        const docHeight = document.documentElement.scrollHeight - window.innerHeight
+        if (docHeight <= 0) return
+        const pct = (window.scrollY / docHeight) * 100
+        if (pct >= 25) trackScrollDepth('25')
+        if (pct >= 50) trackScrollDepth('50')
+        if (pct >= 75) trackScrollDepth('75')
+        if (pct >= 100) trackScrollDepth('100')
+      })
+    }
+    window.addEventListener('scroll', onScroll, { passive: true })
+    return () => window.removeEventListener('scroll', onScroll)
+  }, [])
 
   async function fetchPosts() {
     setLoading(true)

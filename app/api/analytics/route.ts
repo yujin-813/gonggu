@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { recordEvent, getSummary, getTopPosts, getTopSharedPosts, getSourceCounts, getClickCounts, getClickBreakdown, getPostSourceCounts, getRecentSessions, getTopSearchQueries, getYesterdayTodaySourceComparison, classifySource, CLICK_TYPES } from '@/lib/analytics'
+import { recordEvent, getSummary, getTopPosts, getTopSharedPosts, getSourceCounts, getClickCounts, getClickBreakdown, getPostSourceCounts, getRecentSessions, getTopSearchQueries, getYesterdayTodaySourceComparison, getTopMenuClicks, getScrollDepthSummary, classifySource, CLICK_TYPES } from '@/lib/analytics'
 import { loadPosts } from '@/lib/store'
 import { isPagePublic } from '@/lib/period'
 import { visiblePurchaseLinks } from '@/lib/purchaseLinks'
@@ -23,12 +23,13 @@ async function isAdminRequest(request: NextRequest): Promise<boolean> {
 
 export async function POST(request: NextRequest) {
   try {
-    const { type, sessionId, visitorId, postId, clickType, referrer, utmSource, query } = await request.json()
+    const { type, sessionId, visitorId, postId, clickType, referrer, utmSource, query, label } = await request.json()
     if (!type || !sessionId) return NextResponse.json({ error: 'missing' }, { status: 400 })
-    const allowed = new Set(['view', 'bookmark', 'join', 'category', 'search', 'share', 'click'])
+    const allowed = new Set(['view', 'bookmark', 'join', 'category', 'search', 'share', 'click', 'menu', 'scroll'])
     if (!allowed.has(type)) return NextResponse.json({ error: 'invalid type' }, { status: 400 })
     const safeClickType = CLICK_TYPES.includes(clickType) ? clickType : undefined
     const safeQuery = type === 'search' && typeof query === 'string' ? query.slice(0, 60) : undefined
+    const safeLabel = (type === 'menu' || type === 'scroll') && typeof label === 'string' ? label.slice(0, 40) : undefined
     // 관리자 브라우저의 이벤트는 조용히 버린다 — 클라이언트에는 성공으로 응답해서
     // 통계 제외 여부가 화면 동작에 영향을 주지 않도록 한다
     // 크롤러가 JS를 실행해 찍는 이벤트를 걸러낸다 — 안 걸러내면 방문자 수가 봇으로 채워진다
@@ -41,7 +42,7 @@ export async function POST(request: NextRequest) {
       referrer: typeof referrer === 'string' ? referrer.slice(0, 300) : null,
       userAgent: request.headers.get('user-agent'),
     })
-    recordEvent(type, sessionId, { visitorId, postId, clickType: safeClickType, source, query: safeQuery })
+    recordEvent(type, sessionId, { visitorId, postId, clickType: safeClickType, source, query: safeQuery, label: safeLabel })
     return NextResponse.json({ ok: true })
   } catch {
     return NextResponse.json({ error: 'server error' }, { status: 500 })
@@ -64,6 +65,8 @@ export async function GET() {
   const topSharedPosts = withPostInfo(topShared)
   const sources = getSourceCounts(14)
   const topSearchQueries = getTopSearchQueries(14)
+  const topMenuClicks = getTopMenuClicks(14)
+  const scrollDepth = getScrollDepthSummary(14)
   // 네이버 유입이 갑자기 줄었을 때 "어느 상품 페이지에서 줄었는지" 바로 찾기 위한 표
   const naverPageComparison = getYesterdayTodaySourceComparison('naver_search', 10)
     .map(r => {
@@ -102,7 +105,7 @@ export async function GET() {
   )
   const affiliateDetailViews7 = sumIds(getClickCounts(7, ['detail']), affiliateExposedIds)
   return NextResponse.json({
-    summary, topPosts, topSharedPosts, sources, topSearchQueries, naverPageComparison, detailViews, clickBreakdown, postSources, recentSessions,
+    summary, topPosts, topSharedPosts, sources, topSearchQueries, topMenuClicks, scrollDepth, naverPageComparison, detailViews, clickBreakdown, postSources, recentSessions,
     detailViews7, groupbuyClicks7, moneyClicks7, affiliateDetailViews7,
   })
 }
