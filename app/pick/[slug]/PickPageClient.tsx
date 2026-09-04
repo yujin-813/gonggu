@@ -53,7 +53,9 @@ export default function PickPageClient({ subject, active, upcoming, ended }: Pro
     <>
       <header>
         <div className="header-inner">
-          <Link href="/" className="back-btn" aria-label="홈으로"><ArrowLeft size={16} /></Link>
+          {/* /pick 목록에서 들어오는 게 자연스러운 동선이라, 홈이 아니라 목록으로 돌아간다
+              — 브랜드/인플루언서 페이지처럼 홈으로 고정하면 "뒤로가기가 안 먹는 느낌"이 든다 */}
+          <Link href="/pick" className="back-btn" aria-label="공구 모음 목록으로"><ArrowLeft size={16} /></Link>
           <div className="logo">
             <span className="logo-text">{subject.label} 공구 모음</span>
           </div>
