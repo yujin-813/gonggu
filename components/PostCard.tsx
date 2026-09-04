@@ -1,6 +1,7 @@
 'use client'
 import { useState } from 'react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import type { Post } from '@/lib/types'
 import { daysLeft, getPeriodState, badgeFromState, periodTextFromState, isExpired, isNewPost, type BadgeIcon, type PeriodIcon } from '@/lib/period'
 import { CATEGORY_LABEL, categoryIcon } from '@/lib/categoryIcons'
@@ -37,12 +38,21 @@ interface PostCardProps {
    * 필요한 사람만 펼쳐 보게 한다.
    */
   endedCompact?: boolean
+  /**
+   * 기본값 true — 카드를 누르면 상세 페이지로 간다(이미지·상품명·가격·판정영역·여백·
+   * "공구 보기" 버튼 전부). 예전엔 이미지·CTA를 누르면 상세 페이지를 건너뛰고 바로
+   * 외부 구매처로 나가서, 정작 우리 판정·비교 정보를 보여주는 상세 페이지에는 아무도
+   * 못 들어왔다. 상세 페이지 자신이 자기 카드를 그릴 때만 false로 꺼서 예전처럼
+   * "공구 구매하러 가기"가 바로 외부로 나가게 한다(사장님 확인).
+   */
+  linkToDetail?: boolean
 }
 
 export default function PostCard({
   post, isBookmarked, onToggleBookmark, onJoin, onShare, siblings = [], pastPrices = [],
-  endedCompact = false,
+  endedCompact = false, linkToDetail = true,
 }: PostCardProps) {
+  const router = useRouter()
   const [imgFailed, setImgFailed] = useState(false)
   const [showCompare, setShowCompare] = useState(false)
   const [showVerdictDetail, setShowVerdictDetail] = useState(false)
@@ -103,6 +113,13 @@ export default function PostCard({
     onJoin?.(post.id)
     window.open(purchaseLink, '_blank')
   }
+  // 상세 페이지가 언제나 갈 수 있는 곳이라(마감돼도 D-002로 URL을 살려둔다),
+  // 외부 구매 링크 유무와 상관없이 항상 클릭 가능하다. onJoin은 여기서 안 부른다 —
+  // 그건 "구매처로 나갔다"는 신호(groupbuyClicks7 등 수익화 지표가 이걸 쓴다)인데,
+  // 여기는 우리 상세 페이지로 가는 것뿐이다. 상세 페이지 자신이 열릴 때 이미
+  // clickType 'detail'을 찍으므로(PostDetailClient.tsx) 여기서 또 찍을 필요가 없다.
+  const goToDetail = () => router.push(`/post/${post.id}`)
+  const cardClick = linkToDetail ? goToDetail : openPurchaseLink
 
   async function handleShare(e: React.MouseEvent) {
     e.stopPropagation()
@@ -129,8 +146,8 @@ export default function PostCard({
   return (
     <div className="card">
       <div
-        className={`card-img-wrap ${canOpenPurchase ? 'clickable' : ''}`}
-        onClick={openPurchaseLink}
+        className={`card-img-wrap ${linkToDetail || canOpenPurchase ? 'clickable' : ''}`}
+        onClick={cardClick}
       >
         {post.img && !imgFailed ? (
           <>
@@ -190,11 +207,11 @@ export default function PostCard({
         </button>
       </div>
 
-      <div className="card-body">
+      <div className="card-body" onClick={cardClick} style={{ cursor: linkToDetail || canOpenPurchase ? 'pointer' : undefined }}>
         <div className="card-top">
           <div className="avatar"><CatIcon size={15} strokeWidth={2} /></div>
           <span className="account-name">
-            <a href={profileUrl} target="_blank" rel="noreferrer">
+            <a href={profileUrl} target="_blank" rel="noreferrer" onClick={e => e.stopPropagation()}>
               {post.account}
             </a>
           </span>
@@ -253,7 +270,7 @@ export default function PostCard({
             빠진 값이면 화면에만 남아 할인율과 어긋난다 */}
         {!verdict.options.length && verdict.referencePrice && post.price && verdict.referencePrice > post.price && (
           post.market_url
-            ? <a href={post.market_url} target="_blank" rel="noopener noreferrer" className="price-orig" style={{ textDecoration: 'none', display: 'inline-block', marginBottom: post.market_price ? 2 : 8 }}>
+            ? <a href={post.market_url} target="_blank" rel="noopener noreferrer" onClick={e => e.stopPropagation()} className="price-orig" style={{ textDecoration: 'none', display: 'inline-block', marginBottom: post.market_price ? 2 : 8 }}>
                 {verdict.referenceLabel} {verdict.referencePrice.toLocaleString()}원 →
               </a>
             : <span className="price-orig" style={{ display: 'inline-block', marginBottom: 8 }}>{verdict.referenceLabel} {verdict.referencePrice.toLocaleString()}원</span>
@@ -285,7 +302,7 @@ export default function PostCard({
             보여줬다 — 여기서는 접어 두고, 옵션별 표 등 근거가 궁금한 사람만 펼쳐 본다. */}
         {endedCompact ? (
           <>
-            <button type="button" onClick={() => setShowVerdictDetail(v => !v)} className="verdict-detail-toggle">
+            <button type="button" onClick={e => { e.stopPropagation(); setShowVerdictDetail(v => !v) }} className="verdict-detail-toggle">
               가격 비교 자세히 보기 {showVerdictDetail ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
             </button>
             {showVerdictDetail && <DealVerdictBox post={post} />}
@@ -344,7 +361,7 @@ export default function PostCard({
 
         {compareCount > 1 && (
           <button
-            onClick={() => setShowCompare(true)}
+            onClick={e => { e.stopPropagation(); setShowCompare(true) }}
             style={{
               width: '100%', marginBottom: 8,
               background: '#fef9c3', border: '1.5px solid #fbbf24',
@@ -378,6 +395,15 @@ export default function PostCard({
         >
           <CalendarPlus size={16} /> 캘린더에 담기
         </a>
+      ) : linkToDetail ? (
+        // 상세 페이지는 마감돼도 살아있으므로(D-002) 외부 구매 링크 유무와 상관없이 항상 눌린다
+        <button className="card-cta" onClick={cardClick}>
+          {closed
+            ? '마감된 공구 보기 →'
+            : isUpcoming
+            ? <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}><CalendarClock size={16} /> 오픈 예정</span>
+            : '공구 보기 →'}
+        </button>
       ) : (
         <button
           className={`card-cta ${canOpenPurchase ? '' : 'closed'}`}
@@ -390,8 +416,23 @@ export default function PostCard({
             ? <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}><CalendarClock size={16} /> 오픈 예정</span>
             : !(post.purchase_url || post.url)
             ? '링크 없음'
-            : '공구 보기 →'}
+            : '공구 구매하러 가기 →'}
         </button>
+      )}
+
+      {/* 상세 페이지 자신이 자기 카드를 그릴 때만(linkToDetail=false) — 구매 링크와는
+          별개로 "이 인플루언서 인스타에서 실제 게시물을 한 번 더 보고 싶다"는 요구가 있어서
+          (사장님 확인) 구매 버튼 옆에 따로 둔다. */}
+      {!linkToDetail && !endedCompact && post.account && (
+        <a
+          href={profileUrl}
+          target="_blank"
+          rel="noreferrer"
+          className="card-cta"
+          style={{ background: '#f1f5f9', color: '#475569', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, textDecoration: 'none', marginTop: 8 }}
+        >
+          인스타에서 한번 더 보기 →
+        </a>
       )}
 
       {showCompare && (

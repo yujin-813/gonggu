@@ -104,6 +104,7 @@ export default function PostDetailClient({ post, ended = false, upcoming = false
           endedCompact={ended}
           siblings={siblings}
           pastPrices={pastPrices}
+          linkToDetail={false}
         />
       </div>
 
