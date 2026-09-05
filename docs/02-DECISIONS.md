@@ -9,6 +9,44 @@
 
 ---
 
+## D-079 · /request·/propose를 소비자 유입용이 아닌 판매자 확보용 SEO로 명시 · 2026-09-05
+
+**상태:** 유효
+
+**상황** — SEO 페이지 전수 점검 중 `/request`·`/propose` 둘 다 `<title>`이 홈이랑 완전히
+같은 걸 발견(둘 다 `generateMetadata`가 없어 루트 레이아웃 기본값을 그대로 물려받고 있었다).
+같은 title이 여러 페이지에 뜨는 건 검색엔진이 감점 요인으로 본다. 사장님 확인: 이 두
+페이지는 소비자가 아니라 **인플루언서·판매자**가 "내 공구 올리고 싶다", "제휴하고 싶다"로
+찾아오는 창구다.
+
+**결정**
+- 두 페이지 다 그 검색 의도에 맞춘 고유 title·description·canonical·OG/Twitter를 붙인다.
+  `/request`="인스타 공동구매 등록 요청", `/propose`="인플루언서·브랜드 제휴 제안".
+- 폼(`'use client'`)은 메타데이터를 못 내보내므로, `app/influencer/[account]` 때 쓴 것과
+  같은 패턴으로 나눈다 — `page.tsx`(서버, 메타데이터만) + `RequestPageClient.tsx`/
+  `ProposePageClient.tsx`(기존 폼 로직 그대로 이동).
+- sitemap에 새로 넣는다(`priority: 0.4`, `monthly`) — 지금까지 아예 안 실려 있었다.
+- 곁들여 `/admin`이 `<meta name="robots" content="index, follow">`(잘못된 기본값)를 내보내고
+  있던 것도 확인해 `next.config.mjs`의 `headers()`로 `/admin/:path*`에
+  `X-Robots-Tag: noindex, nofollow`를 얹었다. sitemap 제외·외부 링크 없음·로그인 필요는
+  이미 되고 있었다(실측 확인).
+
+**검토한 대안과 버린 이유**
+
+| 대안 | 버린 이유 |
+|---|---|
+| /request·/propose도 소비자 검색어(예: "공구 사이트")에 맞춘 문구 | 사장님이 명확히 판매자 확보용이라고 정정 — 소비자가 검색해서 올 페이지가 아니다 |
+| `/admin`에 `<meta name="robots">`만 추가 | robots.txt가 크롤링 자체를 막고 있어(`Disallow: /admin`) 크롤러가 페이지를 못 읽으면 메타 태그도 못 읽는다. HTTP 헤더(X-Robots-Tag)는 응답만 오면 적용돼 더 확실하다 |
+
+**받아들인 대가** — 없음. 순수하게 놓치고 있던 것을 채운 변경.
+
+**당시 확신도** — 높음. 배포 후 실제 도메인에서 title·canonical·X-Robots-Tag·sitemap 전부
+curl로 재확인했다.
+
+**재검토 조건** — 없음.
+
+---
+
 ## D-078 · loadPosts()에 파일 변경 감지 캐시 · 2026-09-05
 
 **상태:** 유효
