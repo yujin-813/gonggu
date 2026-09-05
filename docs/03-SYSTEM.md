@@ -12,7 +12,7 @@
 | 단계 | 운영 중 · 실사용자 있음 (2026-08-19 기준 사람 방문 고유 IP 163명/2일) |
 | 스택 | Next.js 14 (App Router) · React 18 · TypeScript · 파이썬 수집기 |
 | 저장소 | **파일 기반** — `data/*.json`. DB 없음 |
-| 코드 규모 | `lib/` 3,930줄 · `app/admin` + `components/` 7,850줄 · 파이썬 3,265줄 |
+| 코드 규모 | `lib/` 3,951줄 · `app/admin` + `components/` 7,850줄 · 파이썬 3,265줄 |
 | 데이터 규모 | 게시물 2,399건 (공개 477건) · 인플루언서 소스 63개 · analytics 40일치 |
 | 배포 | EC2 `52.78.55.170`(t3.small) · PM2(fork) + nginx · `bash deploy.sh` — **무중단**(3002↔3003 슬롯 교대, `D-028`) |
 | 도메인 | https://xn--ob0bwir5d.shop (꿀공구.shop, 정식) · https://gonggu.asknuggetdata.com (구 도메인, 트래픽 유지용 병행) |
@@ -261,6 +261,7 @@ public/scraped/   수집 이미지 431MB
 | 위치 | 위험 |
 |---|---|
 | `lib/store.ts`의 `savePosts()` | **전체 배열을 통째로 다시 쓴다.** 동시에 두 요청이 저장하면 나중 것이 먼저 것을 덮는다. 락이 없다 ⚠️ |
+| `lib/store.ts`의 `loadPosts()` | 파일 수정시각+크기가 같으면 캐시를 쓴다(`D-078`). `savePosts()`가 캐시를 비우므로 저장 경로를 안 거치고 `posts.json`을 직접 고치면(스크립트 등) 캐시가 낡은 채로 남을 수 있다 — 파일 크기·시각이 우연히 같으면 놓친다(드묾) |
 | `lib/dealGrade.ts` `getDealVerdict()` | 화면의 모든 숫자가 여기서 나온다. 여기를 고치면 카드·상세·공유카드·정렬이 전부 바뀐다 |
 | `AUTO_MATCH_FLOOR = 0.5` | 낮추면 잘못된 자동 매칭이 판정을 뒤집는다 (`D-006`). `lib/compareCandidates.ts`가 이 값을 읽어 "왜 후보가 판정에서 빠졌는지"를 설명한다. 여러 상품 공구(`isMultiOption`)일 땐 이 비율과 무관하게 항상 "판정에 안 쓰인다"고 말해야 한다 — `getDealVerdict()`가 그럴 땐 `market_price`를 아예 안 보기 때문이다 (`D-073`) |
 | `lib/compareCandidates.ts`의 매칭 문턱 | 풀면 엉뚱한 상품이 후보로 뜨고, 관리자가 고르는 순간 그대로 틀린 비교가가 된다 (`D-023`) |
