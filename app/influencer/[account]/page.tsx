@@ -40,8 +40,11 @@ function resolve(rawAccount: string) {
   }
 }
 
-// 대표 URL이 아니면 여기서 끝 — generateMetadata·기본 export 양쪽에서 부르므로
-// 메타데이터 계산 없이 곧장 리다이렉트된다(둘 중 먼저 실행되는 쪽에서 응답이 끝난다).
+// 대표 URL이 아니면 리다이렉트해야 하는데, generateMetadata 안에서 permanentRedirect를
+// 부르면 진짜 HTTP 308이 아니라 200 + <meta http-equiv="refresh"> 클라이언트 리다이렉트가
+// 나간다(실측 확인 — 스트리밍 응답이 이미 200으로 시작된 뒤라 상태코드를 못 바꾼다).
+// 검색엔진에 링크 신호를 제대로 넘기려면 진짜 308이어야 해서, 리다이렉트는 기본 export
+// (페이지 컴포넌트) 쪽에서만 부른다 — generateMetadata는 계산만 하고 리다이렉트 안 함.
 function redirectIfNotCanonical(data: ReturnType<typeof resolve>) {
   if (!data) return
   if (data.pickSlug) permanentRedirect(`/pick/${encodeURIComponent(data.pickSlug)}`)
@@ -52,7 +55,6 @@ function redirectIfNotCanonical(data: ReturnType<typeof resolve>) {
 
 export function generateMetadata({ params }: { params: { account: string } }): Metadata {
   const data = resolve(params.account)
-  redirectIfNotCanonical(data)
   const handle = decodeURIComponent(params.account).replace('@', '')
   if (!data) {
     return { title: `${handle} 공구`, description: `${handle}님의 공동구매 정보를 꿀공구에서 확인하세요.` }
