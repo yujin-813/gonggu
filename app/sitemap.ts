@@ -137,5 +137,19 @@ export default function sitemap(): MetadataRoute.Sitemap {
       changeFrequency: 'daily' as const,
       priority: 0.6,
     })),
+    // 소비자 유입용이 아니라 인플루언서·판매자 확보용 SEO 페이지 — "공구 등록", "제휴 제안"
+    // 검색 의도에 맞춰 고유 제목을 갖게 된 뒤로 sitemap에도 넣는다
+    {
+      url: `${SITE_URL}/request`,
+      lastModified: new Date(),
+      changeFrequency: 'monthly',
+      priority: 0.4,
+    },
+    {
+      url: `${SITE_URL}/propose`,
+      lastModified: new Date(),
+      changeFrequency: 'monthly',
+      priority: 0.4,
+    },
   ]
 }
