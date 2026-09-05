@@ -84,13 +84,19 @@ async function influencerRedirect(req: NextRequest): Promise<NextResponse | null
   const match = req.nextUrl.pathname.match(/^\/influencer\/([^/]+)$/)
   if (!match) return null
   try {
-    const resolveUrl = new URL(`/api/influencer-redirect?account=${encodeURIComponent(match[1])}`, req.url)
-    const res = await fetch(resolveUrl)
+    // req.url 그대로 쓰면(공개 도메인) 서버가 자기 자신의 공개 도메인으로 다시 나갔다
+    // 들어와야 해서 실패할 수 있다(실측: 로컬은 되는데 배포 서버에서 이 경로로는 응답이
+    // 안 왔다) — 같은 프로세스 안이므로 루프백으로 바로 부른다.
+    const internalPort = process.env.PORT || req.nextUrl.port
+    const base = internalPort ? `http://127.0.0.1:${internalPort}` : req.nextUrl.origin
+    const resolveUrl = new URL(`/api/influencer-redirect?account=${encodeURIComponent(match[1])}`, base)
+    const res = await fetch(resolveUrl, { signal: AbortSignal.timeout(3000) })
     if (!res.ok) return null
     const { redirectTo } = await res.json()
     if (!redirectTo) return null
     return NextResponse.redirect(new URL(redirectTo, req.url), 308)
-  } catch {
+  } catch (err) {
+    console.error('[influencerRedirect] 대표 URL 확인 실패 — 페이지 쪽 안전망으로 넘어감', err)
     return null
   }
 }
