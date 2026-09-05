@@ -49,7 +49,11 @@ export async function POST(request: NextRequest) {
   }
 }
 
-export async function GET() {
+export async function GET(request: NextRequest) {
+  // 관리자 「데이터」 탭의 기간 선택 — 유입 경로·검색어·메뉴 클릭·스크롤 깊이가 이 기간을
+  // 따른다. 나머지(요약 카드·7일 차트·가장 많이 본/공유된 상품)는 그대로 고정 기간이다.
+  const daysParam = parseInt(request.nextUrl.searchParams.get('days') || '14', 10)
+  const days = Number.isFinite(daysParam) ? Math.min(90, Math.max(1, daysParam)) : 14
   const summary = getSummary(14)
   const top = getTopPosts(10)
   const topShared = getTopSharedPosts(10)
@@ -63,10 +67,10 @@ export async function GET() {
     .filter(Boolean)
   const topPosts = withPostInfo(top)
   const topSharedPosts = withPostInfo(topShared)
-  const sources = getSourceCounts(14)
-  const topSearchQueries = getTopSearchQueries(14)
-  const topMenuClicks = getTopMenuClicks(14)
-  const scrollDepth = getScrollDepthSummary(14)
+  const sources = getSourceCounts(days)
+  const topSearchQueries = getTopSearchQueries(days)
+  const topMenuClicks = getTopMenuClicks(days)
+  const scrollDepth = getScrollDepthSummary(days)
   // 네이버 유입이 갑자기 줄었을 때 "어느 상품 페이지에서 줄었는지" 바로 찾기 위한 표
   const naverPageComparison = getYesterdayTodaySourceComparison('naver_search', 10)
     .map(r => {
@@ -105,7 +109,7 @@ export async function GET() {
   )
   const affiliateDetailViews7 = sumIds(getClickCounts(7, ['detail']), affiliateExposedIds)
   return NextResponse.json({
-    summary, topPosts, topSharedPosts, sources, topSearchQueries, topMenuClicks, scrollDepth, naverPageComparison, detailViews, clickBreakdown, postSources, recentSessions,
+    summary, topPosts, topSharedPosts, sources, topSearchQueries, topMenuClicks, scrollDepth, naverPageComparison, detailViews, clickBreakdown, postSources, recentSessions, days,
     detailViews7, groupbuyClicks7, moneyClicks7, affiliateDetailViews7,
   })
 }

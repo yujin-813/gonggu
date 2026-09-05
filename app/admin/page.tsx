@@ -169,6 +169,8 @@ export default function AdminPage() {
   const [naverPageComparison, setNaverPageComparison] = useState<{ id: number; title: string; yesterday: number; today: number }[]>([])
   const [topMenuClicks, setTopMenuClicks] = useState<{ label: string; count: number }[]>([])
   const [scrollDepth, setScrollDepth] = useState<{ depth: string; count: number }[]>([])
+  // 「데이터」 탭의 기간 선택 — 유입 경로·검색어·메뉴 클릭·스크롤 깊이가 이 값을 따른다
+  const [analyticsPeriod, setAnalyticsPeriod] = useState(14)
   // 상품별 상세 조회수(최근 14일) — 채우기 목록을 실제 유입 순으로 세우는 데 쓴다
   const [detailViews, setDetailViews] = useState<Record<string, number>>({})
   // 상품별 클릭(종류별)과 유입 경로 — 수익화 현황 표
@@ -224,8 +226,8 @@ export default function AdminPage() {
     setLoading(false)
   }, [])
 
-  const fetchAnalytics = useCallback(async () => {
-    const r = await fetch('/api/analytics')
+  const fetchAnalytics = useCallback(async (days = analyticsPeriod) => {
+    const r = await fetch(`/api/analytics?days=${days}`)
     if (r.ok) {
       const d = await r.json()
       setAnalytics(d.summary || [])
@@ -245,7 +247,7 @@ export default function AdminPage() {
       setMoneyClicks7(d.moneyClicks7 || 0)
       setAffiliateDetailViews7(d.affiliateDetailViews7 || 0)
     }
-  }, [])
+  }, [analyticsPeriod])
 
   const fetchGrowthGoals = useCallback(async () => {
     const r = await fetch('/api/growth-goals')
@@ -670,7 +672,7 @@ export default function AdminPage() {
           }} />
 
         {/* 방문자 분석 */}
-        <AnalyticsSection data={analytics} topPosts={topPosts} topSharedPosts={topSharedPosts} sources={sources} topSearchQueries={topSearchQueries} naverPageComparison={naverPageComparison} topMenuClicks={topMenuClicks} scrollDepth={scrollDepth} />
+        <AnalyticsSection data={analytics} topPosts={topPosts} topSharedPosts={topSharedPosts} />
 
         {/* 탭 메뉴 */}
         <div id="admin-tabs" className="admin-tabs">
@@ -833,6 +835,12 @@ export default function AdminPage() {
               detailViews7={detailViews7} groupbuyClicks7={groupbuyClicks7} moneyClicks7={moneyClicks7} affiliateDetailViews7={affiliateDetailViews7}
               onSaved={fetchGrowthGoals}
               onGoRevenue={() => { setAdminTab('revenue'); document.getElementById('admin-tabs')?.scrollIntoView({ behavior: 'smooth', block: 'start' }) }} />
+            <DataAnalyticsBoard
+              sources={sources} topSearchQueries={topSearchQueries} topMenuClicks={topMenuClicks}
+              scrollDepth={scrollDepth} naverPageComparison={naverPageComparison}
+              period={analyticsPeriod}
+              onPeriodChange={days => { setAnalyticsPeriod(days); fetchAnalytics(days) }}
+            />
             <VisitorFlow sessions={recentSessions} posts={posts} clickBreakdown={clickBreakdown} postSources={postSources} sources={sources} onRefresh={fetchAnalytics} />
           </>
         )}
@@ -1031,7 +1039,7 @@ function DuplicateGroups({ posts, onEdit, onDelete, onBulkDelete }: {
   )
 }
 
-function AnalyticsSection({ data, topPosts, topSharedPosts, sources, topSearchQueries, naverPageComparison, topMenuClicks, scrollDepth }: { data: DayStat[]; topPosts: TopPost[]; topSharedPosts: TopPost[]; sources: { source: string; label: string; count: number }[]; topSearchQueries: { query: string; count: number }[]; naverPageComparison: { id: number; title: string; yesterday: number; today: number }[]; topMenuClicks: { label: string; count: number }[]; scrollDepth: { depth: string; count: number }[] }) {
+function AnalyticsSection({ data, topPosts, topSharedPosts }: { data: DayStat[]; topPosts: TopPost[]; topSharedPosts: TopPost[] }) {
   const last7 = data.slice(-7)
   const today = last7[last7.length - 1]
   const total7 = last7.reduce((s, d) => s + d.visitors, 0)
@@ -1102,124 +1110,6 @@ function AnalyticsSection({ data, topPosts, topSharedPosts, sources, topSearchQu
               {e.icon} {e.label} <strong>{today.events[e.key]}</strong>회
             </div>
           ))}
-        </div>
-      )}
-
-      {/* 어디서 들어왔는지 — 최근 14일.
-          인스타·카톡 인앱 브라우저는 리퍼러를 안 보내므로, 공유 링크에 utm_source가 붙어
-          있어야 정확히 갈린다. 안 붙은 방문은 "앱 내 브라우저(경로 미상)"으로 모인다. */}
-      {sources.length > 0 && (
-        <div style={{ marginTop: 20, paddingTop: 16, borderTop: '1px solid #f1f5f9' }}>
-          <h4 style={{ margin: '0 0 10px', fontSize: 13, fontWeight: 700, color: '#1e293b' }}>유입 경로 (최근 14일)</h4>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-            {(() => {
-              const total = sources.reduce((sum, s) => sum + s.count, 0) || 1
-              return sources.map((s, i) => (
-                <div key={s.source} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '6px 8px', background: i === 0 ? '#f0fdf4' : '#f8fafc', borderRadius: 8 }}>
-                  <span style={{ fontSize: 12, color: '#0f172a', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{s.label}</span>
-                  <span style={{ position: 'relative', width: 90, height: 6, background: '#e2e8f0', borderRadius: 3, flexShrink: 0 }}>
-                    <span style={{ position: 'absolute', inset: 0, width: `${Math.round((s.count / total) * 100)}%`, background: '#16a34a', borderRadius: 3 }} />
-                  </span>
-                  <span style={{ fontSize: 12, fontWeight: 700, color: '#16a34a', flexShrink: 0, minWidth: 62, textAlign: 'right' }}>
-                    {s.count}명 · {Math.round((s.count / total) * 100)}%
-                  </span>
-                </div>
-              ))
-            })()}
-          </div>
-        </div>
-      )}
-
-      {/* 검색창에 실제로 뭘 치는지 — 2026-09-04부터 기록 시작. 그 전 데이터는 없다
-          (검색창이 그동안 클라이언트에서만 필터링해서 서버로 아무것도 안 보냈다). */}
-      {topSearchQueries.length > 0 && (
-        <div style={{ marginTop: 20, paddingTop: 16, borderTop: '1px solid #f1f5f9' }}>
-          <h4 style={{ margin: '0 0 10px', fontSize: 13, fontWeight: 700, color: '#1e293b' }}>인기 검색어 (최근 14일)</h4>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-            {(() => {
-              const total = topSearchQueries.reduce((sum, s) => sum + s.count, 0) || 1
-              return topSearchQueries.map((s, i) => (
-                <div key={s.query} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '6px 8px', background: i === 0 ? '#fdf4ff' : '#f8fafc', borderRadius: 8 }}>
-                  <span style={{ fontSize: 12, color: '#0f172a', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{s.query}</span>
-                  <span style={{ position: 'relative', width: 90, height: 6, background: '#e2e8f0', borderRadius: 3, flexShrink: 0 }}>
-                    <span style={{ position: 'absolute', inset: 0, width: `${Math.round((s.count / total) * 100)}%`, background: '#a855f7', borderRadius: 3 }} />
-                  </span>
-                  <span style={{ fontSize: 12, fontWeight: 700, color: '#a855f7', flexShrink: 0, minWidth: 40, textAlign: 'right' }}>
-                    {s.count}회
-                  </span>
-                </div>
-              ))
-            })()}
-          </div>
-        </div>
-      )}
-
-      {/* 헤더 ⚙️ 메뉴 클릭 — 2026-09-04부터 기록 시작. 그 전엔 하나도 안 잡혔다. */}
-      {topMenuClicks.length > 0 && (
-        <div style={{ marginTop: 20, paddingTop: 16, borderTop: '1px solid #f1f5f9' }}>
-          <h4 style={{ margin: '0 0 10px', fontSize: 13, fontWeight: 700, color: '#1e293b' }}>메뉴 클릭 (최근 14일)</h4>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-            {(() => {
-              const total = topMenuClicks.reduce((sum, s) => sum + s.count, 0) || 1
-              return topMenuClicks.map((s, i) => (
-                <div key={s.label} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '6px 8px', background: i === 0 ? '#eff6ff' : '#f8fafc', borderRadius: 8 }}>
-                  <span style={{ fontSize: 12, color: '#0f172a', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{s.label}</span>
-                  <span style={{ position: 'relative', width: 90, height: 6, background: '#e2e8f0', borderRadius: 3, flexShrink: 0 }}>
-                    <span style={{ position: 'absolute', inset: 0, width: `${Math.round((s.count / total) * 100)}%`, background: '#3b82f6', borderRadius: 3 }} />
-                  </span>
-                  <span style={{ fontSize: 12, fontWeight: 700, color: '#3b82f6', flexShrink: 0, minWidth: 40, textAlign: 'right' }}>
-                    {s.count}회
-                  </span>
-                </div>
-              ))
-            })()}
-          </div>
-        </div>
-      )}
-
-      {/* 홈 피드 스크롤 깊이 — 25/50/75/100% 지점까지 내린 세션 수. 100까지 온 사람이
-          적으면 그 위쪽 섹션(예: 카테고리별 공구)이 거의 안 보인다는 뜻이다. */}
-      {scrollDepth.some(d => d.count > 0) && (
-        <div style={{ marginTop: 20, paddingTop: 16, borderTop: '1px solid #f1f5f9' }}>
-          <h4 style={{ margin: '0 0 10px', fontSize: 13, fontWeight: 700, color: '#1e293b' }}>홈 피드 스크롤 깊이 (최근 14일)</h4>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-            {(() => {
-              const max = Math.max(...scrollDepth.map(d => d.count), 1)
-              return scrollDepth.map(d => (
-                <div key={d.depth} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '6px 8px', background: '#f8fafc', borderRadius: 8 }}>
-                  <span style={{ fontSize: 12, color: '#0f172a', width: 40, flexShrink: 0 }}>{d.depth}%</span>
-                  <span style={{ position: 'relative', width: 140, height: 6, background: '#e2e8f0', borderRadius: 3, flexShrink: 0 }}>
-                    <span style={{ position: 'absolute', inset: 0, width: `${Math.round((d.count / max) * 100)}%`, background: '#f59e0b', borderRadius: 3 }} />
-                  </span>
-                  <span style={{ fontSize: 12, fontWeight: 700, color: '#f59e0b', flexShrink: 0, minWidth: 50, textAlign: 'right' }}>
-                    {d.count}명
-                  </span>
-                </div>
-              ))
-            })()}
-          </div>
-        </div>
-      )}
-
-      {/* 어제 vs 오늘 네이버 유입 상위 상품 — 전체 네이버 유입이 갑자기 줄었을 때
-          "어느 상품 페이지에서 줄었는지" 바로 찾기 위한 표(사장님 요청). */}
-      {naverPageComparison.length > 0 && (
-        <div style={{ marginTop: 20, paddingTop: 16, borderTop: '1px solid #f1f5f9' }}>
-          <h4 style={{ margin: '0 0 10px', fontSize: 13, fontWeight: 700, color: '#1e293b' }}>어제 vs 오늘 네이버 유입 TOP 10</h4>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-            {naverPageComparison.map(p => {
-              const diff = p.today - p.yesterday
-              return (
-                <div key={p.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '6px 8px', background: '#f8fafc', borderRadius: 8 }}>
-                  <span style={{ fontSize: 12, color: '#0f172a', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.title}</span>
-                  <span style={{ fontSize: 12, color: '#64748b', flexShrink: 0 }}>어제 {p.yesterday} → 오늘 {p.today}</span>
-                  <span style={{ fontSize: 12, fontWeight: 700, flexShrink: 0, minWidth: 40, textAlign: 'right', color: diff < 0 ? '#dc2626' : diff > 0 ? '#16a34a' : '#94a3b8' }}>
-                    {diff > 0 ? `+${diff}` : diff}
-                  </span>
-                </div>
-              )
-            })}
-          </div>
         </div>
       )}
 
@@ -2221,6 +2111,159 @@ function CuratedSubjectManager({
               </div>
             </div>
           ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+// 「데이터」 탭 — 유입 경로·검색어·메뉴 클릭·스크롤 깊이처럼 "고객이 뭘 하는지" 분석하는
+// 것들을 모아둔다. 예전엔 방문자 분석(요약 카드) 바로 아래, 관리자 화면 맨 위에 항상
+// 떠 있었는데, 늘어날수록 화면 첫 화면이 길어져서(사장님 지적) 이 탭으로 옮겼다.
+// 기간 선택은 유입 경로·검색어·메뉴 클릭·스크롤 깊이에만 적용한다 — 어제 vs 오늘
+// 네이버 비교는 개념 자체가 "어제/오늘"이라 기간 선택과 안 맞아서 그대로 둔다.
+function DataAnalyticsBoard({
+  sources, topSearchQueries, topMenuClicks, scrollDepth, naverPageComparison, period, onPeriodChange,
+}: {
+  sources: { source: string; label: string; count: number }[]
+  topSearchQueries: { query: string; count: number }[]
+  topMenuClicks: { label: string; count: number }[]
+  scrollDepth: { depth: string; count: number }[]
+  naverPageComparison: { id: number; title: string; yesterday: number; today: number }[]
+  period: number
+  onPeriodChange: (days: number) => void
+}) {
+  return (
+    <div style={{ background: '#fff', borderRadius: 12, padding: 20, marginBottom: 24, border: '1px solid #e2e8f0' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+        <h3 style={{ margin: 0, fontSize: 15, fontWeight: 700, color: '#1e293b' }}>데이터 분석</h3>
+        <select
+          value={period}
+          onChange={e => onPeriodChange(Number(e.target.value))}
+          className="sort-select"
+        >
+          {[7, 14, 30, 90].map(d => <option key={d} value={d}>최근 {d}일</option>)}
+        </select>
+      </div>
+      <p style={{ margin: '0 0 16px', fontSize: 12, color: '#94a3b8' }}>
+        유입 경로·검색어·메뉴 클릭·스크롤 깊이는 선택한 기간 기준. 네이버 유입 비교는 항상 어제 vs 오늘.
+      </p>
+
+      {/* 어디서 들어왔는지.
+          인스타·카톡 인앱 브라우저는 리퍼러를 안 보내므로, 공유 링크에 utm_source가 붙어
+          있어야 정확히 갈린다. 안 붙은 방문은 "앱 내 브라우저(경로 미상)"으로 모인다. */}
+      {sources.length > 0 && (
+        <div style={{ marginTop: 20, paddingTop: 16, borderTop: '1px solid #f1f5f9' }}>
+          <h4 style={{ margin: '0 0 10px', fontSize: 13, fontWeight: 700, color: '#1e293b' }}>유입 경로 (최근 {period}일)</h4>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            {(() => {
+              const total = sources.reduce((sum, s) => sum + s.count, 0) || 1
+              return sources.map((s, i) => (
+                <div key={s.source} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '6px 8px', background: i === 0 ? '#f0fdf4' : '#f8fafc', borderRadius: 8 }}>
+                  <span style={{ fontSize: 12, color: '#0f172a', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{s.label}</span>
+                  <span style={{ position: 'relative', width: 90, height: 6, background: '#e2e8f0', borderRadius: 3, flexShrink: 0 }}>
+                    <span style={{ position: 'absolute', inset: 0, width: `${Math.round((s.count / total) * 100)}%`, background: '#16a34a', borderRadius: 3 }} />
+                  </span>
+                  <span style={{ fontSize: 12, fontWeight: 700, color: '#16a34a', flexShrink: 0, minWidth: 62, textAlign: 'right' }}>
+                    {s.count}명 · {Math.round((s.count / total) * 100)}%
+                  </span>
+                </div>
+              ))
+            })()}
+          </div>
+        </div>
+      )}
+
+      {/* 검색창에 실제로 뭘 치는지 — 2026-09-04부터 기록 시작. 그 전 데이터는 없다
+          (검색창이 그동안 클라이언트에서만 필터링해서 서버로 아무것도 안 보냈다). */}
+      {topSearchQueries.length > 0 && (
+        <div style={{ marginTop: 20, paddingTop: 16, borderTop: '1px solid #f1f5f9' }}>
+          <h4 style={{ margin: '0 0 10px', fontSize: 13, fontWeight: 700, color: '#1e293b' }}>인기 검색어 (최근 {period}일)</h4>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            {(() => {
+              const total = topSearchQueries.reduce((sum, s) => sum + s.count, 0) || 1
+              return topSearchQueries.map((s, i) => (
+                <div key={s.query} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '6px 8px', background: i === 0 ? '#fdf4ff' : '#f8fafc', borderRadius: 8 }}>
+                  <span style={{ fontSize: 12, color: '#0f172a', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{s.query}</span>
+                  <span style={{ position: 'relative', width: 90, height: 6, background: '#e2e8f0', borderRadius: 3, flexShrink: 0 }}>
+                    <span style={{ position: 'absolute', inset: 0, width: `${Math.round((s.count / total) * 100)}%`, background: '#a855f7', borderRadius: 3 }} />
+                  </span>
+                  <span style={{ fontSize: 12, fontWeight: 700, color: '#a855f7', flexShrink: 0, minWidth: 40, textAlign: 'right' }}>
+                    {s.count}회
+                  </span>
+                </div>
+              ))
+            })()}
+          </div>
+        </div>
+      )}
+
+      {/* 헤더 ⚙️ 메뉴 클릭 — 2026-09-04부터 기록 시작. 그 전엔 하나도 안 잡혔다. */}
+      {topMenuClicks.length > 0 && (
+        <div style={{ marginTop: 20, paddingTop: 16, borderTop: '1px solid #f1f5f9' }}>
+          <h4 style={{ margin: '0 0 10px', fontSize: 13, fontWeight: 700, color: '#1e293b' }}>메뉴 클릭 (최근 {period}일)</h4>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            {(() => {
+              const total = topMenuClicks.reduce((sum, s) => sum + s.count, 0) || 1
+              return topMenuClicks.map((s, i) => (
+                <div key={s.label} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '6px 8px', background: i === 0 ? '#eff6ff' : '#f8fafc', borderRadius: 8 }}>
+                  <span style={{ fontSize: 12, color: '#0f172a', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{s.label}</span>
+                  <span style={{ position: 'relative', width: 90, height: 6, background: '#e2e8f0', borderRadius: 3, flexShrink: 0 }}>
+                    <span style={{ position: 'absolute', inset: 0, width: `${Math.round((s.count / total) * 100)}%`, background: '#3b82f6', borderRadius: 3 }} />
+                  </span>
+                  <span style={{ fontSize: 12, fontWeight: 700, color: '#3b82f6', flexShrink: 0, minWidth: 40, textAlign: 'right' }}>
+                    {s.count}회
+                  </span>
+                </div>
+              ))
+            })()}
+          </div>
+        </div>
+      )}
+
+      {/* 홈 피드 스크롤 깊이 — 25/50/75/100% 지점까지 내린 세션 수. 100까지 온 사람이
+          적으면 그 위쪽 섹션(예: 카테고리별 공구)이 거의 안 보인다는 뜻이다. */}
+      {scrollDepth.some(d => d.count > 0) && (
+        <div style={{ marginTop: 20, paddingTop: 16, borderTop: '1px solid #f1f5f9' }}>
+          <h4 style={{ margin: '0 0 10px', fontSize: 13, fontWeight: 700, color: '#1e293b' }}>홈 피드 스크롤 깊이 (최근 {period}일)</h4>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            {(() => {
+              const max = Math.max(...scrollDepth.map(d => d.count), 1)
+              return scrollDepth.map(d => (
+                <div key={d.depth} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '6px 8px', background: '#f8fafc', borderRadius: 8 }}>
+                  <span style={{ fontSize: 12, color: '#0f172a', width: 40, flexShrink: 0 }}>{d.depth}%</span>
+                  <span style={{ position: 'relative', width: 140, height: 6, background: '#e2e8f0', borderRadius: 3, flexShrink: 0 }}>
+                    <span style={{ position: 'absolute', inset: 0, width: `${Math.round((d.count / max) * 100)}%`, background: '#f59e0b', borderRadius: 3 }} />
+                  </span>
+                  <span style={{ fontSize: 12, fontWeight: 700, color: '#f59e0b', flexShrink: 0, minWidth: 50, textAlign: 'right' }}>
+                    {d.count}명
+                  </span>
+                </div>
+              ))
+            })()}
+          </div>
+        </div>
+      )}
+
+      {/* 어제 vs 오늘 네이버 유입 상위 상품 — 전체 네이버 유입이 갑자기 줄었을 때
+          "어느 상품 페이지에서 줄었는지" 바로 찾기 위한 표(사장님 요청). 기간 선택과 무관. */}
+      {naverPageComparison.length > 0 && (
+        <div style={{ marginTop: 20, paddingTop: 16, borderTop: '1px solid #f1f5f9' }}>
+          <h4 style={{ margin: '0 0 10px', fontSize: 13, fontWeight: 700, color: '#1e293b' }}>어제 vs 오늘 네이버 유입 TOP 10</h4>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            {naverPageComparison.map(p => {
+              const diff = p.today - p.yesterday
+              return (
+                <div key={p.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '6px 8px', background: '#f8fafc', borderRadius: 8 }}>
+                  <span style={{ fontSize: 12, color: '#0f172a', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.title}</span>
+                  <span style={{ fontSize: 12, color: '#64748b', flexShrink: 0 }}>어제 {p.yesterday} → 오늘 {p.today}</span>
+                  <span style={{ fontSize: 12, fontWeight: 700, flexShrink: 0, minWidth: 40, textAlign: 'right', color: diff < 0 ? '#dc2626' : diff > 0 ? '#16a34a' : '#94a3b8' }}>
+                    {diff > 0 ? `+${diff}` : diff}
+                  </span>
+                </div>
+              )
+            })}
+          </div>
         </div>
       )}
     </div>
