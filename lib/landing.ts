@@ -247,6 +247,89 @@ export function categoryPosts(posts: Post[], cat: Category): Post[] {
   return posts.filter(p => p.cat === cat)
 }
 
+// ── 카테고리×기간 조합 페이지 (D-077) ────────────────────────────────────────
+// "유아 마감임박 공구"처럼 카테고리와 기간을 같이 찾는 검색어에 착지할 URL이 없었다.
+// 생활·유아만 연다 — 나머지 카테고리(디지털 2건·반려동물 1건 등)는 게시물 자체가
+// 적어서 조합하면 대부분 빈 페이지가 되고, 그건 카테고리 페이지 자체도 이미 얇다.
+// popular는 제외 — 카테고리별 인기 집계가 따로 없어 조합할 데이터가 없다.
+export const CATEGORY_COMBO_CATEGORIES: Category[] = ['life', 'kids']
+export const CATEGORY_COMBO_KEYS: LandingKey[] = ['today', 'deadline', 'deadline_today', 'monthly', 'upcoming', 'evergreen']
+
+/** LANDING_KEYS 페이지와 같은 URL 세그먼트를 그대로 쓴다(예: deadline_today → "deadline-today") */
+export function comboPathSegment(key: LandingKey): string {
+  return landingCopy(key, 0).path.slice(1)
+}
+
+export function categoryComboPosts(posts: Post[], cat: Category, key: LandingKey): Post[] {
+  const catPosts = categoryPosts(posts, cat)
+  switch (key) {
+    case 'today': return todayPosts(catPosts)
+    case 'deadline': return deadlinePosts(catPosts)
+    case 'deadline_today': return todayDeadlinePosts(catPosts)
+    case 'monthly': return monthlyPosts(catPosts)
+    case 'upcoming': return upcomingPosts(catPosts)
+    case 'evergreen': return evergreenPosts(catPosts)
+    case 'popular': return []
+  }
+}
+
+export function categoryComboCopy(cat: Category, key: LandingKey, count: number): LandingCopy {
+  const label = CATEGORY_LABEL[cat]
+  const path = `/category/${cat}/${comboPathSegment(key)}`
+  switch (key) {
+    case 'today':
+      return {
+        path,
+        h1: `${label} 오늘의 공구 (${kstTodayLabel()})`,
+        title: `${label} 오늘 새로 올라온 공동구매 모아보기 (${kstTodayLabel()})`,
+        description: `${kstTodayLabel()}에 새로 올라온 ${label} 카테고리 공동구매 ${count}건을 모았어요.`,
+        empty: `오늘 새로 올라온 ${label} 공구가 아직 없어요`,
+      }
+    case 'deadline':
+      return {
+        path,
+        h1: `${label} 마감 임박 공구`,
+        title: `${label} 마감 임박 공동구매 모아보기 — 3일 안에 끝나는 ${label} 공구`,
+        description: `3일 안에 마감되는 ${label} 카테고리 공동구매 ${count}건을 모았어요. 마감 순으로 정렬했어요.`,
+        empty: `3일 안에 마감되는 ${label} 공구가 없어요`,
+      }
+    case 'deadline_today':
+      return {
+        path,
+        h1: `${label} 오늘 마감 공구 (${kstTodayLabel()})`,
+        title: `${label} 오늘 마감하는 공동구매 모아보기 (${kstTodayLabel()})`,
+        description: `오늘(${kstTodayLabel()}) 마감되는 ${label} 카테고리 공동구매 ${count}건을 모았어요.`,
+        empty: `오늘 마감되는 ${label} 공구가 없어요`,
+      }
+    case 'monthly':
+      return {
+        path,
+        h1: `${kstMonthLabel()} ${label} 공구`,
+        title: `${label} 이달의 공구 — ${kstMonthLabel()} ${label} 공동구매 모아보기`,
+        description: `${kstMonthLabel()}에 진행되는 ${label} 카테고리 공동구매 ${count}건을 모았어요.`,
+        empty: `이번 달 ${label} 공구가 아직 없어요`,
+      }
+    case 'upcoming':
+      return {
+        path,
+        h1: `${label} 곧 열려요`,
+        title: `${label} 오픈 예정 공구 — 곧 열리는 ${label} 공동구매 모아보기`,
+        description: `아직 열리지 않았지만 오픈이 예정된 ${label} 카테고리 공동구매 ${count}건을 모았어요.`,
+        empty: `오픈 예정인 ${label} 공구가 없어요`,
+      }
+    case 'evergreen':
+      return {
+        path,
+        h1: `${label} 상시딜`,
+        title: `${label} 상시딜 — 언제든 살 수 있는 ${label} 공구 모아보기`,
+        description: `마감일 없이 계속 진행되는 ${label} 카테고리 공동구매(상시딜) ${count}건을 모았어요.`,
+        empty: `상시딜로 확인된 ${label} 공구가 없어요`,
+      }
+    case 'popular':
+      return categoryCopy(cat, count) // combo에서 안 쓴다 — 타입 완결성용
+  }
+}
+
 // ── 홈 섹션 ────────────────────────────────────────────────────────────────
 // 홈을 단일 피드에서 섹션 구조로 바꾸면서, "어떤 상품이 어느 영역에 들어가는가"를 여기
 // 한 곳에서만 정한다. 운영자가 고르는 건 추천(is_featured) 하나뿐이고 나머지는 전부 규칙이다.

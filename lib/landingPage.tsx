@@ -1,7 +1,10 @@
 import type { Metadata } from 'next'
-import type { Post } from './types'
+import type { Post, Category } from './types'
 import type { LandingCopy } from './landing'
-import { SITE_URL, LANDING_KEYS, CATEGORY_KEYS, landingCopy, categoryCopy } from './landing'
+import {
+  SITE_URL, LANDING_KEYS, CATEGORY_KEYS, landingCopy, categoryCopy,
+  CATEGORY_COMBO_CATEGORIES, CATEGORY_COMBO_KEYS, comboPathSegment,
+} from './landing'
 import { CATEGORY_LABEL } from './categoryIcons'
 import DealListClient from '@/components/DealListClient'
 import JsonLd, { itemListSchema, breadcrumbSchema } from '@/components/JsonLd'
@@ -50,9 +53,22 @@ function relatedLinks(currentPath: string) {
   const category = CATEGORY_KEYS
     .map(cat => ({ href: `/category/${cat}`, label: `${CATEGORY_LABEL[cat]} 공구` }))
     .filter(l => l.href !== currentPath)
+  // 카테고리×기간 조합 페이지(D-077)는 sitemap에만 있고 어디서도 안 걸려 있으면 고아
+  // 페이지가 된다 — 그 카테고리 기본 페이지·조합 페이지끼리 서로 링크로 연결한다
+  const comboCat = currentPath.match(/^\/category\/([^/]+)/)?.[1]
+  const combo = comboCat && (CATEGORY_COMBO_CATEGORIES as string[]).includes(comboCat)
+    ? [
+        { href: `/category/${comboCat}`, label: `${CATEGORY_LABEL[comboCat as Category]} 전체` },
+        ...CATEGORY_COMBO_KEYS.map(k => ({
+          href: `/category/${comboCat}/${comboPathSegment(k)}`,
+          label: `${CATEGORY_LABEL[comboCat as Category]} ${landingCopy(k, 0).h1.replace(/\s*\(.*\)$/, '')}`,
+        })),
+      ].filter(l => l.href !== currentPath)
+    : []
   return [
     { title: '모아보기', links: timely },
     { title: '카테고리', links: category },
+    { title: '이 카테고리에서', links: combo },
   ].filter(g => g.links.length > 0)
 }
 

@@ -3,7 +3,10 @@ import { loadCollections, loadPosts } from '@/lib/store'
 import { influencerItems, canonicalAccountFor } from '@/lib/influencerItems'
 import { allBrands } from '@/lib/brandPages'
 import { listCuratedSubjects } from '@/lib/curatedSubjects'
-import { SITE_URL, visiblePosts, routablePosts, LANDING_KEYS, CATEGORY_KEYS, landingCopy } from '@/lib/landing'
+import {
+  SITE_URL, visiblePosts, routablePosts, LANDING_KEYS, CATEGORY_KEYS, landingCopy,
+  CATEGORY_COMBO_CATEGORIES, CATEGORY_COMBO_KEYS, categoryComboPosts,
+} from '@/lib/landing'
 
 // 컬렉션·공구는 재배포 없이 관리자가 수시로 바꾸므로 빌드 시점에 고정되지 않게 요청마다 새로 계산한다
 export const dynamic = 'force-dynamic'
@@ -66,6 +69,21 @@ export default function sitemap(): MetadataRoute.Sitemap {
       changeFrequency: 'daily' as const,
       priority: 0.8,
     })),
+    // 카테고리×기간 조합 — "유아 마감임박 공구"처럼 검색어가 둘 다 있을 때(D-077).
+    // 생활·유아만(게시물이 충분한 카테고리) + 지금 실제로 채울 게 있는 조합만 싣는다 —
+    // today·deadline_today는 그날그날 0건일 수 있는데, 그런 날은 sitemap에서 빠졌다가
+    // 다음 요청 때 다시 채워진다(force-dynamic이라 매 요청 새로 계산). 빈 페이지를
+    // 검색엔진에 안내하지 않기 위함이지, 페이지 자체가 없어지는 건 아니다.
+    ...CATEGORY_COMBO_CATEGORIES.flatMap(cat =>
+      CATEGORY_COMBO_KEYS
+        .filter(key => categoryComboPosts(visiblePosts(), cat, key).length > 0)
+        .map(key => ({
+          url: `${SITE_URL}${landingCopy(key, 0).path.replace(/^\//, `/category/${cat}/`)}`,
+          lastModified: new Date(),
+          changeFrequency: 'daily' as const,
+          priority: 0.6,
+        })),
+    ),
     {
       url: `${SITE_URL}/influencers`,
       lastModified: new Date(),
