@@ -2351,7 +2351,7 @@ function DataAnalyticsBoard({
           <h4 style={{ margin: '0 0 10px', fontSize: 13, fontWeight: 700, color: '#1e293b' }}>
             시간대별 방문{compareData ? ' — A vs B' : ''}
           </h4>
-          <div style={{ display: 'flex', alignItems: 'flex-end', gap: 3, height: 90 }}>
+          <div style={{ display: 'flex', alignItems: 'flex-end', gap: 3, height: 122 }}>
             {(() => {
               const compareHourly = compareData?.hourlyVisits
               const max = Math.max(...hourlyVisits.map(h => h.count), ...(compareHourly?.map(h => h.count) ?? []), 1)
@@ -2359,11 +2359,18 @@ function DataAnalyticsBoard({
                 const bCount = compareHourly?.find(x => x.hour === h.hour)?.count ?? 0
                 return (
                   <div key={h.hour} title={`${h.hour}시 · A ${h.count}명${compareData ? ` · B ${bCount}명` : ''}`}
-                    style={{ flex: 1, display: 'flex', alignItems: 'flex-end', justifyContent: 'center', gap: 1, height: '100%' }}>
-                    <div style={{ flex: 1, height: `${Math.max((h.count / max) * 100, h.count > 0 ? 4 : 0)}%`, background: '#6366f1', borderRadius: '3px 3px 0 0', minHeight: h.count > 0 ? 2 : 0 }} />
-                    {compareData && (
-                      <div style={{ flex: 1, height: `${Math.max((bCount / max) * 100, bCount > 0 ? 4 : 0)}%`, background: '#16a34a', borderRadius: '3px 3px 0 0', minHeight: bCount > 0 ? 2 : 0 }} />
-                    )}
+                    style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'flex-end', height: '100%' }}>
+                    {/* 막대 위 숫자 — 마우스를 올려야만 보이던 걸 항상 보이게(사장님 요청) */}
+                    <div style={{ display: 'flex', gap: 1, fontSize: 8.5, fontWeight: 700, lineHeight: 1.3, marginBottom: 2 }}>
+                      {h.count > 0 && <span style={{ color: '#6366f1' }}>{h.count}</span>}
+                      {compareData && bCount > 0 && <span style={{ color: '#16a34a' }}>{h.count > 0 ? '/' : ''}{bCount}</span>}
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'center', gap: 1, width: '100%', height: 90 }}>
+                      <div style={{ flex: 1, height: `${Math.max((h.count / max) * 100, h.count > 0 ? 4 : 0)}%`, background: '#6366f1', borderRadius: '3px 3px 0 0', minHeight: h.count > 0 ? 2 : 0 }} />
+                      {compareData && (
+                        <div style={{ flex: 1, height: `${Math.max((bCount / max) * 100, bCount > 0 ? 4 : 0)}%`, background: '#16a34a', borderRadius: '3px 3px 0 0', minHeight: bCount > 0 ? 2 : 0 }} />
+                      )}
+                    </div>
                   </div>
                 )
               })
