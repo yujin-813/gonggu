@@ -217,6 +217,48 @@ header {
   color: var(--gray-3);
   font-weight: 600;
 }
+/* 검색창 끝 검색 버튼 — 글자가 있을 때만 뜬다(엔터 없이도 확정할 수 있는 손잡이) */
+.hero-search-btn {
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0; width: 28px; height: 28px; border-radius: 8px;
+  border: none; background: var(--brand); color: #fff; cursor: pointer;
+}
+
+/* 검색창 자동완성 — 인기 검색어. 검색창 바로 아래 딱 붙는다(.hero-search-wrap이
+   position:relative인 기준). 카테고리 드롭다운(.category-dropdown-panel)과 같은
+   "떠 있는 카드처럼 안 보이게 겹쳐 붙이는" 패턴. */
+.search-suggestions {
+  position: absolute; top: 100%; left: 20px; right: 20px;
+  z-index: 60;
+  background: #fff;
+  border: 1.5px solid var(--gray-2);
+  border-top: none;
+  border-radius: 0 0 14px 14px;
+  box-shadow: 0 8px 16px rgba(0, 0, 0, .08);
+  padding: 6px;
+  overflow: hidden;
+}
+.search-suggestions-label {
+  padding: 6px 10px 2px;
+  font-size: 11px;
+  color: var(--gray-3);
+  font-weight: 600;
+}
+.search-suggestion-item {
+  display: flex; align-items: center; gap: 8px;
+  width: 100%;
+  padding: 9px 10px;
+  border: none;
+  background: none;
+  border-radius: 10px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+  text-align: left;
+  cursor: pointer;
+}
+.search-suggestion-item:hover { background: var(--gray-1); }
+.search-suggestion-item svg { color: var(--gray-3); flex-shrink: 0; }
 
 /* ── Category ── */
 /* 스크롤로 카테고리가 접히면 헤더 왼쪽 위 햄버거(.btn-icon, Header.tsx)를 누른 뒤

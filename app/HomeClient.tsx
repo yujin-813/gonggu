@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import Link from 'next/link'
 import Header from '@/components/Header'
 import CategoryFilter from '@/components/CategoryFilter'
@@ -65,6 +65,13 @@ export default function HomeClient({ sections, collectionBanners }: { sections?:
     window.scrollTo({ top: 0, behavior: 'smooth' })
   }
   const [searchQuery, setSearchQuery] = useState('')
+  // 자주 찾는 검색어 자동완성 — 검색창을 누르면(입력 전) 인기 검색어 3개, 한 글자만
+  // 쳐도 그 글자가 들어간 인기 검색어를 보여준다(사장님 요청). 서버가 이미 집계해 둔
+  // 걸 그대로 쓴다 — 여기서 다시 계산 안 함(/api/search-suggestions, 공개 API).
+  const [popularQueries, setPopularQueries] = useState<string[]>([])
+  const [showSuggestions, setShowSuggestions] = useState(false)
+  const searchTrackTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const lastTrackedQuery = useRef('')
   const [sortOrder, setSortOrder] = useState<SortOrder>('latest')
   const [viewingBookmarks, setViewingBookmarks] = useState(false)
   const [toast, setToast] = useState({ message: '', visible: false })
@@ -96,6 +103,7 @@ export default function HomeClient({ sections, collectionBanners }: { sections?:
     setKakaoBannerDismissed(localStorage.getItem('gonggu_kakao_dismissed') === '1')
     fetchPosts()
     track('view')
+    fetch('/api/search-suggestions').then(r => r.json()).then(d => setPopularQueries(d.queries || [])).catch(() => {})
     if (pushSupported()) {
       navigator.serviceWorker.getRegistration('/sw.js')
         .then(reg => reg?.pushManager.getSubscription())
@@ -188,13 +196,30 @@ export default function HomeClient({ sections, collectionBanners }: { sections?:
 
   // 검색창에 실제로 뭘 치는지 기록한다 — 타이핑 중간중간(한 글자씩)을 다 보내면 노이즈만
   // 쌓이므로, 입력이 멈추고 0.8초 지난 뒤의 값만 하나 보낸다. 너무 짧은 검색어(한 글자)는
-  // 의미 있는 신호가 아니라서 뺀다.
+  // 의미 있는 신호가 아니라서 뺀다. 엔터·검색버튼·추천어 클릭으로 확정할 때는
+  // trackSearchNow를 직접 불러 바로 보내고, 이 타이머는 취소한다 — 같은 검색어를
+  // 두 번 세지 않기 위해 lastTrackedQuery로 막는다.
+  function trackSearchNow(q: string) {
+    if (q.length < 2 || lastTrackedQuery.current === q) return
+    lastTrackedQuery.current = q
+    track('search', { query: q })
+  }
   useEffect(() => {
     const q = searchQuery.trim()
+    if (searchTrackTimer.current) clearTimeout(searchTrackTimer.current)
     if (q.length < 2) return
-    const timer = setTimeout(() => track('search', { query: q }), 800)
-    return () => clearTimeout(timer)
+    searchTrackTimer.current = setTimeout(() => trackSearchNow(q), 800)
+    return () => { if (searchTrackTimer.current) clearTimeout(searchTrackTimer.current) }
   }, [searchQuery])
+
+  // 검색 "확정" — 엔터·검색 버튼·추천 검색어 클릭 공통. 목록 필터링 자체는 이미
+  // searchQuery가 바뀔 때마다 실시간으로 되고 있어서(아래 filtered 계산) 여기서 새로
+  // 할 일은 없다 — 키보드를 내리고 추천 목록을 닫고, 집계를 즉시 보내는 것뿐이다.
+  function submitSearch(q: string) {
+    setShowSuggestions(false)
+    if (searchTrackTimer.current) clearTimeout(searchTrackTimer.current)
+    trackSearchNow(q.trim())
+  }
 
   // 홈 피드를 얼마나 내려서 보는지 — 25/50/75/100% 지점을 지날 때만 기록한다(스크롤
   // 이벤트마다 보내면 초당 수십 번씩 쏟아진다). 세션당 마일스톤 하나는 한 번만
@@ -334,6 +359,15 @@ export default function HomeClient({ sections, collectionBanners }: { sections?:
   })
 
 
+  // 검색창 자동완성 목록 — 아직 안 쳤으면(포커스만) 인기 검색어 3개, 한 글자라도
+  // 쳤으면 그 글자가 들어간 인기 검색어를 보여준다. 이미 친 검색어 그대로와 완전히
+  // 같은 추천은 눌러도 의미가 없어서 뺀다.
+  const searchSuggestions = (() => {
+    const q = searchQuery.trim().toLowerCase()
+    if (!q) return popularQueries.slice(0, 3)
+    return popularQueries.filter(pq => pq !== q && pq.toLowerCase().includes(q)).slice(0, 5)
+  })()
+
   // group_key가 있는 게시글끼리 묶음 (published 된 것들만)
   const groupMap = new Map<string, typeof posts>()
   for (const p of posts) {
@@ -361,7 +395,7 @@ export default function HomeClient({ sections, collectionBanners }: { sections?:
           onCategoryMenuToggle={() => setCategoryMenuOpen(v => !v)}
         />
 
-        <div className="hero-search-wrap">
+        <div className="hero-search-wrap" style={{ position: 'relative' }}>
           <div className="hero-search">
             <Search size={18} />
             <input
@@ -369,8 +403,40 @@ export default function HomeClient({ sections, collectionBanners }: { sections?:
               placeholder="찾고 싶은 상품을 검색해보세요"
               value={searchQuery}
               onChange={e => setSearchQuery(e.target.value)}
+              onFocus={() => setShowSuggestions(true)}
+              // 추천어를 누르는 클릭이 blur보다 먼저 끝나야 목록이 안 사라지고 선택된다 —
+              // 그래서 살짝 늦춰서 닫는다(추천 버튼 쪽 onMouseDown이 그 사이에 처리됨)
+              onBlur={() => setTimeout(() => setShowSuggestions(false), 150)}
+              onKeyDown={e => { if (e.key === 'Enter') submitSearch(searchQuery) }}
             />
+            {searchQuery && (
+              <button
+                type="button"
+                className="hero-search-btn"
+                aria-label="검색"
+                onClick={() => submitSearch(searchQuery)}
+              >
+                <Search size={16} />
+              </button>
+            )}
           </div>
+
+          {showSuggestions && searchSuggestions.length > 0 && (
+            <div className="search-suggestions">
+              {!searchQuery.trim() && <div className="search-suggestions-label">자주 찾는 검색어</div>}
+              {searchSuggestions.map(q => (
+                <button
+                  key={q}
+                  type="button"
+                  className="search-suggestion-item"
+                  onMouseDown={e => { e.preventDefault(); setSearchQuery(q); submitSearch(q) }}
+                >
+                  <Search size={13} />
+                  {q}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
 
         {/* 드롭다운은 nav(app-header, sticky) 안에 둔다 — sticky가 위치 기준(containing
