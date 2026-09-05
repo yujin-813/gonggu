@@ -26,16 +26,37 @@ function atomicWrite(file: string, content: string) {
   fs.renameSync(tmp, file)
 }
 
+// posts.json이 6.3MB라 페이지마다(홈·카테고리·상세 전부) 매번 통째로 읽고 파싱하면
+// 방문자가 늘수록 그게 그대로 서버 부하가 된다. 파일 수정 시각(mtimeMs)+크기만 보고
+// 안 바뀌었으면 파싱을 건너뛴다 — 관리자(Next.js)와 수집기(파이썬, cron)가 서로 다른
+// 프로세스에서 같은 파일을 건드리므로 통째로 캐시하면 안 되고, 매번 이 값만 가볍게 확인한다.
+let postsCache: { mtimeMs: number; size: number; data: Post[] } | null = null
+
 export function loadPosts(): Post[] {
   ensureDir()
   if (!fs.existsSync(POSTS_FILE)) return []
-  try { return JSON.parse(fs.readFileSync(POSTS_FILE, 'utf-8')) }
-  catch { return [] }
+  try {
+    const stat = fs.statSync(POSTS_FILE)
+    if (!postsCache || postsCache.mtimeMs !== stat.mtimeMs || postsCache.size !== stat.size) {
+      postsCache = {
+        mtimeMs: stat.mtimeMs,
+        size: stat.size,
+        data: JSON.parse(fs.readFileSync(POSTS_FILE, 'utf-8')),
+      }
+    }
+    // 캐시된 배열을 그대로 내주면 호출부가 posts[idx].foo = x처럼 항목을 직접 고칠 때
+    // (app/api/posts/[id]/route.ts 등) savePosts()로 쓰기도 전에 캐시가 먼저 바뀐다 —
+    // 매번 복제해서 내준다
+    return structuredClone(postsCache.data)
+  } catch {
+    return []
+  }
 }
 
 export function savePosts(posts: Post[]): void {
   ensureDir()
   atomicWrite(POSTS_FILE, JSON.stringify(posts, null, 2))
+  postsCache = null // 다음 loadPosts()가 방금 쓴 내용을 다시 읽게 한다
 }
 
 export function loadScraperStatus(): ScraperStatus {
