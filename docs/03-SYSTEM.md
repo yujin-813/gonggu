@@ -1,7 +1,7 @@
 # 03 · 시스템 — 지금 상태
 
 > **"지금"만 쓴다.** 변경 이력과 "예전에는 ○○였다"는 여기 쓰지 않는다. 과거는 `02-DECISIONS.md`에 있다.
-> 마지막 갱신: 2026-09-04
+> 마지막 갱신: 2026-09-05
 
 ---
 
@@ -12,7 +12,7 @@
 | 단계 | 운영 중 · 실사용자 있음 (2026-08-19 기준 사람 방문 고유 IP 163명/2일) |
 | 스택 | Next.js 14 (App Router) · React 18 · TypeScript · 파이썬 수집기 |
 | 저장소 | **파일 기반** — `data/*.json`. DB 없음 |
-| 코드 규모 | `lib/` 3,790줄 · `app/admin` + `components/` 7,843줄 · 파이썬 3,265줄 |
+| 코드 규모 | `lib/` 3,831줄 · `app/admin` + `components/` 7,843줄 · 파이썬 3,265줄 |
 | 데이터 규모 | 게시물 2,399건 (공개 477건) · 인플루언서 소스 63개 · analytics 40일치 |
 | 배포 | EC2 `52.78.55.170`(t3.small) · PM2(fork) + nginx · `bash deploy.sh` — **무중단**(3002↔3003 슬롯 교대, `D-028`) |
 | 도메인 | https://xn--ob0bwir5d.shop (꿀공구.shop, 정식) · https://gonggu.asknuggetdata.com (구 도메인, 트래픽 유지용 병행) |
@@ -55,6 +55,12 @@
 - SEO — JSON-LD(WebSite/ItemList/Product·Offer/BreadcrumbList/FAQPage), sitemap.xml(555 URL), robots.txt,
   네이버·구글 소유확인. sitemap `lastmod`는 `updated_at||scraped_at`, 가격·마감상태 변경 시
   IndexNow 통보(`lib/indexnow.ts`, `D-055`)
+- **인플루언서 대표 URL** — 인스타 핸들이 바뀌면 `post.account`도 바뀌어 같은 사람이 계정
+  여러 개로 갈릴 수 있다. `influencer_name` 기준으로 게시물 최다 계정을 대표로 고르고(`/pick`
+  등록이 있으면 그게 우선), 비대표 계정은 미들웨어(`middleware.ts` → `/api/influencer-redirect`)가
+  308로 대표 URL에 리다이렉트한다. `/influencer/[account]`는 상품 목록을 서버에서 계산해
+  props로 내려 검색엔진이 읽을 수 있다(예전엔 클라이언트 fetch뿐이라 서버 HTML엔 "불러오는
+  중..."만 있었다). sitemap에는 대표 URL만 실린다(`D-076`)
 - **브랜드 랜딩 페이지** `/brand/[brand]` — `post.brand`로 묶어 진행 중 공구(상품별 딜 판정 포함)와
   최근 종료 공구·과거 가격을 나눠 보여준다. 상품 2건 이상인 브랜드만 페이지가 있다(1건은 개별
   상품 페이지와 다를 게 없어 얇은 콘텐츠가 된다) — 현재 45개, `lib/brandPages.ts`. sitemap에도 포함 (`D-075`)

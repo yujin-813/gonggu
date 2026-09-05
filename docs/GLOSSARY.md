@@ -31,6 +31,7 @@
 | 제휴 문의 | `Inquiry` (`data/inquiries.json`) | `/propose`로 들어온 인플루언서·브랜드 제안. `/api/posts/request`(공구 등록 요청)와는 다른 창구다 |
 | KST 오늘 | `kstToday()` (`lib/kst.ts`) | 서버는 UTC로 돈다. 날짜 경계를 다루려면 `new Date()`가 아니라 반드시 이 함수를 거칠 것 |
 | 마감일 미확인 | `PeriodState` → `deadline_unknown` | 수집기가 마감일을 못 읽은 공구. 상시딜과 다르다 — 21일 지나면 마감으로 본다 |
+| 대표 계정 | `canonicalAccountFor()` (`lib/influencerItems.ts`) | 인스타 핸들이 바뀌어 같은 인플루언서가 계정 여러 개로 갈렸을 때, 게시물이 가장 많은 계정(또는 `/pick` 등록이 있으면 그쪽). 비대표 URL은 여기로 308 리다이렉트된다(`D-076`) |
 
 ---
 
