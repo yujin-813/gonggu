@@ -6,7 +6,7 @@ import { SITE_URL } from '@/lib/landing'
 import { CATEGORY_LABEL } from '@/lib/categoryIcons'
 import { visiblePurchaseLinks, sameProductLinks } from '@/lib/purchaseLinks'
 import { getDealVerdict } from '@/lib/dealGrade'
-import { relatedPosts, type RelatedKind } from '@/lib/relatedPosts'
+import { relatedPosts } from '@/lib/relatedPosts'
 import { allBrands } from '@/lib/brandPages'
 import { priceQA, periodQA } from '@/lib/postLongtail'
 import JsonLd, { productSchema, breadcrumbSchema, faqSchema } from '@/components/JsonLd'
@@ -49,9 +49,18 @@ function getPastPrices(post: Post) {
     .slice(0, 5)
 }
 
-/** 종료 페이지 하단에 붙일 "비슷한 공구" — 같은 카테고리에서 진행 중인 것만 */
+/** 마감 페이지 하단 "비슷한 공구" — 관련도 없으면 카테고리 폴백까지 허용(그래도 볼 건
+ * 있어야 하므로) */
 function getRelated(post: Post) {
-  return relatedPosts(post, loadPosts(), RELATED_LIMIT)
+  return relatedPosts(post, loadPosts(), RELATED_LIMIT, { allowCategoryFallback: true })
+}
+
+/** 진행 중 공구 하단 "비슷한 공구" — 태그·제목·브랜드·인플루언서로 강하게 관련된 것만.
+ * 카테고리 폴백은 안 쓴다 — 잘 팔리는 딜 밑에 상관없는 걸 끼워 넣느니 아예 안 보여주는
+ * 게 낫다(원칙 2). 4개면 충분해서 마감 페이지보다 적게 가져온다. */
+const ACTIVE_RELATED_LIMIT = 4
+function getActiveRelated(post: Post) {
+  return relatedPosts(post, loadPosts(), ACTIVE_RELATED_LIMIT, { allowCategoryFallback: false })
 }
 
 // 기존 설명은 "13,800원 — 꿀공구에서 확인해보세요"뿐이라 검색 결과에서 상품을 구분할
@@ -140,7 +149,7 @@ export default function PostPage({ params }: { params: { id: string } }) {
   // 되기 때문이다 (D-027).
   const upcoming = getPeriodState(post).kind === 'upcoming'
   const betterPrice = !ended && getDealVerdict(post).display.key === 'meh'
-  const related = ended ? getRelated(post) : { posts: [] as Post[], kind: 'category' as RelatedKind }
+  const related = ended ? getRelated(post) : getActiveRelated(post)
   // 진행 중일 때만 "다른 인플루언서 공구가도 비교" — 마감 공구는 EndedDealNotice가 이미
   // 별도의 비교(대체 구매처)를 보여주고 있어서 겹치지 않게 여기선 안 낸다
   const siblings = ended ? [] : getSiblings(post)

@@ -4,6 +4,7 @@ import type { Post, Category, PurchaseLink, PurchaseLinkRelation, DealOption } f
 import { RELATION_DEFAULT_REASON } from '@/lib/types'
 import { normalizePurchaseLinks } from '@/lib/purchaseLinks'
 import { parseOptionLines } from '@/lib/searchQuery'
+import { computeTags } from '@/lib/tagGen'
 
 const CATEGORIES = [
   { value: 'kids',   label: '유아동' },
@@ -76,6 +77,10 @@ export default function AddPostModal({ onClose, onSubmit, editPost, existingGrou
 
   const [marketUrl, setMarketUrl] = useState('')
 
+  // 상세페이지 "비슷한 공구" 추천용 내부 태그 — 고객에겐 안 보임(lib/publicPost.ts denylist).
+  // lib/tagGen.ts가 규칙 사전으로 자동 생성하고, 이상하면 여기서 손으로 고친다
+  const [tags, setTags] = useState<string[]>([])
+  const [tagInput, setTagInput] = useState('')
   const [customVerdict,       setCustomVerdict]       = useState('')
   const [customVerdictDetail, setCustomVerdictDetail] = useState('')
   const [customVerdictCls,    setCustomVerdictCls]    = useState<'great' | 'good' | 'neutral' | 'check'>('good')
@@ -166,6 +171,9 @@ export default function AddPostModal({ onClose, onSubmit, editPost, existingGrou
     setNewGroupMode(false)
     setNewGroupInput('')
     setBrand(editPost.brand || '')
+    // 이미 태그가 있으면 그대로 두고(관리자가 손댄 걸 덮어쓰지 않는다), 없으면 그 자리에서
+    // 자동 생성해 보여준다 — 저장을 눌러야 실제로 반영된다
+    setTags(editPost.tags?.length ? editPost.tags : computeTags(editPost))
     if (editPost.img && !editPost.img.startsWith('data:')) {
       setImgPreview(editPost.img)
       setImgSaved(editPost.img)
@@ -311,6 +319,7 @@ export default function AddPostModal({ onClose, onSubmit, editPost, existingGrou
         // 구성·공구가가 채워진 세트만 저장한다 (빈 줄이 판정에 섞이면 안 된다)
         options: options.filter(o => o.price > 0),
         purchase_links: cleanedLinks,
+        tags: tags.length ? tags : computeTags({ title: title.trim(), brand: brand.trim() || null, cat }),
         // 예전 단일 필드는 비워 둔다 — 위 배열이 이미 그 값을 흡수했고, 남겨두면
         // 관리자가 지운 링크가 normalizePurchaseLinks를 통해 되살아난다
         partners_platform:     null,
@@ -434,6 +443,50 @@ export default function AddPostModal({ onClose, onSubmit, editPost, existingGrou
         <select value={cat} onChange={e => setCat(e.target.value as Category)}>
           {CATEGORIES.map(c => <option key={c.value} value={c.value}>{c.label}</option>)}
         </select>
+
+        {/* 내부 태그 — 상세페이지 "비슷한 공구" 추천에만 쓰고 고객 화면엔 안 뜬다 */}
+        <label>
+          내부 태그 <span style={{ fontSize: 12, color: '#94a3b8', fontWeight: 400 }}>(고객에겐 안 보여요 — 비슷한 공구 추천용)</span>
+        </label>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 8, alignItems: 'center' }}>
+          {tags.map(t => (
+            <span key={t} style={{
+              display: 'inline-flex', alignItems: 'center', gap: 4,
+              background: '#f1f5f9', border: '1px solid #e2e8f0', borderRadius: 999,
+              padding: '4px 10px', fontSize: 12.5, color: '#334155',
+            }}>
+              {t}
+              <button
+                type="button"
+                onClick={() => setTags(prev => prev.filter(x => x !== t))}
+                style={{ border: 'none', background: 'none', cursor: 'pointer', color: '#94a3b8', fontSize: 13, lineHeight: 1, padding: 0 }}
+                aria-label={`${t} 태그 삭제`}
+              >×</button>
+            </span>
+          ))}
+          <button
+            type="button"
+            onClick={() => setTags(computeTags({ title: title.trim(), brand: brand.trim() || null, cat }))}
+            style={{
+              fontSize: 12, fontWeight: 600, color: '#6366f1', background: '#eef2ff',
+              border: '1px solid #c7d2fe', borderRadius: 999, padding: '4px 10px', cursor: 'pointer',
+            }}
+          >↻ 자동 생성</button>
+        </div>
+        <input
+          type="text"
+          value={tagInput}
+          onChange={e => setTagInput(e.target.value)}
+          onKeyDown={e => {
+            if (e.key !== 'Enter' && e.key !== ',') return
+            e.preventDefault()
+            const v = tagInput.trim()
+            if (v && !tags.includes(v)) setTags(prev => [...prev, v])
+            setTagInput('')
+          }}
+          placeholder="태그 입력 후 Enter (예: 수납, 정리)"
+          style={{ marginBottom: 12 }}
+        />
 
         {/* 공구 기간 — 원본에서 확인 안 되는 경우가 많아 필수 아님. 확인되는 만큼만 입력 */}
         <label>공구 기간 <span style={{ fontSize: 12, color: '#94a3b8', fontWeight: 400 }}>(선택 — 확인되는 대로 입력)</span></label>

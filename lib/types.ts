@@ -92,6 +92,9 @@ export interface Post {
   // 인플루언서 확산 후보 관리 — 관리자가 직접 연락하고 상태만 기록한다(자동 발송 아님)
   outreach_status?: 'none' | 'sent' | 'confirmed' | 'converted'
   outreach_updated_at?: string | null
+  // 상세페이지 "비슷한 공구" 추천용 내부 태그(lib/tagGen.ts가 자동 생성, 관리자가 수정 가능).
+  // 고객에게는 안 보인다 — lib/publicPost.ts denylist에도 있다.
+  tags?: string[]
   compare_none_at?: string | null
   compare_none_reason?: CompareNoneReason | null
   compare_none_note?: string | null

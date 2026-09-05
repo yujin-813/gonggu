@@ -7,6 +7,7 @@ import PostCard from '@/components/PostCard'
 import PostLongtailInfo from '@/components/PostLongtailInfo'
 import Toast from '@/components/Toast'
 import EndedDealNotice from '@/components/EndedDealNotice'
+import RelatedPosts from '@/components/RelatedPosts'
 import BetterPriceNotice from '@/components/BetterPriceNotice'
 import UpcomingNotice from '@/components/UpcomingNotice'
 import ShareInvite from '@/components/ShareInvite'
@@ -115,6 +116,7 @@ export default function PostDetailClient({ post, ended = false, upcoming = false
           relatedKind={relatedKind} categoryLabel={categoryLabel} section="related" />
       )}
       {!ended && betterPrice && <BetterPriceNotice post={post} purchaseLinks={purchaseLinks} />}
+      {!ended && <RelatedPosts posts={related} kind={relatedKind} />}
 
       {/* 공유는 재방문 없이도 효용이 있고 우리에겐 신규 유입이 된다. 31일간 0회였던 건
           버튼이 이미지 위 라벨 없는 아이콘 하나였기 때문으로 보인다 */}

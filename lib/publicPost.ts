@@ -37,6 +37,7 @@ const INTERNAL_FIELDS = [
   'market_price_note',
   'collectionIds',
   'outreach_status', 'outreach_updated_at',
+  'tags',
 ] as const satisfies readonly (keyof Post)[]
 
 export function toPublicPost(post: Post): Post {

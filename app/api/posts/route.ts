@@ -5,6 +5,7 @@ import { daysLeft, isCustomerVisible, isPagePublic } from '@/lib/period'
 import { enforcePurchaseLinkRequirement, syncPriceWithOptions, reconcileReviewReasons } from '@/lib/postGuards'
 import { toPublicPosts } from '@/lib/publicPost'
 import { pingIndexNow, postUrl } from '@/lib/indexnow'
+import { computeTags } from '@/lib/tagGen'
 
 const CAT_EMOJI: Record<string, string> = {
   kids: '👶', life: '🏠', food: '🍽️', health: '💊', beauty: '💄',
@@ -122,6 +123,9 @@ export async function POST(request: NextRequest) {
     partners_option_note:  data.partners_option_note?.trim() || null,
     partners_checked_at:   data.partners_checked_at || null,
     partners_visible:      Boolean(data.partners_visible),
+    tags: Array.isArray(data.tags) && data.tags.length
+      ? data.tags
+      : computeTags({ title: data.title, brand: data.brand || null, cat: data.cat }),
   }
 
   const guarded = reconcileReviewReasons(syncPriceWithOptions(enforcePurchaseLinkRequirement(newPost)))
