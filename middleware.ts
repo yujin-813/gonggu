@@ -76,7 +76,29 @@ function isProtected(req: NextRequest): boolean {
   return false
 }
 
+// 인플루언서 계정 중복 URL을 대표 URL로 308 리다이렉트한다. 페이지 렌더링(React 스트리밍)
+// 안에서 permanentRedirect()를 부르면 실서버(Node 20)에서 진짜 308이 아니라 200+메타리프레시로
+// 나가는 문제가 있어(app/influencer/[account]/page.tsx 참고) 렌더링이 시작되기 전인 미들웨어에서
+// 처리한다. 실패해도 페이지 쪽에 같은 로직이 한 번 더 있어 안전망은 있다(소프트 리다이렉트로라도 나감).
+async function influencerRedirect(req: NextRequest): Promise<NextResponse | null> {
+  const match = req.nextUrl.pathname.match(/^\/influencer\/([^/]+)$/)
+  if (!match) return null
+  try {
+    const resolveUrl = new URL(`/api/influencer-redirect?account=${encodeURIComponent(match[1])}`, req.url)
+    const res = await fetch(resolveUrl)
+    if (!res.ok) return null
+    const { redirectTo } = await res.json()
+    if (!redirectTo) return null
+    return NextResponse.redirect(new URL(redirectTo, req.url), 308)
+  } catch {
+    return null
+  }
+}
+
 export async function middleware(req: NextRequest) {
+  const influencerRes = await influencerRedirect(req)
+  if (influencerRes) return influencerRes
+
   if (!isProtected(req)) return NextResponse.next()
 
   const secret = process.env.ADMIN_PASSWORD
@@ -98,6 +120,7 @@ export async function middleware(req: NextRequest) {
 
 export const config = {
   matcher: [
+    '/influencer/:path*',
     '/api/posts',
     '/api/posts/:path*',
     '/api/inquiries',
