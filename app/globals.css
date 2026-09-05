@@ -1338,6 +1338,8 @@ header {
 /* 제휴 문의 배너(.propose-banner)와 같은 톤 — 단색 배경 대신 어두운 바탕에 컬렉션
    색(--banner-color, 컬렉션마다 다름)을 겹친 비정형 도형. 높이는 그 배너의 약 1.5배
    (사장님 요청) — padding·아이콘 배지를 키워서 만든다. */
+/* 제휴 문의 배너(어두운 바탕 + 얼룩 도형)와 다른 컨셉 — 밝은 바탕에 "꿀"을 연상시키는
+   육각(벌집) 도형을 겹친다. 아이콘/이모지는 안 쓴다(사장님 요청). */
 .collection-banner {
   position: relative;
   display: flex; align-items: center; gap: 14px;
@@ -1345,8 +1347,8 @@ header {
   overflow: hidden;
   padding: 26px 20px;
   border-radius: 16px; box-sizing: border-box;
-  background: linear-gradient(135deg, #241608 0%, #241608 100%);
-  color: #fff; text-decoration: none;
+  background: linear-gradient(135deg, var(--brand-light) 0%, #fff 100%);
+  color: var(--text); text-decoration: none;
   isolation: isolate;
 }
 .collection-banner-shapes {
@@ -1354,51 +1356,25 @@ header {
   overflow: hidden;
   z-index: 0;
 }
-.collection-banner-shape {
+/* 정육각형 — clip-path로 벌집 셀 하나를 만든다. 크기·위치·투명도를 겹쳐서 깊이감을 준다 */
+.collection-banner-hex {
   position: absolute;
-  opacity: .85;
-  filter: blur(1px);
   background: var(--banner-color);
+  clip-path: polygon(25% 0%, 75% 0%, 100% 50%, 75% 100%, 25% 100%, 0% 50%);
 }
-.collection-banner-shape-1 {
-  width: 190px; height: 190px;
-  right: -50px; top: -70px;
-  border-radius: 62% 38% 55% 45% / 45% 60% 40% 55%;
-  opacity: .9;
-}
-.collection-banner-shape-2 {
-  width: 150px; height: 150px;
-  right: 70px; bottom: -80px;
-  border-radius: 40% 60% 45% 55% / 55% 45% 60% 40%;
-  opacity: .5;
-  mix-blend-mode: screen;
-}
-.collection-banner-shape-3 {
-  width: 90px; height: 90px;
-  right: 10px; bottom: 14px;
-  border-radius: 55% 45% 60% 40% / 40% 55% 45% 60%;
-  opacity: .3;
-  background: #fff;
-}
-.collection-banner-emoji-badge {
-  position: relative; z-index: 1;
-  flex-shrink: 0;
-  display: flex; align-items: center; justify-content: center;
-  width: 52px; height: 52px;
-  border-radius: 14px;
-  background: rgba(255, 255, 255, .16);
-}
-.collection-banner-emoji { font-size: 26px; line-height: 1; }
+.collection-banner-hex-1 { width: 130px; height: 130px; right: -20px; top: -35px; opacity: .18; }
+.collection-banner-hex-2 { width: 100px; height: 100px; right: 60px; bottom: -40px; opacity: .28; }
+.collection-banner-hex-3 { width: 60px; height: 60px; right: 20px; bottom: 18px; opacity: .5; }
 .collection-banner-text { position: relative; z-index: 1; flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
-.collection-banner-title { font-size: 17px; font-weight: 800; }
+.collection-banner-title { font-size: 17px; font-weight: 800; color: var(--text); }
 .collection-banner-desc {
-  font-size: 13px; color: rgba(255, 255, 255, .75);
+  font-size: 13px; color: var(--gray-4);
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
 .collection-banner-cta {
   position: relative; z-index: 1;
   flex-shrink: 0; font-size: 12.5px; font-weight: 700; white-space: nowrap;
-  color: rgba(255, 255, 255, .9);
+  color: var(--banner-color);
 }
 .collection-banner-dots { display: flex; justify-content: center; gap: 6px; margin-top: -2px; }
 .collection-banner-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--gray-2); }

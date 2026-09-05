@@ -26,15 +26,14 @@ export default function CollectionBannerCarousel({ banners }: { banners: Collect
           <Link key={b.id} href={`/collection/${b.id}`} className="collection-banner"
             style={{ '--banner-color': b.color } as React.CSSProperties}
             onClick={() => track('click', { clickType: 'other' })}>
-            {/* 단색 배경 대신 배너 배경에 컬렉션 색을 겹친 비정형 도형(blob)을 깐다 —
-                제휴 문의 배너와 같은 톤(사장님 요청). 색은 컬렉션마다 다르므로(관리자가
-                고름) --banner-color로 받아서 blob에 입힌다. */}
+            {/* 제휴 문의 배너(어두운 바탕 + 얼룩 도형)와 다른 컨셉으로 — 밝은 바탕에
+                "꿀"을 연상시키는 육각(벌집) 도형을 겹친다(사장님 요청: 아이콘 빼고
+                다른 컨셉으로). 아이콘/이모지는 안 쓴다. */}
             <div className="collection-banner-shapes" aria-hidden="true">
-              <span className="collection-banner-shape collection-banner-shape-1" />
-              <span className="collection-banner-shape collection-banner-shape-2" />
-              <span className="collection-banner-shape collection-banner-shape-3" />
+              <span className="collection-banner-hex collection-banner-hex-1" />
+              <span className="collection-banner-hex collection-banner-hex-2" />
+              <span className="collection-banner-hex collection-banner-hex-3" />
             </div>
-            <span className="collection-banner-emoji-badge"><span className="collection-banner-emoji">{b.emoji}</span></span>
             <span className="collection-banner-text">
               <span className="collection-banner-title">{b.title}</span>
               {b.description && <span className="collection-banner-desc">{b.description}</span>}
