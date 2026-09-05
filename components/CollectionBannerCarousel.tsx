@@ -24,9 +24,17 @@ export default function CollectionBannerCarousel({ banners }: { banners: Collect
       <div className="collection-banner-scroll" ref={scrollRef} onScroll={handleScroll}>
         {banners.map(b => (
           <Link key={b.id} href={`/collection/${b.id}`} className="collection-banner"
-            style={{ background: `linear-gradient(135deg, ${b.color}, ${b.color}CC)` }}
+            style={{ '--banner-color': b.color } as React.CSSProperties}
             onClick={() => track('click', { clickType: 'other' })}>
-            <span className="collection-banner-emoji">{b.emoji}</span>
+            {/* 단색 배경 대신 배너 배경에 컬렉션 색을 겹친 비정형 도형(blob)을 깐다 —
+                제휴 문의 배너와 같은 톤(사장님 요청). 색은 컬렉션마다 다르므로(관리자가
+                고름) --banner-color로 받아서 blob에 입힌다. */}
+            <div className="collection-banner-shapes" aria-hidden="true">
+              <span className="collection-banner-shape collection-banner-shape-1" />
+              <span className="collection-banner-shape collection-banner-shape-2" />
+              <span className="collection-banner-shape collection-banner-shape-3" />
+            </div>
+            <span className="collection-banner-emoji-badge"><span className="collection-banner-emoji">{b.emoji}</span></span>
             <span className="collection-banner-text">
               <span className="collection-banner-title">{b.title}</span>
               {b.description && <span className="collection-banner-desc">{b.description}</span>}
