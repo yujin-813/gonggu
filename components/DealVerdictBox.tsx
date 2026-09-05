@@ -49,9 +49,9 @@ export default function DealVerdictBox({ post }: { post: Post }) {
             <tbody>
               {v.options.filter(o => o.option.comparePrice).map((o, i) => (
                 <tr key={i}>
-                  <td className="option-name">
+                  <td className="option-name" title={o.option.name || undefined}>
                     {o.option.name || `구성 ${i + 1}`}
-                    {o.option.gift && <span className="option-gift">사은품 {o.option.gift}</span>}
+                    {o.option.gift && <span className="option-gift" title={`사은품 ${o.option.gift}`}>사은품 {o.option.gift}</span>}
                   </td>
                   <td className="num option-price">{o.option.price.toLocaleString()}원</td>
                   <td className="num option-compare">

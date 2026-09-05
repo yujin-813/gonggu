@@ -1792,10 +1792,18 @@ header {
 .option-table thead th { font-size: 11px; padding-bottom: 6px; }
 .option-table td { vertical-align: top; padding: 7px 0; border-bottom: 1px solid var(--gray-2); }
 .option-table tbody tr:last-child td { border-bottom: 0; }
-.option-name { padding-right: 10px; font-weight: 600; color: var(--text); line-height: 1.45; }
+/* 구성 이름이 길면(예: "식세기 세제 12인용 세트 (오리지널 그린레몬 50개입 2개 + ...)")
+   줄바꿈되면서 표 세로 길이가 들쭉날쭉해지고 모바일에서 깨져 보였다 — 한 줄로 자르고
+   말줄임(...)만 보여준다. 글자 수로 자르면(예: slice(0,20)) 폰트·화면 폭에 따라
+   어중간하게 잘리므로, 폭 기준 CSS ellipsis를 쓴다 — 화면 크기와 무관하게 안전하다. */
+.option-name {
+  padding-right: 10px; font-weight: 600; color: var(--text); line-height: 1.45;
+  max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
 .option-gift {
   display: block; margin-top: 2px;
   font-size: 11px; font-weight: 600; color: #B45309;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
 .option-price { font-weight: 800; color: var(--text); white-space: nowrap; }
 .option-compare { color: var(--gray-3); white-space: nowrap; }
