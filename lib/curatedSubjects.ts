@@ -17,6 +17,14 @@ export function listCuratedSubjects(): CuratedSubject[] {
   return loadCuratedSubjects().filter(s => s.enabled)
 }
 
+/** 이 인플루언서(influencer_name)를 이미 대표하는 공구 모음이 있는지 — 있으면 그게
+ * /influencer/[account]보다 더 완전한 대표 URL이다(계정 핸들 드리프트와 무관하게 전부
+ * 모으므로). sitemap·리다이렉트가 이걸로 우선순위를 정한다. */
+export function getCuratedSubjectForInfluencer(name: string): CuratedSubject | null {
+  const s = loadCuratedSubjects().find(s => s.enabled && s.matchField === 'influencer_name' && s.matchValue === name)
+  return s || null
+}
+
 export function subjectPosts(subject: CuratedSubject): { active: Post[]; upcoming: Post[]; ended: Post[] } {
   const all = loadPosts().filter(p =>
     (subject.matchField === 'brand' ? p.brand === subject.matchValue : p.influencer_name === subject.matchValue)

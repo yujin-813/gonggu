@@ -1,6 +1,6 @@
 import type { MetadataRoute } from 'next'
 import { loadCollections, loadPosts } from '@/lib/store'
-import { influencerItems } from '@/lib/influencerItems'
+import { influencerItems, canonicalAccountFor } from '@/lib/influencerItems'
 import { allBrands } from '@/lib/brandPages'
 import { listCuratedSubjects } from '@/lib/curatedSubjects'
 import { SITE_URL, visiblePosts, routablePosts, LANDING_KEYS, CATEGORY_KEYS, landingCopy } from '@/lib/landing'
@@ -18,8 +18,27 @@ export default function sitemap(): MetadataRoute.Sitemap {
   // 자리라 기준이 어긋나 있었다. 진행 중 공구가 0건이어도 지난 상품 20건이 떠 있는 계정이
   // 74개 중 35개였고 그게 통째로 색인에서 빠져 있었다. 화면이 보여주는 것과 같은 규칙으로 센다.
   const allPosts = loadPosts()
-  const accounts = [...new Set(allPosts.map(p => p.account).filter(Boolean))]
+  const qualifyingAccounts = [...new Set(allPosts.map(p => p.account).filter(Boolean))]
     .filter(account => influencerItems(allPosts, account).length > 0)
+
+  // 인스타 핸들이 바뀌면 account 값도 바뀐다 — 같은 사람이 계정 여러 개로 갈려서(실측
+  // 80명 중 13명) sitemap에 URL이 쪼개져 있었다. influencer_name 기준으로 대표 계정
+  // 하나만 낸다. 이미 /pick이 그 사람을 대표하면(관리자가 고른 공구 모음, 계정
+  // 드리프트와 무관하게 전부 모음) /influencer 쪽 URL은 아예 뺀다 — 같은 사람을
+  // 가리키는 두 URL이 sitemap에 같이 실리면 안 된다(사장님 요청).
+  const pickedInfluencerNames = new Set(
+    listCuratedSubjects().filter(s => s.matchField === 'influencer_name').map(s => s.matchValue),
+  )
+  const canonicalAccountByName = new Map<string, string>()
+  for (const account of qualifyingAccounts) {
+    const name = allPosts.find(p => p.account === account)?.influencer_name
+    const key = name || account // 이름 없으면 계정 자체가 그룹
+    if (name && pickedInfluencerNames.has(name)) continue
+    if (!canonicalAccountByName.has(key)) {
+      canonicalAccountByName.set(key, name ? canonicalAccountFor(allPosts, name) : account)
+    }
+  }
+  const accounts = [...new Set(canonicalAccountByName.values())]
 
   const lastPostUpdate = posts.reduce<string>(
     (latest, p) => ((p.scraped_at || '') > latest ? p.scraped_at || '' : latest),

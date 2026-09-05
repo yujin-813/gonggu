@@ -28,8 +28,9 @@ export function generateMetadata({ params }: { params: { slug: string } }): Meta
   if (!data) return { title: '공구 모음을 찾을 수 없어요' }
   const { subject, active, upcoming, ended } = data
   const kindLabel = KIND_LABEL[subject.kind] || ''
-  // <title>은 루트 레이아웃 template("%s | 꿀공구")을 타므로 접미사를 붙이지 않는다
-  const pageTitle = `${subject.label} 공구 모음`
+  // <title>은 루트 레이아웃 template("%s | 꿀공구")을 타므로 접미사를 붙이지 않는다.
+  // "OO 공구 일정" 검색과 실제로 맞물리게 형식을 통일한다(사장님 요청).
+  const pageTitle = `${subject.label} 공구 일정 | 진행중·예정·지난 공동구매`
   const shareTitle = `${pageTitle} | 꿀공구`
   const compared = comparedCount(active)
   const description = active.length > 0

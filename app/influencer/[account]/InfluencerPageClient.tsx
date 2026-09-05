@@ -20,23 +20,23 @@ interface InfluencerInfo {
 
 type SortOrder = 'latest' | 'price_low' | 'price_high'
 
-export default function InfluencerPage({ params }: { params: { account: string } }) {
+interface Props {
+  params: { account: string }
+  // 상세 페이지(app/influencer/[account]/page.tsx)가 서버에서 이미 계산해 props로
+  // 내려준다 — 예전엔 여기서 /api/posts/by-influencer를 클라이언트 fetch로 불러서
+  // 서버 HTML엔 상품이 하나도 안 찍혔다(검색엔진이 못 읽음, 80개 페이지 전부 해당).
+  initialInfluencer: InfluencerInfo | null
+  initialItems: InfluencerItem[]
+}
+
+export default function InfluencerPage({ params, initialInfluencer, initialItems }: Props) {
   const account = decodeURIComponent(params.account)
-  const [influencer, setInfluencer] = useState<InfluencerInfo | null>(null)
-  const [items, setItems] = useState<InfluencerItem[]>([])
-  const [loading, setLoading] = useState(true)
+  const [influencer] = useState<InfluencerInfo | null>(initialInfluencer)
+  const [items] = useState<InfluencerItem[]>(initialItems)
   const [sortOrder, setSortOrder] = useState<SortOrder>('latest')
   const [query, setQuery] = useState('')
   const [following, setFollowing] = useState(false)
   const [toast, setToast] = useState({ message: '', visible: false })
-
-  useEffect(() => {
-    fetch(`/api/posts/by-influencer?account=${encodeURIComponent(account)}`)
-      .then(r => r.json())
-      .then(d => { setInfluencer(d.influencer); setItems(d.items ?? []) })
-      .catch(() => {})
-      .finally(() => setLoading(false))
-  }, [account])
 
   // 홈의 "팔로우한 인플루언서만 보기"가 읽는 것과 같은 저장소를 쓴다 — 팔로우는
   // 여기(인플루언서 페이지)에서만 하고, 홈은 그 결과를 필터링해서 보여주기만 한다
@@ -113,7 +113,7 @@ export default function InfluencerPage({ params }: { params: { account: string }
 
       <Toast message={toast.message} visible={toast.visible} onHide={() => setToast(t => ({ ...t, visible: false }))} />
 
-      {!loading && items.length > 0 && (
+      {items.length > 0 && (
         <div className="hero-search-wrap">
           <div className="hero-search">
             <Search size={18} />
@@ -127,7 +127,7 @@ export default function InfluencerPage({ params }: { params: { account: string }
         </div>
       )}
 
-      {!loading && items.length > 0 && (
+      {items.length > 0 && (
         <div className="topbar">
           <span className="count-text">총 <strong>{sorted.length}</strong>개</span>
           <select
@@ -143,9 +143,7 @@ export default function InfluencerPage({ params }: { params: { account: string }
       )}
 
       <div className="feed" style={{ paddingBottom: 100, paddingTop: 12 }}>
-        {loading ? (
-          <div className="empty"><p>불러오는 중...</p></div>
-        ) : items.length === 0 ? (
+        {items.length === 0 ? (
           <div className="empty"><p>표시할 수 있는 추천 상품이 없어요</p></div>
         ) : sorted.length === 0 ? (
           <div className="empty"><p>검색 결과가 없어요</p></div>

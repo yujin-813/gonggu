@@ -11,16 +11,49 @@ import type { Post } from './types'
  * 나가는 ItemList는 0건, 설명은 "공동구매 0건"인 계정이 74개 중 35개였다(2026-08-23).
  * 한 곳에서만 정하고 양쪽이 같이 읽는다.
  */
+function isDisplayableInfluencerItem(p: Post): boolean {
+  return !!p.price &&
+    !!(p.purchase_url || p.url) &&
+    !!p.img &&
+    !(p.review_reason || []).includes('이미지 다운로드 실패')
+}
+
 export function influencerItems(posts: Post[], account: string): Post[] {
   const normalized = account.startsWith('@') ? account : `@${account}`
   return posts
-    .filter(p =>
-      (p.account || '').toLowerCase() === normalized.toLowerCase() &&
-      !!p.price &&
-      !!(p.purchase_url || p.url) &&
-      !!p.img &&
-      !(p.review_reason || []).includes('이미지 다운로드 실패'),
-    )
+    .filter(p => (p.account || '').toLowerCase() === normalized.toLowerCase() && isDisplayableInfluencerItem(p))
+    .sort((a, b) => (b.scraped_at || '').localeCompare(a.scraped_at || ''))
+}
+
+/** account 문자열이 속한 influencer_name을 찾는다 — 계정 핸들이 바뀌어도 이름은
+ * 안정적이라 이걸 기준으로 "같은 사람"을 묶는다. 못 찾으면 null. */
+export function influencerNameOf(posts: Post[], account: string): string | null {
+  const normalized = account.startsWith('@') ? account : `@${account}`
+  const found = posts.find(p => (p.account || '').toLowerCase() === normalized.toLowerCase())
+  return found?.influencer_name || null
+}
+
+/** 같은 influencer_name인데 인스타 핸들이 바뀌어 계정값이 여러 개로 갈린 경우(실측:
+ * 80명 중 13명), 표시 가능한 게시물이 가장 많은 계정을 대표로 삼는다 — 동점이면 가장
+ * 최근에 수집된 쪽. sitemap·리다이렉트가 이 계정 하나로만 모이게 하기 위한 것. */
+export function canonicalAccountFor(posts: Post[], name: string): string {
+  const stats = new Map<string, { count: number; latest: string }>()
+  for (const p of posts) {
+    if (p.influencer_name !== name || !p.account || !isDisplayableInfluencerItem(p)) continue
+    const e = stats.get(p.account) || { count: 0, latest: '' }
+    e.count += 1
+    if ((p.scraped_at || '') > e.latest) e.latest = p.scraped_at || ''
+    stats.set(p.account, e)
+  }
+  const sorted = [...stats.entries()].sort((a, b) => b[1].count - a[1].count || b[1].latest.localeCompare(a[1].latest))
+  return sorted[0]?.[0] || ''
+}
+
+/** influencerItems와 같은 표시 기준이지만, 계정 하나가 아니라 같은 influencer_name의
+ * 모든 계정 변형을 합친다 — 계정이 갈려도(예: 마마홈) 전체가 한 페이지에 모인다. */
+export function influencerItemsByName(posts: Post[], name: string): Post[] {
+  return posts
+    .filter(p => p.influencer_name === name && isDisplayableInfluencerItem(p))
     .sort((a, b) => (b.scraped_at || '').localeCompare(a.scraped_at || ''))
 }
 
