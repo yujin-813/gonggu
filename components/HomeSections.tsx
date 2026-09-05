@@ -104,16 +104,11 @@ export default function HomeSections({
                 className="popular-search-item"
                 onClick={() => track('click', { clickType: 'other' })}
               >
+                {/* NEW/▲▼ 배지는 잠시 뺐다 — 검색어 집계가 아직 얼마 안 쌓여서 전부
+                    "NEW"로만 떠 빨간색이 과했다(사장님 지적). 데이터가 쌓이면(직전
+                    기간과 비교할 게 생기면) 다시 붙이기로 함 — 계산 로직(trend)은
+                    안 지우고 그대로 둔다. */}
                 <span className="popular-search-rank">{item.rank}</span>
-                {item.trend === 'new' ? (
-                  <span className="popular-search-badge popular-search-new">NEW</span>
-                ) : item.trend === 'up' ? (
-                  <span className="popular-search-badge popular-search-up">▲</span>
-                ) : item.trend === 'down' ? (
-                  <span className="popular-search-badge popular-search-down">▼</span>
-                ) : (
-                  <span className="popular-search-badge popular-search-same">-</span>
-                )}
                 <span className="popular-search-text">{item.query}</span>
               </Link>
             ))}

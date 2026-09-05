@@ -35,12 +35,15 @@ export default function Header({
         <button className="btn-icon" onClick={onCategoryMenuToggle} title="카테고리" aria-label="카테고리">
           <Menu size={18} />
         </button>
-        <Link href="/" className="logo" aria-label="홈으로">
+        {/* 로고는 일부러 Link가 아니라 진짜 <a>다 — Link(클라이언트 이동)는 검색어·필터·
+            스크롤 위치 같은 홈의 로컬 상태를 안 지운다. 로고는 "처음으로 돌아가기"라
+            실제로 새로고침돼서 깨끗한 상태로 열려야 한다(사장님 확인). */}
+        <a href="/" className="logo" aria-label="홈으로">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src="/logo-symbol.png" alt="" className="logo-symbol" width={20} height={20} />
           <span className="logo-text">꿀공구</span>
           <span className="logo-tagline">| 꿀 같은 공구만 모아드려요</span>
-        </Link>
+        </a>
         <div style={{ flex: 1 }} />
         <button
           className={`btn-icon ${menuOpen ? 'active' : ''}`}
