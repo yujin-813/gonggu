@@ -870,7 +870,19 @@ def fetch_product_info(url, domain):
             r'<meta[^>]+content=["\']([^"\']+)["\'][^>]+property=["\']og:image["\']',
         ):
             mt = re.search(pat, html, re.I)
-            if mt: result["img"] = mt.group(1).strip(); break
+            # 위즈 계열 쇼핑몰(mamahome·foryou-home·mariettle 등, bizpon.biz 이미지 CDN을
+            # 쓰는 곳)이 og:image에 실제 경로 대신 'h' 한 글자만 박아둔 깨진 템플릿을 그대로
+            # 쓰고 있다(3개 몰에서 동일하게 실측 확인) — 슬래시도 없는 짧은 값은 URL이 아니라고
+            # 보고 다음 전략(아래 bizpon.biz <img> 태그)으로 넘어간다.
+            if mt and "/" in mt.group(1) and len(mt.group(1)) >= 8:
+                result["img"] = mt.group(1).strip()
+                break
+    if not result.get("img"):
+        # 위즈 계열 쇼핑몰 상품 상세의 메인 이미지 — og:image가 깨져 있을 때의 대체 경로.
+        # bizpon.biz는 위즈 솔루션이 공용으로 쓰는 이미지 CDN이라 도메인이 달라도 패턴은 같다.
+        mt = re.search(r'<img[^>]+src=["\']([^"\']*bizpon\.biz/BIZ_PR_IMG/[^"\']+)["\']', html, re.I)
+        if mt:
+            result["img"] = mt.group(1).strip()
     if not result.get("brand"):
         for pat in (
             r'<meta[^>]+property=["\']product:brand["\'][^>]+content=["\']([^"\']+)["\']',
