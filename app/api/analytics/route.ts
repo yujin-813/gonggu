@@ -1,5 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { recordEvent, getSummary, getTopPosts, getTopSharedPosts, getSourceCounts, getClickCounts, getClickBreakdown, getPostSourceCounts, getRecentSessions, getTopSearchQueries, getYesterdayTodaySourceComparison, getTopMenuClicks, getScrollDepthSummary, classifySource, CLICK_TYPES } from '@/lib/analytics'
+import { kstToday, kstDateOffset } from '@/lib/kst'
+
+const DATE_RE = /^\d{4}-\d{2}-\d{2}$/
 import { loadPosts } from '@/lib/store'
 import { isPagePublic } from '@/lib/period'
 import { visiblePurchaseLinks } from '@/lib/purchaseLinks'
@@ -50,10 +53,14 @@ export async function POST(request: NextRequest) {
 }
 
 export async function GET(request: NextRequest) {
-  // 관리자 「데이터」 탭의 기간 선택 — 유입 경로·검색어·메뉴 클릭·스크롤 깊이가 이 기간을
-  // 따른다. 나머지(요약 카드·7일 차트·가장 많이 본/공유된 상품)는 그대로 고정 기간이다.
-  const daysParam = parseInt(request.nextUrl.searchParams.get('days') || '14', 10)
-  const days = Number.isFinite(daysParam) ? Math.min(90, Math.max(1, daysParam)) : 14
+  // 관리자 「데이터」 탭의 기간 선택(달력) — 유입 경로·검색어·메뉴 클릭·스크롤 깊이가
+  // 이 구간을 따른다. 나머지(요약 카드·7일 차트·가장 많이 본/공유된 상품)는 그대로
+  // 고정 기간이다. 형식이 이상하면(달력 대신 잘못된 값) 조용히 최근 14일로 되돌린다 —
+  // 관리자 화면이 통째로 500 나는 것보다 낫다.
+  const fromParam = request.nextUrl.searchParams.get('from')
+  const toParam = request.nextUrl.searchParams.get('to')
+  const from = fromParam && DATE_RE.test(fromParam) ? fromParam : kstDateOffset(13)
+  const to = toParam && DATE_RE.test(toParam) && toParam >= from ? toParam : kstToday()
   const summary = getSummary(14)
   const top = getTopPosts(10)
   const topShared = getTopSharedPosts(10)
@@ -67,10 +74,10 @@ export async function GET(request: NextRequest) {
     .filter(Boolean)
   const topPosts = withPostInfo(top)
   const topSharedPosts = withPostInfo(topShared)
-  const sources = getSourceCounts(days)
-  const topSearchQueries = getTopSearchQueries(days)
-  const topMenuClicks = getTopMenuClicks(days)
-  const scrollDepth = getScrollDepthSummary(days)
+  const sources = getSourceCounts(from, to)
+  const topSearchQueries = getTopSearchQueries(from, to)
+  const topMenuClicks = getTopMenuClicks(from, to)
+  const scrollDepth = getScrollDepthSummary(from, to)
   // 네이버 유입이 갑자기 줄었을 때 "어느 상품 페이지에서 줄었는지" 바로 찾기 위한 표
   const naverPageComparison = getYesterdayTodaySourceComparison('naver_search', 10)
     .map(r => {
@@ -109,7 +116,7 @@ export async function GET(request: NextRequest) {
   )
   const affiliateDetailViews7 = sumIds(getClickCounts(7, ['detail']), affiliateExposedIds)
   return NextResponse.json({
-    summary, topPosts, topSharedPosts, sources, topSearchQueries, topMenuClicks, scrollDepth, naverPageComparison, detailViews, clickBreakdown, postSources, recentSessions, days,
+    summary, topPosts, topSharedPosts, sources, topSearchQueries, topMenuClicks, scrollDepth, naverPageComparison, detailViews, clickBreakdown, postSources, recentSessions, from, to,
     detailViews7, groupbuyClicks7, moneyClicks7, affiliateDetailViews7,
   })
 }

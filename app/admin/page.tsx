@@ -13,6 +13,7 @@ import { findCompareCandidates, type CompareCandidate } from '@/lib/compareCandi
 import { COMPARE_NONE_REASON_LABEL, type CompareNoneReason } from '@/lib/types'
 import { GradeBadge } from '@/components/DealVerdictBox'
 import { SITE_URL } from '@/lib/siteUrl'
+import { kstToday, kstDateOffset } from '@/lib/kst'
 import { CheckCircle2, TriangleAlert, Search, Flame, ImageOff, Eye, EyeOff, Package, Copy } from 'lucide-react'
 import AddPostModal from '@/components/AddPostModal'
 
@@ -169,8 +170,18 @@ export default function AdminPage() {
   const [naverPageComparison, setNaverPageComparison] = useState<{ id: number; title: string; yesterday: number; today: number }[]>([])
   const [topMenuClicks, setTopMenuClicks] = useState<{ label: string; count: number }[]>([])
   const [scrollDepth, setScrollDepth] = useState<{ depth: string; count: number }[]>([])
-  // 「데이터」 탭의 기간 선택 — 유입 경로·검색어·메뉴 클릭·스크롤 깊이가 이 값을 따른다
-  const [analyticsPeriod, setAnalyticsPeriod] = useState(14)
+  // 「데이터」 탭의 기간 선택(달력) — 유입 경로·검색어·메뉴 클릭·스크롤 깊이가 이 구간을
+  // 따른다. 기본값은 예전과 같은 최근 14일.
+  const [rangeA, setRangeA] = useState({ from: kstDateOffset(13), to: kstToday() })
+  // 기간 비교 — 켜면 rangeB를 별도로 골라 A/B를 나란히 비교한다
+  const [compareEnabled, setCompareEnabled] = useState(false)
+  const [rangeB, setRangeB] = useState({ from: kstDateOffset(1), to: kstDateOffset(1) })
+  const [compareData, setCompareData] = useState<{
+    sources: { source: string; label: string; count: number }[]
+    topSearchQueries: { query: string; count: number }[]
+    topMenuClicks: { label: string; count: number }[]
+    scrollDepth: { depth: string; count: number }[]
+  } | null>(null)
   // 상품별 상세 조회수(최근 14일) — 채우기 목록을 실제 유입 순으로 세우는 데 쓴다
   const [detailViews, setDetailViews] = useState<Record<string, number>>({})
   // 상품별 클릭(종류별)과 유입 경로 — 수익화 현황 표
@@ -226,8 +237,8 @@ export default function AdminPage() {
     setLoading(false)
   }, [])
 
-  const fetchAnalytics = useCallback(async (days = analyticsPeriod) => {
-    const r = await fetch(`/api/analytics?days=${days}`)
+  const fetchAnalytics = useCallback(async (from = rangeA.from, to = rangeA.to) => {
+    const r = await fetch(`/api/analytics?from=${from}&to=${to}`)
     if (r.ok) {
       const d = await r.json()
       setAnalytics(d.summary || [])
@@ -247,7 +258,22 @@ export default function AdminPage() {
       setMoneyClicks7(d.moneyClicks7 || 0)
       setAffiliateDetailViews7(d.affiliateDetailViews7 || 0)
     }
-  }, [analyticsPeriod])
+  }, [rangeA])
+
+  // 기간 비교(B) — 메인 상태(sources 등)는 안 건드리고 따로 담는다. VisitorFlow 등
+  // 다른 화면이 sources를 참조하는데, 비교용 B기간 값으로 덮어쓰면 엉뚱해진다.
+  const fetchCompareAnalytics = useCallback(async (from: string, to: string) => {
+    const r = await fetch(`/api/analytics?from=${from}&to=${to}`)
+    if (r.ok) {
+      const d = await r.json()
+      setCompareData({
+        sources: d.sources || [],
+        topSearchQueries: d.topSearchQueries || [],
+        topMenuClicks: d.topMenuClicks || [],
+        scrollDepth: d.scrollDepth || [],
+      })
+    }
+  }, [])
 
   const fetchGrowthGoals = useCallback(async () => {
     const r = await fetch('/api/growth-goals')
@@ -433,6 +459,13 @@ export default function AdminPage() {
     const iv = setInterval(() => { fetchInpockStatus() }, 5000)
     return () => clearInterval(iv)
   }, [fetchPosts, fetchAnalytics, fetchGrowthGoals, fetchPurchaseLog, fetchInquiries, fetchInfluencerSources, fetchInpockStatus, fetchCollections, fetchCuratedSubjects])
+
+  // 기간 비교가 켜져 있는 동안 B기간이 바뀌면 다시 불러온다. 꺼지면 비교 데이터를 비워서
+  // 다시 켰을 때 지난 값이 잠깐 보이는 걸 막는다.
+  useEffect(() => {
+    if (compareEnabled) fetchCompareAnalytics(rangeB.from, rangeB.to)
+    else setCompareData(null)
+  }, [compareEnabled, rangeB, fetchCompareAnalytics])
 
   async function togglePublished(p: Post) {
     const isPublished = p.status === 'published' || (!p.status && p.published !== false)
@@ -838,8 +871,13 @@ export default function AdminPage() {
             <DataAnalyticsBoard
               sources={sources} topSearchQueries={topSearchQueries} topMenuClicks={topMenuClicks}
               scrollDepth={scrollDepth} naverPageComparison={naverPageComparison}
-              period={analyticsPeriod}
-              onPeriodChange={days => { setAnalyticsPeriod(days); fetchAnalytics(days) }}
+              rangeA={rangeA}
+              onRangeAChange={r => { setRangeA(r); fetchAnalytics(r.from, r.to) }}
+              compareEnabled={compareEnabled}
+              onCompareToggle={setCompareEnabled}
+              rangeB={rangeB}
+              onRangeBChange={setRangeB}
+              compareData={compareData}
             />
             <VisitorFlow sessions={recentSessions} posts={posts} clickBreakdown={clickBreakdown} postSources={postSources} sources={sources} onRefresh={fetchAnalytics} />
           </>
@@ -2117,133 +2155,188 @@ function CuratedSubjectManager({
   )
 }
 
+type DateRange = { from: string; to: string }
+
+// 기간 하나를 고르는 위젯 — 오늘/어제는 따로 눌러 바로 그날 하루로 고정하고(사장님 요청),
+// 달력(<input type="date">)으로 임의 구간도 고를 수 있다. 네이티브 달력을 쓰는 이유는
+// 커스텀 캘린더 컴포넌트를 새로 만들지 않아도 모바일·PC 양쪽에서 바로 되기 때문이다.
+function RangePicker({ range, onChange }: { range: DateRange; onChange: (r: DateRange) => void }) {
+  const today = kstToday()
+  const yesterday = kstDateOffset(1)
+  const isToday = range.from === today && range.to === today
+  const isYesterday = range.from === yesterday && range.to === yesterday
+  const presetDays = [7, 14, 30, 90]
+  const isPreset = (d: number) => range.from === kstDateOffset(d - 1) && range.to === today
+
+  const btnStyle = (active: boolean): React.CSSProperties => ({
+    padding: '5px 10px', borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: 'pointer',
+    border: active ? '1.5px solid #6366f1' : '1.5px solid #e2e8f0',
+    background: active ? '#eef2ff' : '#fff', color: active ? '#4338ca' : '#475569',
+  })
+
+  return (
+    <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 6 }}>
+      <button style={btnStyle(isToday)} onClick={() => onChange({ from: today, to: today })}>오늘</button>
+      <button style={btnStyle(isYesterday)} onClick={() => onChange({ from: yesterday, to: yesterday })}>어제</button>
+      {presetDays.map(d => (
+        <button key={d} style={btnStyle(isPreset(d))} onClick={() => onChange({ from: kstDateOffset(d - 1), to: today })}>
+          최근 {d}일
+        </button>
+      ))}
+      <span style={{ display: 'flex', alignItems: 'center', gap: 4, marginLeft: 4 }}>
+        <input type="date" value={range.from} max={range.to} onChange={e => onChange({ ...range, from: e.target.value })}
+          style={{ border: '1.5px solid #e2e8f0', borderRadius: 8, padding: '4px 6px', fontSize: 12 }} />
+        <span style={{ color: '#94a3b8', fontSize: 12 }}>~</span>
+        <input type="date" value={range.to} min={range.from} max={today} onChange={e => onChange({ ...range, to: e.target.value })}
+          style={{ border: '1.5px solid #e2e8f0', borderRadius: 8, padding: '4px 6px', fontSize: 12 }} />
+      </span>
+    </div>
+  )
+}
+
+type CountRow = { key: string; label: string; count: number }
+
+// 기간 비교가 켜져 있으면 표 A/B를 나란히, 아니면 지금까지처럼 막대 하나로 보여준다.
+// 라벨이 A/B에서 다를 수 있어(예: A엔 없던 유입 경로가 B엔 있음) 합집합으로 행을 만든다.
+function MetricBlock({ title, rowsA, rowsB, unit, color }: {
+  title: string
+  rowsA: CountRow[]
+  rowsB: CountRow[] | null
+  unit: string
+  color: string
+}) {
+  if (rowsA.length === 0 && (!rowsB || rowsB.length === 0)) return null
+
+  if (!rowsB) {
+    const total = rowsA.reduce((s, r) => s + r.count, 0) || 1
+    return (
+      <div style={{ marginTop: 20, paddingTop: 16, borderTop: '1px solid #f1f5f9' }}>
+        <h4 style={{ margin: '0 0 10px', fontSize: 13, fontWeight: 700, color: '#1e293b' }}>{title}</h4>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+          {rowsA.map((r, i) => (
+            <div key={r.key} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '6px 8px', background: i === 0 ? '#f8fafc' : '#f8fafc', borderRadius: 8 }}>
+              <span style={{ fontSize: 12, color: '#0f172a', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.label}</span>
+              <span style={{ position: 'relative', width: 90, height: 6, background: '#e2e8f0', borderRadius: 3, flexShrink: 0 }}>
+                <span style={{ position: 'absolute', inset: 0, width: `${Math.round((r.count / total) * 100)}%`, background: color, borderRadius: 3 }} />
+              </span>
+              <span style={{ fontSize: 12, fontWeight: 700, color, flexShrink: 0, minWidth: 50, textAlign: 'right' }}>
+                {r.count}{unit}
+              </span>
+            </div>
+          ))}
+        </div>
+      </div>
+    )
+  }
+
+  const keys = [...new Set([...rowsA.map(r => r.key), ...rowsB.map(r => r.key)])]
+  const merged = keys.map(k => {
+    const a = rowsA.find(r => r.key === k)
+    const b = rowsB.find(r => r.key === k)
+    return { key: k, label: a?.label || b?.label || k, a: a?.count || 0, b: b?.count || 0 }
+  }).sort((x, y) => (y.a + y.b) - (x.a + x.b))
+
+  return (
+    <div style={{ marginTop: 20, paddingTop: 16, borderTop: '1px solid #f1f5f9' }}>
+      <h4 style={{ margin: '0 0 10px', fontSize: 13, fontWeight: 700, color: '#1e293b' }}>{title} — A vs B</h4>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+        {merged.map(r => {
+          const diff = r.b - r.a
+          return (
+            <div key={r.key} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '6px 8px', background: '#f8fafc', borderRadius: 8 }}>
+              <span style={{ fontSize: 12, color: '#0f172a', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.label}</span>
+              <span style={{ fontSize: 12, color: '#64748b', flexShrink: 0 }}>A {r.a}{unit} → B {r.b}{unit}</span>
+              <span style={{ fontSize: 12, fontWeight: 700, flexShrink: 0, minWidth: 40, textAlign: 'right', color: diff < 0 ? '#dc2626' : diff > 0 ? '#16a34a' : '#94a3b8' }}>
+                {diff > 0 ? `+${diff}` : diff}
+              </span>
+            </div>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
 // 「데이터」 탭 — 유입 경로·검색어·메뉴 클릭·스크롤 깊이처럼 "고객이 뭘 하는지" 분석하는
 // 것들을 모아둔다. 예전엔 방문자 분석(요약 카드) 바로 아래, 관리자 화면 맨 위에 항상
 // 떠 있었는데, 늘어날수록 화면 첫 화면이 길어져서(사장님 지적) 이 탭으로 옮겼다.
-// 기간 선택은 유입 경로·검색어·메뉴 클릭·스크롤 깊이에만 적용한다 — 어제 vs 오늘
-// 네이버 비교는 개념 자체가 "어제/오늘"이라 기간 선택과 안 맞아서 그대로 둔다.
+// 기간 선택·비교는 유입 경로·검색어·메뉴 클릭·스크롤 깊이에만 적용한다 — 어제 vs 오늘
+// 네이버 비교는 개념 자체가 "어제/오늘"이라 그대로 둔다.
 function DataAnalyticsBoard({
-  sources, topSearchQueries, topMenuClicks, scrollDepth, naverPageComparison, period, onPeriodChange,
+  sources, topSearchQueries, topMenuClicks, scrollDepth, naverPageComparison,
+  rangeA, onRangeAChange, compareEnabled, onCompareToggle, rangeB, onRangeBChange, compareData,
 }: {
   sources: { source: string; label: string; count: number }[]
   topSearchQueries: { query: string; count: number }[]
   topMenuClicks: { label: string; count: number }[]
   scrollDepth: { depth: string; count: number }[]
   naverPageComparison: { id: number; title: string; yesterday: number; today: number }[]
-  period: number
-  onPeriodChange: (days: number) => void
+  rangeA: DateRange
+  onRangeAChange: (r: DateRange) => void
+  compareEnabled: boolean
+  onCompareToggle: (v: boolean) => void
+  rangeB: DateRange
+  onRangeBChange: (r: DateRange) => void
+  compareData: {
+    sources: { source: string; label: string; count: number }[]
+    topSearchQueries: { query: string; count: number }[]
+    topMenuClicks: { label: string; count: number }[]
+    scrollDepth: { depth: string; count: number }[]
+  } | null
 }) {
+  const rowsA = {
+    sources: sources.map(s => ({ key: s.source, label: s.label, count: s.count })),
+    search: topSearchQueries.map(s => ({ key: s.query, label: s.query, count: s.count })),
+    menu: topMenuClicks.map(s => ({ key: s.label, label: s.label, count: s.count })),
+    scroll: scrollDepth.map(s => ({ key: s.depth, label: `${s.depth}%`, count: s.count })),
+  }
+  const rowsB = compareData ? {
+    sources: compareData.sources.map(s => ({ key: s.source, label: s.label, count: s.count })),
+    search: compareData.topSearchQueries.map(s => ({ key: s.query, label: s.query, count: s.count })),
+    menu: compareData.topMenuClicks.map(s => ({ key: s.label, label: s.label, count: s.count })),
+    scroll: compareData.scrollDepth.map(s => ({ key: s.depth, label: `${s.depth}%`, count: s.count })),
+  } : null
+
   return (
     <div style={{ background: '#fff', borderRadius: 12, padding: 20, marginBottom: 24, border: '1px solid #e2e8f0' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
-        <h3 style={{ margin: 0, fontSize: 15, fontWeight: 700, color: '#1e293b' }}>데이터 분석</h3>
-        <select
-          value={period}
-          onChange={e => onPeriodChange(Number(e.target.value))}
-          className="sort-select"
-        >
-          {[7, 14, 30, 90].map(d => <option key={d} value={d}>최근 {d}일</option>)}
-        </select>
+      <h3 style={{ margin: '0 0 12px', fontSize: 15, fontWeight: 700, color: '#1e293b' }}>데이터 분석</h3>
+
+      <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+        <span style={{ fontSize: 12, fontWeight: 700, color: '#6366f1', flexShrink: 0 }}>{compareEnabled ? 'A기간' : '기간'}</span>
+        <RangePicker range={rangeA} onChange={onRangeAChange} />
       </div>
-      <p style={{ margin: '0 0 16px', fontSize: 12, color: '#94a3b8' }}>
-        유입 경로·검색어·메뉴 클릭·스크롤 깊이는 선택한 기간 기준. 네이버 유입 비교는 항상 어제 vs 오늘.
+
+      <label style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 10, fontSize: 12, color: '#475569', cursor: 'pointer' }}>
+        <input type="checkbox" checked={compareEnabled} onChange={e => onCompareToggle(e.target.checked)} />
+        다른 기간과 비교하기
+      </label>
+
+      {compareEnabled && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 8 }}>
+          <span style={{ fontSize: 12, fontWeight: 700, color: '#16a34a', flexShrink: 0 }}>B기간</span>
+          <RangePicker range={rangeB} onChange={onRangeBChange} />
+        </div>
+      )}
+
+      <p style={{ margin: '10px 0 0', fontSize: 12, color: '#94a3b8' }}>
+        유입 경로·검색어·메뉴 클릭·스크롤 깊이는 위에서 고른 기간 기준. 네이버 유입 비교는 항상 어제 vs 오늘(아래, 기간 선택과 무관).
       </p>
 
       {/* 어디서 들어왔는지.
           인스타·카톡 인앱 브라우저는 리퍼러를 안 보내므로, 공유 링크에 utm_source가 붙어
           있어야 정확히 갈린다. 안 붙은 방문은 "앱 내 브라우저(경로 미상)"으로 모인다. */}
-      {sources.length > 0 && (
-        <div style={{ marginTop: 20, paddingTop: 16, borderTop: '1px solid #f1f5f9' }}>
-          <h4 style={{ margin: '0 0 10px', fontSize: 13, fontWeight: 700, color: '#1e293b' }}>유입 경로 (최근 {period}일)</h4>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-            {(() => {
-              const total = sources.reduce((sum, s) => sum + s.count, 0) || 1
-              return sources.map((s, i) => (
-                <div key={s.source} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '6px 8px', background: i === 0 ? '#f0fdf4' : '#f8fafc', borderRadius: 8 }}>
-                  <span style={{ fontSize: 12, color: '#0f172a', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{s.label}</span>
-                  <span style={{ position: 'relative', width: 90, height: 6, background: '#e2e8f0', borderRadius: 3, flexShrink: 0 }}>
-                    <span style={{ position: 'absolute', inset: 0, width: `${Math.round((s.count / total) * 100)}%`, background: '#16a34a', borderRadius: 3 }} />
-                  </span>
-                  <span style={{ fontSize: 12, fontWeight: 700, color: '#16a34a', flexShrink: 0, minWidth: 62, textAlign: 'right' }}>
-                    {s.count}명 · {Math.round((s.count / total) * 100)}%
-                  </span>
-                </div>
-              ))
-            })()}
-          </div>
-        </div>
-      )}
+      <MetricBlock title="유입 경로" rowsA={rowsA.sources} rowsB={rowsB?.sources ?? null} unit="명" color="#16a34a" />
 
       {/* 검색창에 실제로 뭘 치는지 — 2026-09-04부터 기록 시작. 그 전 데이터는 없다
           (검색창이 그동안 클라이언트에서만 필터링해서 서버로 아무것도 안 보냈다). */}
-      {topSearchQueries.length > 0 && (
-        <div style={{ marginTop: 20, paddingTop: 16, borderTop: '1px solid #f1f5f9' }}>
-          <h4 style={{ margin: '0 0 10px', fontSize: 13, fontWeight: 700, color: '#1e293b' }}>인기 검색어 (최근 {period}일)</h4>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-            {(() => {
-              const total = topSearchQueries.reduce((sum, s) => sum + s.count, 0) || 1
-              return topSearchQueries.map((s, i) => (
-                <div key={s.query} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '6px 8px', background: i === 0 ? '#fdf4ff' : '#f8fafc', borderRadius: 8 }}>
-                  <span style={{ fontSize: 12, color: '#0f172a', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{s.query}</span>
-                  <span style={{ position: 'relative', width: 90, height: 6, background: '#e2e8f0', borderRadius: 3, flexShrink: 0 }}>
-                    <span style={{ position: 'absolute', inset: 0, width: `${Math.round((s.count / total) * 100)}%`, background: '#a855f7', borderRadius: 3 }} />
-                  </span>
-                  <span style={{ fontSize: 12, fontWeight: 700, color: '#a855f7', flexShrink: 0, minWidth: 40, textAlign: 'right' }}>
-                    {s.count}회
-                  </span>
-                </div>
-              ))
-            })()}
-          </div>
-        </div>
-      )}
+      <MetricBlock title="인기 검색어" rowsA={rowsA.search} rowsB={rowsB?.search ?? null} unit="회" color="#a855f7" />
 
       {/* 헤더 ⚙️ 메뉴 클릭 — 2026-09-04부터 기록 시작. 그 전엔 하나도 안 잡혔다. */}
-      {topMenuClicks.length > 0 && (
-        <div style={{ marginTop: 20, paddingTop: 16, borderTop: '1px solid #f1f5f9' }}>
-          <h4 style={{ margin: '0 0 10px', fontSize: 13, fontWeight: 700, color: '#1e293b' }}>메뉴 클릭 (최근 {period}일)</h4>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-            {(() => {
-              const total = topMenuClicks.reduce((sum, s) => sum + s.count, 0) || 1
-              return topMenuClicks.map((s, i) => (
-                <div key={s.label} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '6px 8px', background: i === 0 ? '#eff6ff' : '#f8fafc', borderRadius: 8 }}>
-                  <span style={{ fontSize: 12, color: '#0f172a', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{s.label}</span>
-                  <span style={{ position: 'relative', width: 90, height: 6, background: '#e2e8f0', borderRadius: 3, flexShrink: 0 }}>
-                    <span style={{ position: 'absolute', inset: 0, width: `${Math.round((s.count / total) * 100)}%`, background: '#3b82f6', borderRadius: 3 }} />
-                  </span>
-                  <span style={{ fontSize: 12, fontWeight: 700, color: '#3b82f6', flexShrink: 0, minWidth: 40, textAlign: 'right' }}>
-                    {s.count}회
-                  </span>
-                </div>
-              ))
-            })()}
-          </div>
-        </div>
-      )}
+      <MetricBlock title="메뉴 클릭" rowsA={rowsA.menu} rowsB={rowsB?.menu ?? null} unit="회" color="#3b82f6" />
 
       {/* 홈 피드 스크롤 깊이 — 25/50/75/100% 지점까지 내린 세션 수. 100까지 온 사람이
           적으면 그 위쪽 섹션(예: 카테고리별 공구)이 거의 안 보인다는 뜻이다. */}
-      {scrollDepth.some(d => d.count > 0) && (
-        <div style={{ marginTop: 20, paddingTop: 16, borderTop: '1px solid #f1f5f9' }}>
-          <h4 style={{ margin: '0 0 10px', fontSize: 13, fontWeight: 700, color: '#1e293b' }}>홈 피드 스크롤 깊이 (최근 {period}일)</h4>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-            {(() => {
-              const max = Math.max(...scrollDepth.map(d => d.count), 1)
-              return scrollDepth.map(d => (
-                <div key={d.depth} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '6px 8px', background: '#f8fafc', borderRadius: 8 }}>
-                  <span style={{ fontSize: 12, color: '#0f172a', width: 40, flexShrink: 0 }}>{d.depth}%</span>
-                  <span style={{ position: 'relative', width: 140, height: 6, background: '#e2e8f0', borderRadius: 3, flexShrink: 0 }}>
-                    <span style={{ position: 'absolute', inset: 0, width: `${Math.round((d.count / max) * 100)}%`, background: '#f59e0b', borderRadius: 3 }} />
-                  </span>
-                  <span style={{ fontSize: 12, fontWeight: 700, color: '#f59e0b', flexShrink: 0, minWidth: 50, textAlign: 'right' }}>
-                    {d.count}명
-                  </span>
-                </div>
-              ))
-            })()}
-          </div>
-        </div>
-      )}
+      <MetricBlock title="홈 피드 스크롤 깊이" rowsA={rowsA.scroll} rowsB={rowsB?.scroll ?? null} unit="명" color="#f59e0b" />
 
       {/* 어제 vs 오늘 네이버 유입 상위 상품 — 전체 네이버 유입이 갑자기 줄었을 때
           "어느 상품 페이지에서 줄었는지" 바로 찾기 위한 표(사장님 요청). 기간 선택과 무관. */}

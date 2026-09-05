@@ -174,13 +174,27 @@ export function classifySource(opts: {
   return { source: 'direct', detail: null }
 }
 
-/** 최근 N일 유입 경로 집계 — 많은 순으로 */
-export function getSourceCounts(days = 14): { source: string; label: string; count: number }[] {
+// 날짜별 { 키: 횟수 } 기록(searchQueries/menuClicks/scrollDepth 전부 이 모양)을
+// [from, to] 구간(둘 다 포함, YYYY-MM-DD 문자열 비교)으로 합산한다. 관리자 「데이터」
+// 탭이 달력으로 임의 기간을 고를 수 있어야 해서, "최근 N일"(오늘 기준 고정) 대신
+// 구간 자체를 받는다 — 지난달 임의의 며칠처럼 오늘과 안 이어진 기간도 조회할 수 있다.
+function sumInRange(record: Record<string, Record<string, number>> | undefined, from: string, to: string): Record<string, number> {
+  const total: Record<string, number> = {}
+  for (const [date, entries] of Object.entries(record || {})) {
+    if (date < from || date > to) continue
+    for (const [key, n] of Object.entries(entries)) {
+      total[key] = (total[key] || 0) + n
+    }
+  }
+  return total
+}
+
+/** [from, to] 구간 유입 경로 집계 — 많은 순으로 */
+export function getSourceCounts(from: string, to: string): { source: string; label: string; count: number }[] {
   const data = load()
-  const cutoff = kstDateOffset(days)
   const total: Record<string, number> = {}
   for (const [date, day] of Object.entries(data.daily)) {
-    if (date < cutoff) continue
+    if (date < from || date > to) continue
     for (const [src, n] of Object.entries(day.sources || {})) {
       total[src] = (total[src] || 0) + n
     }
@@ -190,50 +204,26 @@ export function getSourceCounts(days = 14): { source: string; label: string; cou
     .sort((a, b) => b.count - a.count)
 }
 
-/** 최근 N일 사이트 안 검색창 입력어 — 많은 순으로 */
-export function getTopSearchQueries(days = 14, limit = 15): { query: string; count: number }[] {
-  const data = load()
-  const cutoff = kstDateOffset(days)
-  const total: Record<string, number> = {}
-  for (const [date, queries] of Object.entries(data.searchQueries || {})) {
-    if (date < cutoff) continue
-    for (const [q, n] of Object.entries(queries)) {
-      total[q] = (total[q] || 0) + n
-    }
-  }
+/** [from, to] 구간 사이트 안 검색창 입력어 — 많은 순으로 */
+export function getTopSearchQueries(from: string, to: string, limit = 15): { query: string; count: number }[] {
+  const total = sumInRange(load().searchQueries, from, to)
   return Object.entries(total)
     .map(([query, count]) => ({ query, count }))
     .sort((a, b) => b.count - a.count)
     .slice(0, limit)
 }
 
-/** 최근 N일 헤더 메뉴 클릭 — 많은 순으로 */
-export function getTopMenuClicks(days = 14): { label: string; count: number }[] {
-  const data = load()
-  const cutoff = kstDateOffset(days)
-  const total: Record<string, number> = {}
-  for (const [date, clicks] of Object.entries(data.menuClicks || {})) {
-    if (date < cutoff) continue
-    for (const [label, n] of Object.entries(clicks)) {
-      total[label] = (total[label] || 0) + n
-    }
-  }
+/** [from, to] 구간 헤더 메뉴 클릭 — 많은 순으로 */
+export function getTopMenuClicks(from: string, to: string): { label: string; count: number }[] {
+  const total = sumInRange(load().menuClicks, from, to)
   return Object.entries(total)
     .map(([label, count]) => ({ label, count }))
     .sort((a, b) => b.count - a.count)
 }
 
-/** 최근 N일 홈 피드 스크롤 깊이 — 마일스톤별 도달 세션 수 */
-export function getScrollDepthSummary(days = 14): { depth: string; count: number }[] {
-  const data = load()
-  const cutoff = kstDateOffset(days)
-  const total: Record<string, number> = { '25': 0, '50': 0, '75': 0, '100': 0 }
-  for (const [date, depths] of Object.entries(data.scrollDepth || {})) {
-    if (date < cutoff) continue
-    for (const [depth, n] of Object.entries(depths)) {
-      total[depth] = (total[depth] || 0) + n
-    }
-  }
+/** [from, to] 구간 홈 피드 스크롤 깊이 — 마일스톤별 도달 세션 수 */
+export function getScrollDepthSummary(from: string, to: string): { depth: string; count: number }[] {
+  const total = sumInRange(load().scrollDepth, from, to)
   return ['25', '50', '75', '100'].map(depth => ({ depth, count: total[depth] || 0 }))
 }
 
