@@ -6,7 +6,7 @@ import { CATEGORY_LABEL, categoryIcon } from '@/lib/categoryIcons'
 import Toast from '@/components/Toast'
 import DealStrip, { InfluencerStrip } from '@/components/DealStrip'
 import { track } from '@/lib/track'
-import { Flame, Award, CalendarDays, AlarmClock, CalendarRange, ShoppingBag, CalendarClock, TrendingUp } from 'lucide-react'
+import { Flame, Award, CalendarDays, AlarmClock, CalendarRange, ShoppingBag, CalendarClock, TrendingUp, ChevronRight, Megaphone } from 'lucide-react'
 
 // 홈 큐레이션. 두 종류의 영역이 있다.
 //
@@ -124,6 +124,25 @@ export default function HomeSections({
         title="공구는 끝났지만 지금 살 수 있어요"
         posts={endedButBuyable}
       />
+
+      {/* 제휴 문의 배너 — 브랜드·셀러가 직접 공구를 제안하는 창구(/propose, D-033/D-067).
+          단색 배경 대신 브랜드 오렌지 톤을 겹친 비정형 도형으로 꾸몄다(사장님 요청,
+          "그냥 색만 깔지 말고"). 얇게 — 목록 사이 배너가 카드보다 커지면 안 된다. */}
+      <div className="strip">
+        <Link href="/propose" className="propose-banner" onClick={() => track('click', { clickType: 'other' })}>
+          <div className="propose-banner-shapes" aria-hidden="true">
+            <span className="propose-shape propose-shape-1" />
+            <span className="propose-shape propose-shape-2" />
+            <span className="propose-shape propose-shape-3" />
+          </div>
+          <Megaphone size={22} strokeWidth={2} className="propose-banner-icon" />
+          <div className="propose-banner-text">
+            <strong>공구 입점 문의하기</strong>
+            <span>브랜드·셀러라면 여기서 제안해보세요</span>
+          </div>
+          <ChevronRight size={20} className="propose-banner-arrow" />
+        </Link>
+      </div>
 
       <Toast
         message={toast.message}
