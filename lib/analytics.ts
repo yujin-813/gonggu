@@ -213,6 +213,27 @@ export function getTopSearchQueries(from: string, to: string, limit = 15): { que
     .slice(0, limit)
 }
 
+/** 홈 화면 "인기 검색어" TOP N — 최근 days일과 그 직전 같은 길이 기간을 비교해
+ * NEW(직전 기간엔 없던 검색어)·순위 상승/하락/유지를 함께 매긴다. 순위 비교는
+ * 직전 기간 전체 순위(제한 없음)를 봐야 "11위였다가 9위로 올라옴"까지 알 수 있다 —
+ * 직전 기간도 top N만 보면 11위 밖은 전부 "NEW"로 잘못 잡힌다. */
+export function getTopSearchQueriesWithTrend(days = 7, limit = 10): { rank: number; query: string; trend: 'new' | 'up' | 'down' | 'same' }[] {
+  const to = kstToday()
+  const from = kstDateOffset(days - 1)
+  const prevTo = kstDateOffset(days)
+  const prevFrom = kstDateOffset(days * 2 - 1)
+  const current = getTopSearchQueries(from, to, limit)
+  const previous = getTopSearchQueries(prevFrom, prevTo, 9999)
+  const prevRank = new Map(previous.map((q, i) => [q.query, i + 1]))
+  return current.map((c, i) => {
+    const rank = i + 1
+    const prevR = prevRank.get(c.query)
+    const trend: 'new' | 'up' | 'down' | 'same' =
+      prevR === undefined ? 'new' : prevR > rank ? 'up' : prevR < rank ? 'down' : 'same'
+    return { rank, query: c.query, trend }
+  })
+}
+
 /** [from, to] 구간 헤더 메뉴 클릭 — 많은 순으로 */
 export function getTopMenuClicks(from: string, to: string): { label: string; count: number }[] {
   const total = sumInRange(load().menuClicks, from, to)

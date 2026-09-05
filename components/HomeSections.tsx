@@ -1,11 +1,12 @@
 'use client'
 import { useState, useEffect } from 'react'
+import Link from 'next/link'
 import type { Post, Category } from '@/lib/types'
 import { CATEGORY_LABEL, categoryIcon } from '@/lib/categoryIcons'
 import Toast from '@/components/Toast'
 import DealStrip, { InfluencerStrip } from '@/components/DealStrip'
 import { track } from '@/lib/track'
-import { Flame, Award, CalendarDays, AlarmClock, CalendarRange, ShoppingBag, CalendarClock } from 'lucide-react'
+import { Flame, Award, CalendarDays, AlarmClock, CalendarRange, ShoppingBag, CalendarClock, TrendingUp } from 'lucide-react'
 
 // 홈 큐레이션. 두 종류의 영역이 있다.
 //
@@ -42,9 +43,11 @@ export default function HomeSections({
 }: Props) {
   const [bookmarks, setBookmarks] = useState<Set<number>>(new Set())
   const [toast, setToast] = useState({ message: '', visible: false })
+  const [popularSearches, setPopularSearches] = useState<{ rank: number; query: string; trend: 'new' | 'up' | 'down' | 'same' }[]>([])
 
   useEffect(() => {
     setBookmarks(new Set(JSON.parse(localStorage.getItem('gonggu_bookmarks') || '[]')))
+    fetch('/api/popular-searches').then(r => r.json()).then(d => setPopularSearches(d.items || [])).catch(() => {})
   }, [])
 
   function toggleBookmark(id: number) {
@@ -84,6 +87,39 @@ export default function HomeSections({
       ))}
 
       <InfluencerStrip influencers={influencers} />
+
+      {/* 인기 검색어 TOP 10 — 사장님이 참고 화면으로 준 캡처(쇼핑몰 흔한 순위 위젯)와
+          같은 2열 번호 목록. 클릭하면 /?q=검색어로 이동하고, 홈이 그 쿼리를 읽어
+          검색창에 채우고 바로 필터링한다(HomeClient.tsx의 useSearchParams 효과). */}
+      {popularSearches.length > 0 && (
+        <section className="strip popular-search-strip">
+          <div className="strip-head">
+            <h2 className="strip-title"><TrendingUp size={17} strokeWidth={2.5} />인기 검색어</h2>
+          </div>
+          <div className="popular-search-grid">
+            {popularSearches.map(item => (
+              <Link
+                key={item.query}
+                href={`/?q=${encodeURIComponent(item.query)}`}
+                className="popular-search-item"
+                onClick={() => track('click', { clickType: 'other' })}
+              >
+                <span className="popular-search-rank">{item.rank}</span>
+                {item.trend === 'new' ? (
+                  <span className="popular-search-badge popular-search-new">NEW</span>
+                ) : item.trend === 'up' ? (
+                  <span className="popular-search-badge popular-search-up">▲</span>
+                ) : item.trend === 'down' ? (
+                  <span className="popular-search-badge popular-search-down">▼</span>
+                ) : (
+                  <span className="popular-search-badge popular-search-same">-</span>
+                )}
+                <span className="popular-search-text">{item.query}</span>
+              </Link>
+            ))}
+          </div>
+        </section>
+      )}
 
       {/* 마감 공구는 목록에서 사라지지만, 대체 구매처를 확인해 둔 것은 여기서 다시 만난다.
           마감된 공구가 진행 중보다 많고 검색 유입도 그쪽이 크므로, 사이트 안에서도

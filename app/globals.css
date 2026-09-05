@@ -217,11 +217,19 @@ header {
   color: var(--gray-3);
   font-weight: 600;
 }
-/* 검색창 끝 검색 버튼 — 글자가 있을 때만 뜬다(엔터 없이도 확정할 수 있는 손잡이) */
+/* 검색창 끝 검색 버튼 — 항상 오른쪽 하나만 (왼쪽 장식 아이콘 없앰, 엔터 없이도
+   확정할 수 있는 손잡이) */
 .hero-search-btn {
   display: flex; align-items: center; justify-content: center;
   flex-shrink: 0; width: 28px; height: 28px; border-radius: 8px;
   border: none; background: var(--brand); color: #fff; cursor: pointer;
+}
+
+/* 검색창 바깥을 누르면 추천 목록을 닫는다 — 카테고리 드롭다운(.category-dropdown-overlay)과
+   같은 패턴이지만, 자동완성은 화면을 어둡게 가릴 만큼 무거운 UI가 아니라서 투명하게 둔다. */
+.search-suggestions-overlay {
+  position: fixed; inset: 0;
+  z-index: 55;
 }
 
 /* 검색창 자동완성 — 인기 검색어. 검색창 바로 아래 딱 붙는다(.hero-search-wrap이
@@ -1542,6 +1550,40 @@ header {
 }
 .strip-avatar img { width: 100%; height: 100%; object-fit: cover; }
 .strip-card-influencer .strip-name { -webkit-line-clamp: 1; }
+
+/* 인기 검색어 TOP 10 — 쇼핑몰 흔한 2열 순위 위젯(사장님이 참고 캡처로 준 형태) */
+.popular-search-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  column-gap: 20px;
+  row-gap: 4px;
+  padding: 4px 20px 8px;
+}
+.popular-search-item {
+  display: flex; align-items: center; gap: 8px;
+  padding: 10px 4px;
+  text-decoration: none;
+  border-bottom: 1px solid var(--gray-1);
+  min-width: 0;
+}
+.popular-search-rank {
+  font-size: 15px; font-weight: 800; color: var(--text);
+  width: 16px; flex-shrink: 0;
+}
+.popular-search-badge {
+  font-size: 10px; font-weight: 800; flex-shrink: 0;
+  display: inline-flex; align-items: center; justify-content: center;
+}
+.popular-search-new {
+  background: #DC2626; color: #fff; border-radius: 4px; padding: 2px 4px;
+}
+.popular-search-up   { color: #DC2626; }
+.popular-search-down { color: #2563EB; }
+.popular-search-same { color: var(--gray-3); }
+.popular-search-text {
+  font-size: 14px; font-weight: 600; color: var(--text);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
 
 /* ── 꿀공구 판정 ────────────────────────────────────────────────────────── */
 /* "이 공구 진짜 싼가"에 답하는 블록. 숫자를 먼저 보여주고 판정을 뒤에 두는데,

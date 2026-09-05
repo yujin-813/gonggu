@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react'
 import Link from 'next/link'
+import { useSearchParams } from 'next/navigation'
 import Header from '@/components/Header'
 import CategoryFilter from '@/components/CategoryFilter'
 import CollectionBannerCarousel from '@/components/CollectionBannerCarousel'
@@ -44,6 +45,7 @@ const KAKAO_CHANNEL_URL = 'http://pf.kakao.com/_WVxgfX/friend'
 interface CollectionBanner { id: string; title: string; description: string; emoji: string; color: string }
 
 export default function HomeClient({ sections, collectionBanners }: { sections?: React.ReactNode; collectionBanners: CollectionBanner[] }) {
+  const searchParams = useSearchParams()
   const [posts, setPosts] = useState<Post[]>([])
   const [bookmarks, setBookmarks] = useState<Set<number>>(new Set())
   const [currentCat, setCurrentCat] = useState<Category | 'all' | 'evergreen' | 'upcoming'>('all')
@@ -221,6 +223,16 @@ export default function HomeClient({ sections, collectionBanners }: { sections?:
     trackSearchNow(q.trim())
   }
 
+  // 인기 검색어 위젯(HomeSections)에서 검색어를 누르면 /?q=검색어로 온다 — 그 값을
+  // 검색창에 채우고 바로 확정한다. HomeSections는 이 페이지의 searchQuery 상태를
+  // 직접 못 건드리는 자리(server component인 app/page.tsx를 거쳐 내려오는 자식)라
+  // URL을 통해 전달한다.
+  useEffect(() => {
+    const q = searchParams.get('q')
+    if (q) { setSearchQuery(q); submitSearch(q) }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams])
+
   // 홈 피드를 얼마나 내려서 보는지 — 25/50/75/100% 지점을 지날 때만 기록한다(스크롤
   // 이벤트마다 보내면 초당 수십 번씩 쏟아진다). 세션당 마일스톤 하나는 한 번만
   // 보내지는 건 trackScrollDepth 안에서 sessionStorage로 막는다.
@@ -397,45 +409,47 @@ export default function HomeClient({ sections, collectionBanners }: { sections?:
 
         <div className="hero-search-wrap" style={{ position: 'relative' }}>
           <div className="hero-search">
-            <Search size={18} />
             <input
               type="search"
               placeholder="찾고 싶은 상품을 검색해보세요"
               value={searchQuery}
               onChange={e => setSearchQuery(e.target.value)}
               onFocus={() => setShowSuggestions(true)}
-              // 추천어를 누르는 클릭이 blur보다 먼저 끝나야 목록이 안 사라지고 선택된다 —
-              // 그래서 살짝 늦춰서 닫는다(추천 버튼 쪽 onMouseDown이 그 사이에 처리됨)
-              onBlur={() => setTimeout(() => setShowSuggestions(false), 150)}
               onKeyDown={e => { if (e.key === 'Enter') submitSearch(searchQuery) }}
             />
-            {searchQuery && (
-              <button
-                type="button"
-                className="hero-search-btn"
-                aria-label="검색"
-                onClick={() => submitSearch(searchQuery)}
-              >
-                <Search size={16} />
-              </button>
-            )}
+            {/* 검색 아이콘은 오른쪽 끝 하나만 — 왼쪽 장식용 아이콘과 두 개 떠 있던 걸 정리 */}
+            <button
+              type="button"
+              className="hero-search-btn"
+              aria-label="검색"
+              onClick={() => submitSearch(searchQuery)}
+            >
+              <Search size={16} />
+            </button>
           </div>
 
+          {/* 검색창 바깥을 누르면 "검색창을 그만 쓰겠다"는 뜻으로 보고 추천 목록을 닫는다.
+              input의 onBlur만으로는 모바일 터치·다른 요소 클릭 순서에 따라 안 닫히는
+              경우가 있어서(사장님 지적), 카테고리 드롭다운(.category-dropdown-overlay)과
+              같은 패턴으로 화면 전체를 덮는 투명 오버레이를 깔고 그걸 눌러야 닫히게 한다. */}
           {showSuggestions && searchSuggestions.length > 0 && (
-            <div className="search-suggestions">
-              {!searchQuery.trim() && <div className="search-suggestions-label">자주 찾는 검색어</div>}
-              {searchSuggestions.map(q => (
-                <button
-                  key={q}
-                  type="button"
-                  className="search-suggestion-item"
-                  onMouseDown={e => { e.preventDefault(); setSearchQuery(q); submitSearch(q) }}
-                >
-                  <Search size={13} />
-                  {q}
-                </button>
-              ))}
-            </div>
+            <>
+              <div className="search-suggestions-overlay" onClick={() => setShowSuggestions(false)} />
+              <div className="search-suggestions">
+                {!searchQuery.trim() && <div className="search-suggestions-label">자주 찾는 검색어</div>}
+                {searchSuggestions.map(q => (
+                  <button
+                    key={q}
+                    type="button"
+                    className="search-suggestion-item"
+                    onMouseDown={e => { e.preventDefault(); setSearchQuery(q); submitSearch(q) }}
+                  >
+                    <Search size={13} />
+                    {q}
+                  </button>
+                ))}
+              </div>
+            </>
           )}
         </div>
 
