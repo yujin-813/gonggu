@@ -8,6 +8,22 @@ server {
 
     client_max_body_size 20m;
 
+    # 업로드·수집 이미지는 Nginx가 직접 서빙(Next.js 우회) — Next.js는 production
+    # 모드에서 public/ 파일 목록을 서버 시작 시점에 한 번만 스캔한다. 수집기(cron)가
+    # 배포 사이에 새로 내려받은 이미지는 다음 배포 전까지 Next.js가 못 찾아 404가
+    # 난다(실측 확인, 2026-09-05). Nginx alias는 요청마다 디스크를 직접 읽어 이 문제가
+    # 없다.
+    location /uploads/ {
+        alias /home/ubuntu/gonggu/public/uploads/;
+        expires 30d;
+        add_header Cache-Control "public, immutable";
+    }
+    location /scraped/ {
+        alias /home/ubuntu/gonggu/public/scraped/;
+        expires 30d;
+        add_header Cache-Control "public, immutable";
+    }
+
     location / {
         proxy_pass         http://localhost:3002;
         proxy_http_version 1.1;

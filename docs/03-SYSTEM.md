@@ -279,6 +279,7 @@ public/scraped/   수집 이미지 431MB
 | `lib/publicPost.ts`의 필드 denylist | 위와 반대 방향 — Post에 관리자 전용 필드를 새로 추가하면 여기 목록에도 넣을 것. 안 넣으면 고객 화면 페이지 소스(뷰소스/RSC payload)에 그대로 샌다 (`D-044`) |
 | `middleware.ts`의 `config.matcher` | 새 관리자 API를 만들면 `isProtected()`와 `matcher` **양쪽**에 등록해야 한다. 한쪽만 하면 무방비 |
 | `data/posts.json` 직접 편집 | 서버에서 스크립트로 고칠 때는 반드시 백업부터. 저장은 스크립트 끝에서 한 번만 일어난다 |
+| `public/uploads/`·`public/scraped/` | **nginx가 직접 서빙한다(`/uploads/`·`/scraped/` alias, `D-081`).** Next.js(production)는 이 디렉터리의 파일 목록을 서버 시작 시점에 한 번만 스캔해서, 배포 사이에 수집기가 새로 내려받은 이미지는 다음 배포 전까지 404가 난다 — nginx alias가 없으면 재현된다 |
 | 마감일 형식 | `YYYY-MM-DD` 문자열 비교로 판단한다. 시각이 섞이면 표시와 비교가 동시에 깨진다. `lib/period.ts`의 `dateOnly()`, `inpock.py`의 `_date_only()`가 방어한다 |
 
 ---
