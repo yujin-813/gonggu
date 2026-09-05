@@ -1060,8 +1060,16 @@ def resolve_img(img, shortcode):
     src = img if img.startswith("http") else IMG_CDN + re.sub(r"^images/", "", img)
     ext = re.search(r"\.(jpg|jpeg|png|webp|gif|avif)", src, re.I)
     ext = ext.group(1).lower() if ext else "jpg"
+    headers = {"User-Agent": UA, "Referer": INPOCK + "/"}
     try:
-        r = requests.get(src, headers={"User-Agent": UA, "Referer": INPOCK + "/"}, timeout=15)
+        try:
+            r = requests.get(src, headers=headers, timeout=15)
+        except requests.exceptions.SSLError:
+            # 위즈 계열 자사몰의 이미지 CDN(bizpon.biz)도 중간 인증서를 빼먹는다 —
+            # _get_with_cert_fallback와 같은 이유로 검증 실패일 때만 검증을 끄고 재시도한다
+            import urllib3
+            urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+            r = requests.get(src, headers=headers, timeout=15, verify=False)
         if r.status_code == 200 and r.content:
             dest = IMG_DIR / f"{shortcode}.{ext}"
             dest.write_bytes(r.content)
