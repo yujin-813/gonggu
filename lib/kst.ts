@@ -24,3 +24,9 @@ export function kstToday(): string {
 export function kstDateOffset(daysAgo: number): string {
   return new Date(kstNow().getTime() - daysAgo * 86400000).toISOString().slice(0, 10)
 }
+
+/** 지금 KST 시각(0~23) — "시간대별 방문" 집계용. UTC 시각에 9시간을 더한 kstNow()
+ * 기준이라 날짜 경계와 같은 이유로 여기 둔다. */
+export function kstHour(): number {
+  return kstNow().getUTCHours()
+}

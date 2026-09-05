@@ -170,6 +170,7 @@ export default function AdminPage() {
   const [naverPageComparison, setNaverPageComparison] = useState<{ id: number; title: string; yesterday: number; today: number }[]>([])
   const [topMenuClicks, setTopMenuClicks] = useState<{ label: string; count: number }[]>([])
   const [scrollDepth, setScrollDepth] = useState<{ depth: string; count: number }[]>([])
+  const [hourlyVisits, setHourlyVisits] = useState<{ hour: number; count: number }[]>([])
   // 「데이터」 탭의 기간 선택(달력) — 유입 경로·검색어·메뉴 클릭·스크롤 깊이가 이 구간을
   // 따른다. 기본값은 예전과 같은 최근 14일.
   const [rangeA, setRangeA] = useState({ from: kstDateOffset(13), to: kstToday() })
@@ -181,6 +182,7 @@ export default function AdminPage() {
     topSearchQueries: { query: string; count: number }[]
     topMenuClicks: { label: string; count: number }[]
     scrollDepth: { depth: string; count: number }[]
+    hourlyVisits: { hour: number; count: number }[]
   } | null>(null)
   // 상품별 상세 조회수(최근 14일) — 채우기 목록을 실제 유입 순으로 세우는 데 쓴다
   const [detailViews, setDetailViews] = useState<Record<string, number>>({})
@@ -249,6 +251,7 @@ export default function AdminPage() {
       setNaverPageComparison(d.naverPageComparison || [])
       setTopMenuClicks(d.topMenuClicks || [])
       setScrollDepth(d.scrollDepth || [])
+      setHourlyVisits(d.hourlyVisits || [])
       setDetailViews(d.detailViews || {})
       setClickBreakdown(d.clickBreakdown || {})
       setPostSources(d.postSources || {})
@@ -271,6 +274,7 @@ export default function AdminPage() {
         topSearchQueries: d.topSearchQueries || [],
         topMenuClicks: d.topMenuClicks || [],
         scrollDepth: d.scrollDepth || [],
+        hourlyVisits: d.hourlyVisits || [],
       })
     }
   }, [])
@@ -870,7 +874,7 @@ export default function AdminPage() {
               onGoRevenue={() => { setAdminTab('revenue'); document.getElementById('admin-tabs')?.scrollIntoView({ behavior: 'smooth', block: 'start' }) }} />
             <DataAnalyticsBoard
               sources={sources} topSearchQueries={topSearchQueries} topMenuClicks={topMenuClicks}
-              scrollDepth={scrollDepth} naverPageComparison={naverPageComparison}
+              scrollDepth={scrollDepth} hourlyVisits={hourlyVisits} naverPageComparison={naverPageComparison}
               rangeA={rangeA}
               onRangeAChange={r => { setRangeA(r); fetchAnalytics(r.from, r.to) }}
               compareEnabled={compareEnabled}
@@ -2263,13 +2267,14 @@ function MetricBlock({ title, rowsA, rowsB, unit, color }: {
 // 기간 선택·비교는 유입 경로·검색어·메뉴 클릭·스크롤 깊이에만 적용한다 — 어제 vs 오늘
 // 네이버 비교는 개념 자체가 "어제/오늘"이라 그대로 둔다.
 function DataAnalyticsBoard({
-  sources, topSearchQueries, topMenuClicks, scrollDepth, naverPageComparison,
+  sources, topSearchQueries, topMenuClicks, scrollDepth, hourlyVisits, naverPageComparison,
   rangeA, onRangeAChange, compareEnabled, onCompareToggle, rangeB, onRangeBChange, compareData,
 }: {
   sources: { source: string; label: string; count: number }[]
   topSearchQueries: { query: string; count: number }[]
   topMenuClicks: { label: string; count: number }[]
   scrollDepth: { depth: string; count: number }[]
+  hourlyVisits: { hour: number; count: number }[]
   naverPageComparison: { id: number; title: string; yesterday: number; today: number }[]
   rangeA: DateRange
   onRangeAChange: (r: DateRange) => void
@@ -2282,6 +2287,7 @@ function DataAnalyticsBoard({
     topSearchQueries: { query: string; count: number }[]
     topMenuClicks: { label: string; count: number }[]
     scrollDepth: { depth: string; count: number }[]
+    hourlyVisits: { hour: number; count: number }[]
   } | null
 }) {
   const rowsA = {
@@ -2337,6 +2343,47 @@ function DataAnalyticsBoard({
       {/* 홈 피드 스크롤 깊이 — 25/50/75/100% 지점까지 내린 세션 수. 100까지 온 사람이
           적으면 그 위쪽 섹션(예: 카테고리별 공구)이 거의 안 보인다는 뜻이다. */}
       <MetricBlock title="홈 피드 스크롤 깊이" rowsA={rowsA.scroll} rowsB={rowsB?.scroll ?? null} unit="명" color="#f59e0b" />
+
+      {/* 시간대별 방문 — 몇 시에 사람이 몰리는지(사장님 요청). 0~23시 순서를 그대로
+          보여줘야 하는 시계열이라, 인기순으로 다시 정렬하는 MetricBlock 대신 따로 그린다. */}
+      {hourlyVisits.some(h => h.count > 0) && (
+        <div style={{ marginTop: 20, paddingTop: 16, borderTop: '1px solid #f1f5f9' }}>
+          <h4 style={{ margin: '0 0 10px', fontSize: 13, fontWeight: 700, color: '#1e293b' }}>
+            시간대별 방문{compareData ? ' — A vs B' : ''}
+          </h4>
+          <div style={{ display: 'flex', alignItems: 'flex-end', gap: 3, height: 90 }}>
+            {(() => {
+              const compareHourly = compareData?.hourlyVisits
+              const max = Math.max(...hourlyVisits.map(h => h.count), ...(compareHourly?.map(h => h.count) ?? []), 1)
+              return hourlyVisits.map(h => {
+                const bCount = compareHourly?.find(x => x.hour === h.hour)?.count ?? 0
+                return (
+                  <div key={h.hour} title={`${h.hour}시 · A ${h.count}명${compareData ? ` · B ${bCount}명` : ''}`}
+                    style={{ flex: 1, display: 'flex', alignItems: 'flex-end', justifyContent: 'center', gap: 1, height: '100%' }}>
+                    <div style={{ flex: 1, height: `${Math.max((h.count / max) * 100, h.count > 0 ? 4 : 0)}%`, background: '#6366f1', borderRadius: '3px 3px 0 0', minHeight: h.count > 0 ? 2 : 0 }} />
+                    {compareData && (
+                      <div style={{ flex: 1, height: `${Math.max((bCount / max) * 100, bCount > 0 ? 4 : 0)}%`, background: '#16a34a', borderRadius: '3px 3px 0 0', minHeight: bCount > 0 ? 2 : 0 }} />
+                    )}
+                  </div>
+                )
+              })
+            })()}
+          </div>
+          <div style={{ display: 'flex', gap: 3, marginTop: 4 }}>
+            {hourlyVisits.map(h => (
+              <div key={h.hour} style={{ flex: 1, textAlign: 'center', fontSize: 9, color: '#94a3b8' }}>
+                {h.hour % 3 === 0 ? h.hour : ''}
+              </div>
+            ))}
+          </div>
+          {compareData && (
+            <div style={{ display: 'flex', gap: 12, marginTop: 6, fontSize: 11, color: '#64748b' }}>
+              <span><span style={{ display: 'inline-block', width: 8, height: 8, background: '#6366f1', borderRadius: 2, marginRight: 4 }} />A기간</span>
+              <span><span style={{ display: 'inline-block', width: 8, height: 8, background: '#16a34a', borderRadius: 2, marginRight: 4 }} />B기간</span>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* 어제 vs 오늘 네이버 유입 상위 상품 — 전체 네이버 유입이 갑자기 줄었을 때
           "어느 상품 페이지에서 줄었는지" 바로 찾기 위한 표(사장님 요청). 기간 선택과 무관. */}

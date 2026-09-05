@@ -1,6 +1,6 @@
 import fs from 'fs'
 import path from 'path'
-import { kstToday, kstDateOffset } from './kst'
+import { kstToday, kstDateOffset, kstHour } from './kst'
 
 const DATA_DIR = path.join(process.cwd(), 'data')
 const FILE = path.join(DATA_DIR, 'analytics.json')
@@ -67,6 +67,10 @@ interface AnalyticsData {
   // 세션 수. 세션당 마일스톤 하나는 한 번만 센다(track.ts가 sessionStorage로 막는다) —
   // 안 그러면 스크롤할 때마다 이벤트가 쏟아진다.
   scrollDepth?: Record<string, Record<string, number>>
+  // 시간대별 방문 — hourly[YYYY-MM-DD][시(0~23)] = 그 시간대에 방문한 세션 수.
+  // "몇 시에 사람이 몰리나"를 보려고(사장님 요청) — day.sources와 같은 자리(방문 1건당
+  // 한 번)에서 같이 센다.
+  hourly?: Record<string, Record<string, number>>
 }
 
 export interface RecentEvent {
@@ -248,6 +252,13 @@ export function getScrollDepthSummary(from: string, to: string): { depth: string
   return ['25', '50', '75', '100'].map(depth => ({ depth, count: total[depth] || 0 }))
 }
 
+/** [from, to] 구간 시간대별 방문 — 0~23시 24칸, 항상 전부 채워서 반환한다(빈 시간대도
+ * 0으로 보여야 "이 시간대는 정말 안 온다"를 알 수 있다). */
+export function getHourlyVisits(from: string, to: string): { hour: number; count: number }[] {
+  const total = sumInRange(load().hourly, from, to)
+  return Array.from({ length: 24 }, (_, hour) => ({ hour, count: total[String(hour)] || 0 }))
+}
+
 export function recordEvent(type: string, sessionId: string, opts?: { visitorId?: string; postId?: number; clickType?: ClickType; source?: string; query?: string; label?: string }) {
   const data = load()
   const today = kstToday()
@@ -285,6 +296,12 @@ export function recordEvent(type: string, sessionId: string, opts?: { visitorId?
       if (!day.sources) day.sources = {}
       day.sources[opts.source] = (day.sources[opts.source] || 0) + 1
     }
+    // 시간대별 방문 — 몇 시에 사람이 몰리는지. 방문(day.visitors)과 같은 기준으로
+    // 세션당 하루 한 번만 센다(같은 시간대에 새로고침을 여러 번 해도 한 번).
+    if (!data.hourly) data.hourly = {}
+    if (!data.hourly[today]) data.hourly[today] = {}
+    const hour = String(kstHour())
+    data.hourly[today][hour] = (data.hourly[today][hour] || 0) + 1
   }
 
   // 신규/재방문 판별 — sessionStorage 기반 sessionId는 탭마다 새로 생기므로, 브라우저에

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { recordEvent, getSummary, getTopPosts, getTopSharedPosts, getSourceCounts, getClickCounts, getClickBreakdown, getPostSourceCounts, getRecentSessions, getTopSearchQueries, getYesterdayTodaySourceComparison, getTopMenuClicks, getScrollDepthSummary, classifySource, CLICK_TYPES } from '@/lib/analytics'
+import { recordEvent, getSummary, getTopPosts, getTopSharedPosts, getSourceCounts, getClickCounts, getClickBreakdown, getPostSourceCounts, getRecentSessions, getTopSearchQueries, getYesterdayTodaySourceComparison, getTopMenuClicks, getScrollDepthSummary, getHourlyVisits, classifySource, CLICK_TYPES } from '@/lib/analytics'
 import { kstToday, kstDateOffset } from '@/lib/kst'
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/
@@ -78,6 +78,7 @@ export async function GET(request: NextRequest) {
   const topSearchQueries = getTopSearchQueries(from, to)
   const topMenuClicks = getTopMenuClicks(from, to)
   const scrollDepth = getScrollDepthSummary(from, to)
+  const hourlyVisits = getHourlyVisits(from, to)
   // 네이버 유입이 갑자기 줄었을 때 "어느 상품 페이지에서 줄었는지" 바로 찾기 위한 표
   const naverPageComparison = getYesterdayTodaySourceComparison('naver_search', 10)
     .map(r => {
@@ -116,7 +117,7 @@ export async function GET(request: NextRequest) {
   )
   const affiliateDetailViews7 = sumIds(getClickCounts(7, ['detail']), affiliateExposedIds)
   return NextResponse.json({
-    summary, topPosts, topSharedPosts, sources, topSearchQueries, topMenuClicks, scrollDepth, naverPageComparison, detailViews, clickBreakdown, postSources, recentSessions, from, to,
+    summary, topPosts, topSharedPosts, sources, topSearchQueries, topMenuClicks, scrollDepth, hourlyVisits, naverPageComparison, detailViews, clickBreakdown, postSources, recentSessions, from, to,
     detailViews7, groupbuyClicks7, moneyClicks7, affiliateDetailViews7,
   })
 }
